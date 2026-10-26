@@ -52,45 +52,58 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-        #  cache: 'npm'
+       #   cache: 'npm'
 
       - name: Create Snapshot Backup Directory
         run: mkdir -p mysql-backup
 
-      # 2. Restore MySQL Snapshot from Previous Workflow Run
+      # 2. Restore MySQL Snapshot from Previous Workflow Run (using v2 key to bypass legacy system-schema dumps)
       - name: Restore Persistent MySQL Database Cache
         id: restore-mysql-cache
         uses: actions/cache/restore@v4
         with:
           path: mysql-backup
-          key: mysql-snapshot-${{ runner.os }}-${{ github.run_id }}
+          key: mysql-v2-snapshot-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
-            mysql-snapshot-${{ runner.os }}-
-            mysql-snapshot-
+            mysql-v2-snapshot-${{ runner.os }}-
+            mysql-v2-snapshot-
 
       # 3. Restore Database from Cached Snapshot OR Initialize Schema
       - name: Initialize or Restore MySQL Database
+        env:
+          MYSQL_PWD: root_password_123
         run: |
           echo "Waiting for MySQL container readiness..."
-          until mysqladmin ping -h 127.0.0.1 -u root -proot_password_123 --silent; do
+          until mysqladmin ping -h 127.0.0.1 -u root --silent; do
             sleep 1
           done
           echo "MySQL service is healthy and online."
 
+          RESTORE_SUCCESS=0
           if [ -f "mysql-backup/snapshot.sql.gz" ]; then
             echo "=========================================================="
             echo "Found existing cached MySQL snapshot! Restoring data..."
             echo "=========================================================="
-            gunzip -c mysql-backup/snapshot.sql.gz | mysql -h 127.0.0.1 -u root -proot_password_123
-            echo "Database successfully restored from cache!"
-            if [ -f "mysql-backup/snapshot-meta.json" ]; then
-              cat mysql-backup/snapshot-meta.json
+            
+            # Decompress and import application database
+            if gunzip -c mysql-backup/snapshot.sql.gz | mysql -h 127.0.0.1 -u root 2>restore_err.log; then
+              echo "Database successfully restored from cache!"
+              RESTORE_SUCCESS=1
+              if [ -f "mysql-backup/snapshot-meta.json" ]; then
+                cat mysql-backup/snapshot-meta.json
+              fi
+            else
+              echo "Warning: Snapshot restoration returned an error (likely old format):"
+              cat restore_err.log
+              echo "Falling back to fresh schema initialization to ensure zero downtime..."
             fi
-          else
+          fi
+
+          if [ $RESTORE_SUCCESS -eq 0 ]; then
             echo "=========================================================="
-            echo "No cached snapshot found. Initializing fresh schema & seed..."
+            echo "Initializing fresh schema & seed data from db/schema.sql..."
             echo "=========================================================="
-            mysql -h 127.0.0.1 -u root -proot_password_123 omniserve_db < db/schema.sql
+            mysql -h 127.0.0.1 -u root omniserve_db < db/schema.sql
             echo "Fresh schema and sample data initialized."
           fi
 
@@ -206,9 +219,12 @@ jobs:
       # =========================================================================
       # 8. CRITICAL: GUARANTEED SNAPSHOT CAPTURE ON CANCEL, TIMEOUT, FAIL, OR SUCCESS
       # Using 'if: always()' ensures this step executes even when cancelled or timed out!
+      # We dump specifically '--databases omniserve_db' to avoid ERROR 3552 on system 'mysql' schema!
       # =========================================================================
       - name: Safely Capture MySQL Full Snapshot
         if: always()
+        env:
+          MYSQL_PWD: root_password_123
         run: |
           echo "=========================================================="
           echo "Initiating Guaranteed Snapshot Capture (Zero-Data-Loss)..."
@@ -216,18 +232,17 @@ jobs:
           mkdir -p mysql-backup
 
           # Check if MySQL is accessible
-          if mysqladmin ping -h 127.0.0.1 -u root -proot_password_123 --silent; then
-            echo "Taking comprehensive mysqldump with all tables, routines & triggers..."
+          if mysqladmin ping -h 127.0.0.1 -u root --silent; then
+            echo "Taking mysqldump for application database 'omniserve_db'..."
             
-            # Dump all databases with single transaction and gzip compression
-            mysqldump -h 127.0.0.1 -u root -proot_password_123 \
-              --all-databases \
+            # Dump ONLY application database 'omniserve_db' with all routines, triggers, events
+            mysqldump -h 127.0.0.1 -u root \
+              --databases omniserve_db \
               --single-transaction \
               --routines \
               --triggers \
               --events \
               --add-drop-table \
-              --add-drop-database \
               --complete-insert \
               | gzip -9 > mysql-backup/snapshot.sql.gz
 
@@ -243,6 +258,7 @@ jobs:
             "run_id": "${{ github.run_id }}",
             "run_attempt": "${{ github.run_attempt }}",
             "workflow_status": "${{ job.status }}",
+            "database": "omniserve_db",
             "size_bytes": $FILESIZE,
             "sha256": "$CHECKSUM"
           }
@@ -261,7 +277,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: mysql-backup
-          key: mysql-snapshot-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: mysql-v2-snapshot-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       # 10. Upload Snapshot as Workflow Artifact (90-Day Retention)
       - name: Upload Snapshot as Redundant Workflow Artifact

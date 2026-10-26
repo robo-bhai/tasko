@@ -18,4 +18,3 @@ View your app in AI Studio: https://ai.studio/apps/57a34a31-4e02-4160-a3fe-27190
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
-# tasko
