@@ -1,0 +1,6 @@
+{
+  "name": "OmniServe On-Demand Super App",
+  "description": "Unified on-demand delivery, home services, and cargo transport booking platform with Customer, Service Provider, and Admin portals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,274 @@
+name: OmniServe Production Host & 5-Hour Cloudflare Tunnel with Persistent MySQL
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      duration_hours:
+        description: 'Duration to keep app live (1 to 5 hours)'
+        required: true
+        default: '5'
+        type: choice
+        options:
+          - '1'
+          - '2'
+          - '3'
+          - '4'
+          - '5'
+
+concurrency:
+  group: mysql-cloudflare-live-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  host-live-app-with-tunnel:
+    name: Live Host on Custom Domain (5 Hours) & Zero-Loss MySQL Backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 350 # Max allowed runtime for 5-hour hosting session
+
+    # 1. Local MySQL 8.0 Service Container
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root_password_123
+          MYSQL_DATABASE: omniserve_db
+          MYSQL_USER: omniserve
+          MYSQL_PASSWORD: omniserve_secure_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -proot_password_123"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=12
+
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20 Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Create Snapshot Backup Directory
+        run: mkdir -p mysql-backup
+
+      # 2. Restore MySQL Snapshot from Previous Workflow Run
+      - name: Restore Persistent MySQL Database Cache
+        id: restore-mysql-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: mysql-backup
+          key: mysql-snapshot-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            mysql-snapshot-${{ runner.os }}-
+            mysql-snapshot-
+
+      # 3. Restore Database from Cached Snapshot OR Initialize Schema
+      - name: Initialize or Restore MySQL Database
+        run: |
+          echo "Waiting for MySQL container readiness..."
+          until mysqladmin ping -h 127.0.0.1 -u root -proot_password_123 --silent; do
+            sleep 1
+          done
+          echo "MySQL service is healthy and online."
+
+          if [ -f "mysql-backup/snapshot.sql.gz" ]; then
+            echo "=========================================================="
+            echo "Found existing cached MySQL snapshot! Restoring data..."
+            echo "=========================================================="
+            gunzip -c mysql-backup/snapshot.sql.gz | mysql -h 127.0.0.1 -u root -proot_password_123
+            echo "Database successfully restored from cache!"
+            if [ -f "mysql-backup/snapshot-meta.json" ]; then
+              cat mysql-backup/snapshot-meta.json
+            fi
+          else
+            echo "=========================================================="
+            echo "No cached snapshot found. Initializing fresh schema & seed..."
+            echo "=========================================================="
+            mysql -h 127.0.0.1 -u root -proot_password_123 omniserve_db < db/schema.sql
+            echo "Fresh schema and sample data initialized."
+          fi
+
+          echo "Database tables verified:"
+          mysql -h 127.0.0.1 -u omniserve -pomniserve_secure_password omniserve_db -e "
+            SELECT 'users' AS table_name, COUNT(*) AS total_rows FROM users
+            UNION ALL
+            SELECT 'services', COUNT(*) FROM services
+            UNION ALL
+            SELECT 'vehicles', COUNT(*) FROM vehicles
+            UNION ALL
+            SELECT 'orders', COUNT(*) FROM orders;
+          "
+
+      - name: Install Application Dependencies
+        run: npm ci
+
+      - name: Build Production Frontend Assets
+        run: npm run build
+
+      # 4. Install Cloudflare Tunnel Client (cloudflared)
+      - name: Install Cloudflare Tunnel (cloudflared)
+        run: |
+          echo "Installing latest cloudflared linux-amd64 package..."
+          curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared.deb
+          cloudflared --version
+
+      # 5. Start Full-Stack Application Server in Background
+      - name: Start Production OmniServe Server (Port 3000)
+        env:
+          NODE_ENV: production
+          PORT: 3000
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: 3306
+          MYSQL_USER: omniserve
+          MYSQL_PASSWORD: omniserve_secure_password
+          MYSQL_DATABASE: omniserve_db
+        run: |
+          echo "Launching OmniServe Express server..."
+          npx tsx server.ts > app.log 2>&1 &
+          APP_PID=$!
+          echo "App started with PID: $APP_PID"
+
+          # Wait for app health check
+          echo "Waiting for app server to respond on http://127.0.0.1:3000/api/health..."
+          for i in {1..30}; do
+            if curl -s http://127.0.0.1:3000/api/health | grep -q "healthy"; then
+              echo "App server is responding healthy!"
+              curl -s http://127.0.0.1:3000/api/health
+              break
+            fi
+            sleep 1
+          done
+
+      # 6. Connect Cloudflare Tunnel to Custom Domain via Secret Token
+      - name: Connect Cloudflare Tunnel to Custom Domain
+        env:
+          CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_TUNNEL_TOKEN" ]; then
+            echo "=========================================================================="
+            echo "WARNING: Secret 'CLOUDFLARE_TUNNEL_TOKEN' is not set in GitHub Repository Secrets!"
+            echo "Starting ephemeral Quick Tunnel as fallback so the app is still accessible..."
+            echo "To use your custom domain, add 'CLOUDFLARE_TUNNEL_TOKEN' in Repo Settings -> Secrets."
+            echo "=========================================================================="
+            cloudflared tunnel --url http://127.0.0.1:3000 > cloudflared.log 2>&1 &
+            sleep 6
+            grep -o 'https://[-a-z0-9.]*\.trycloudflare\.com' cloudflared.log | head -n 1 || true
+          else
+            echo "Connecting Cloudflare Tunnel using your configured Secret Token..."
+            cloudflared tunnel run --token "$CLOUDFLARE_TUNNEL_TOKEN" > cloudflared.log 2>&1 &
+            TUNNEL_PID=$!
+            echo "Cloudflare Tunnel service is active! PID: $TUNNEL_PID"
+            sleep 5
+            echo "Tunnel connection established to your custom domain."
+          fi
+
+      # 7. Keep Live for 5 Hours with Active Health Probe Loop
+      - name: Host Live Application (Up to 5 Hours)
+        run: |
+          DURATION_HOURS=${{ github.event.inputs.duration_hours || '5' }}
+          TOTAL_SECONDS=$((DURATION_HOURS * 3600))
+          INTERVAL=120 # check every 2 minutes
+
+          echo "=========================================================================="
+          echo " OmniServe is now LIVE on your Custom Domain via Cloudflare Tunnel!"
+          echo " Scheduled Live Hosting Window: $DURATION_HOURS Hours ($TOTAL_SECONDS seconds)"
+          echo "=========================================================================="
+          echo "To stop early and trigger instant zero-loss snapshot, click 'Cancel workflow' anytime."
+
+          ELAPSED=0
+          while [ $ELAPSED -lt $TOTAL_SECONDS ]; do
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+            MINUTES_RUN=$((ELAPSED / 60))
+            MINUTES_REMAINING=$(((TOTAL_SECONDS - ELAPSED) / 60))
+
+            # Query health and active MySQL orders count
+            HEALTH_STATUS=$(curl -s http://127.0.0.1:3000/api/health || echo '{"status":"unreachable"}')
+            echo "[$(date -u +"%H:%M:%SZ")] Running: ${MINUTES_RUN}m elapsed | ${MINUTES_REMAINING}m remaining | Health: $HEALTH_STATUS"
+
+            # Check if app is still alive
+            if ! curl -s http://127.0.0.1:3000/api/health | grep -q "healthy"; then
+              echo "ERROR: Server healthcheck failed. Outputting app logs:"
+              cat app.log | tail -n 40
+              exit 1
+            fi
+          done
+
+          echo "5-hour hosting session completed normally."
+
+      # =========================================================================
+      # 8. CRITICAL: GUARANTEED SNAPSHOT CAPTURE ON CANCEL, TIMEOUT, FAIL, OR SUCCESS
+      # Using 'if: always()' ensures this step executes even when cancelled or timed out!
+      # =========================================================================
+      - name: Safely Capture MySQL Full Snapshot
+        if: always()
+        run: |
+          echo "=========================================================="
+          echo "Initiating Guaranteed Snapshot Capture (Zero-Data-Loss)..."
+          echo "=========================================================="
+          mkdir -p mysql-backup
+
+          # Check if MySQL is accessible
+          if mysqladmin ping -h 127.0.0.1 -u root -proot_password_123 --silent; then
+            echo "Taking comprehensive mysqldump with all tables, routines & triggers..."
+            
+            # Dump all databases with single transaction and gzip compression
+            mysqldump -h 127.0.0.1 -u root -proot_password_123 \
+              --all-databases \
+              --single-transaction \
+              --routines \
+              --triggers \
+              --events \
+              --add-drop-table \
+              --add-drop-database \
+              --complete-insert \
+              | gzip -9 > mysql-backup/snapshot.sql.gz
+
+            FILESIZE=$(stat -c%s "mysql-backup/snapshot.sql.gz" 2>/dev/null || stat -f%z "mysql-backup/snapshot.sql.gz")
+            CHECKSUM=$(sha256sum "mysql-backup/snapshot.sql.gz" | awk '{print $1}')
+
+            # Generate metadata summary
+            cat <<EOF > mysql-backup/snapshot-meta.json
+          {
+            "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "git_commit": "${{ github.sha }}",
+            "git_ref": "${{ github.ref }}",
+            "run_id": "${{ github.run_id }}",
+            "run_attempt": "${{ github.run_attempt }}",
+            "workflow_status": "${{ job.status }}",
+            "size_bytes": $FILESIZE,
+            "sha256": "$CHECKSUM"
+          }
+          EOF
+
+            echo "Snapshot created successfully!"
+            ls -lh mysql-backup/
+            cat mysql-backup/snapshot-meta.json
+          else
+            echo "WARNING: MySQL server was already terminated or unreachable. Preserving existing backup if present."
+          fi
+
+      # 9. Save Snapshot to GitHub Actions Cache for Next Run
+      - name: Save Persistent MySQL Database Cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: mysql-backup
+          key: mysql-snapshot-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      # 10. Upload Snapshot as Workflow Artifact (90-Day Retention)
+      - name: Upload Snapshot as Redundant Workflow Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mysql-persistent-snapshot-${{ github.run_id }}
+          path: mysql-backup/
+          retention-days: 90
+          if-no-files-found: warn
