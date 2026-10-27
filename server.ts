@@ -20,16 +20,16 @@ async function syncSuperAdminFromEnv() {
     if (existing && existing.length > 0) {
       const existingId = (existing[0] as any).id;
       await query('UPDATE users SET email = ?, password = ? WHERE id = ?', [adminEmail, adminPassword, existingId]);
-      console.log(`[OmniServe] Verified & synced Super Admin credentials in MySQL for: ${adminEmail}`);
+      console.log(`[Khanewal Connect] Verified & synced Super Admin credentials in MySQL for: ${adminEmail}`);
     } else {
       await query(`
         INSERT INTO users (id, name, email, phone, password, role, avatar, address, wallet_balance, status)
-        VALUES (?, 'Super Administrator', ?, '+92 300 0009988', ?, 'admin', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80', 'Headquarters, Blue Area, Islamabad', 150000.00, 'active')
+        VALUES (?, 'Super Administrator', ?, '+92 300 0009988', ?, 'admin', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80', 'Main Complex, Civil Lines, Khanewal', 150000.00, 'active')
       `, ['usr-admin-1', adminEmail, adminPassword]);
-      console.log(`[OmniServe] Provisioned initial Super Admin in MySQL for: ${adminEmail}`);
+      console.log(`[Khanewal Connect] Provisioned initial Super Admin in MySQL for: ${adminEmail}`);
     }
   } catch (err: any) {
-    console.warn('[OmniServe] Note syncing admin credentials:', err.message);
+    console.warn('[Khanewal Connect] Note syncing admin credentials:', err.message);
   }
 }
 

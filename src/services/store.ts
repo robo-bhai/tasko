@@ -32,7 +32,7 @@ export const INITIAL_USERS: User[] = [
     password: DEFAULT_ADMIN_PASSWORD,
     role: 'admin',
     avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-    address: 'Corporate Headquarters, Blue Area, Islamabad',
+    address: 'Main Complex, Civil Lines, Khanewal',
     walletBalance: 150000,
     status: 'active',
     joinedDate: '2024-11-01'
@@ -208,7 +208,7 @@ export const Store = {
         password: DEFAULT_ADMIN_PASSWORD,
         role: 'admin',
         avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-        address: 'Corporate Headquarters, Islamabad',
+        address: 'Main Complex, Civil Lines, Khanewal',
         walletBalance: 150000,
         status: 'active',
         joinedDate: '2024-11-01'

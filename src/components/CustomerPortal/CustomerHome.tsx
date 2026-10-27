@@ -23,8 +23,11 @@ import {
   Briefcase,
   CheckCircle2,
   Headphones,
-  PhoneCall
+  PhoneCall,
+  Download,
+  Building
 } from 'lucide-react';
+import { PWAInstallButton } from '../PWAInstallButton';
 
 interface CustomerHomeProps {
   onOpenOrderModal: (category: 'custom_delivery' | 'home_services' | 'transport_cargo', preselectedId?: string) => void;
@@ -141,41 +144,47 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
               {t.heroSubtitle}
             </p>
 
-            <div className="flex flex-wrap items-center gap-3 pt-2">
+            {/* Action Buttons + Install PWA (Verified by Play Store) */}
+            <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 pt-2">
               <button
                 onClick={() => onOpenOrderModal('custom_delivery')}
-                className="px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs md:text-sm font-bold rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                className="px-4 sm:px-5 py-2.5 sm:py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer"
               >
                 <ShoppingBag className="w-4 h-4" />
                 <span>{t.catDeliveryBtn}</span>
               </button>
               <button
                 onClick={() => onOpenOrderModal('home_services')}
-                className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs md:text-sm font-semibold rounded-xl transition-all border border-slate-700 flex items-center gap-2 cursor-pointer"
+                className="px-4 sm:px-5 py-2.5 sm:py-3 bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs sm:text-sm font-semibold rounded-xl transition-all border border-slate-700 flex items-center gap-2 cursor-pointer"
               >
                 <Wrench className="w-4 h-4 text-emerald-400" />
                 <span>{t.catServicesBtn}</span>
               </button>
               <button
                 onClick={() => onOpenOrderModal('transport_cargo')}
-                className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs md:text-sm font-semibold rounded-xl transition-all border border-slate-700 flex items-center gap-2 cursor-pointer"
+                className="px-4 sm:px-5 py-2.5 sm:py-3 bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs sm:text-sm font-semibold rounded-xl transition-all border border-slate-700 flex items-center gap-2 cursor-pointer"
               >
                 <Truck className="w-4 h-4 text-amber-400" />
                 <span>{t.catTransportBtn}</span>
               </button>
+
+              {/* Install PWA Button with Play Store Trust Badge */}
+              <div className="pt-1 sm:pt-0">
+                <PWAInstallButton isUrdu={isUrdu} variant="hero" />
+              </div>
             </div>
 
-            <div className="pt-2 flex flex-wrap items-center gap-6 text-xs text-slate-400 border-t border-slate-800/80">
+            <div className="pt-2 flex flex-wrap items-center gap-4 sm:gap-6 text-xs text-slate-400 border-t border-slate-800/80">
               <div className="flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>{isUrdu ? '100% تصدیق شدہ ورکرز' : '100% Verified Providers'}</span>
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{isUrdu ? '100% تصدیق شدہ خانیوال ورکرز' : '100% Verified Local Pros'}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-blue-400" />
-                <span>{isUrdu ? 'فوری اور بروقت ترسیل' : 'Under 45-Min Dispatch'}</span>
+                <Clock className="w-4 h-4 text-blue-400 shrink-0" />
+                <span>{isUrdu ? 'فوری اور بروقت ترسیل' : 'Under 35-Min Dispatch'}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <BadgePercent className="w-4 h-4 text-amber-400" />
+                <BadgePercent className="w-4 h-4 text-amber-400 shrink-0" />
                 <span>{isUrdu ? 'کیش آن ڈیلیوری اور جاز کیش/ایزی پیسہ' : 'COD & JazzCash / EasyPaisa'}</span>
               </div>
             </div>
@@ -193,6 +202,54 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
             />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent lg:bg-gradient-to-r lg:from-slate-900 lg:to-transparent" />
           </div>
+        </div>
+      </section>
+
+      {/* Khanewal Active Coverage Areas Strip */}
+      <section className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <MapPin className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-900">
+                {isUrdu ? 'خانیوال کوریج زون (Khanewal Operational Areas)' : 'Current Active Service Areas in Khanewal'}
+              </h4>
+              <p className="text-[11px] text-slate-500">
+                {isUrdu ? 'صرف خانیوال سٹی اور آس پاس کے علاقوں میں فوری ڈیلیوری اور ہوم سروسز' : 'Exclusively available across Khanewal city neighborhoods & nearby tehsils'}
+              </p>
+            </div>
+          </div>
+
+          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full w-fit">
+            ● {isUrdu ? '100% فعال لوکل رائیڈرز و ٹیکنیشنز' : 'Active Local Khanewal Fleet'}
+          </span>
+        </div>
+
+        <div className="pt-3 flex flex-wrap gap-2 text-xs">
+          {[
+            { ur: 'پیپلز کالونی', en: 'Peoples Colony' },
+            { ur: 'سول لائنز', en: 'Civil Lines' },
+            { ur: 'ریلوے روڈ / اسٹیشن', en: 'Railway Road' },
+            { ur: 'طارق آباد', en: 'Tariqabad' },
+            { ur: 'الحرم سٹی', en: 'Al-Haram City' },
+            { ur: 'بلاک 1 تا 15', en: 'Block 1 - 15' },
+            { ur: 'کینٹ / ماڈل ٹاؤن', en: 'Cantt & Model Town' },
+            { ur: 'پرانا خانیوال', en: 'Old Khanewal' },
+            { ur: 'کبیروالہ لنک روڈ', en: 'Kabirwala Road' },
+            { ur: 'میاں چنوں بائی پاس', en: 'Mian Channu Bypass' },
+            { ur: 'جہانیاں روڈ', en: 'Jahanian Road' },
+            { ur: 'کچا کھوہ کوریڈور', en: 'Kacha Khoh' }
+          ].map((loc, idx) => (
+            <span
+              key={idx}
+              className="px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-medium hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 transition-colors flex items-center gap-1"
+            >
+              <MapPin className="w-3 h-3 text-blue-500 shrink-0" />
+              <span>{isUrdu ? loc.ur : loc.en}</span>
+            </span>
+          ))}
         </div>
       </section>
 

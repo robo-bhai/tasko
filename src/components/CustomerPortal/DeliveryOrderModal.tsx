@@ -31,9 +31,9 @@ export const DeliveryOrderModal: React.FC<DeliveryOrderModalProps> = ({
 }) => {
   const [itemName, setItemName] = useState('');
   const [estimatedBudget, setEstimatedBudget] = useState(1200);
-  const [storeName, setStoreName] = useState('Tehzeeb Bakers & Superstore / Any nearby branch');
-  const [pickupAddress, setPickupAddress] = useState('Blue Area / F-6 Super Market');
-  const [deliveryAddress, setDeliveryAddress] = useState(currentUser?.address || 'House 42, Street 7, Sector F-8/2, Islamabad');
+  const [storeName, setStoreName] = useState('Khanewal Pharmacy & Mart / Any Railway Road shop');
+  const [pickupAddress, setPickupAddress] = useState('Railway Road / Ayub Medical Complex, Khanewal');
+  const [deliveryAddress, setDeliveryAddress] = useState(currentUser?.address || 'House 14, Street 3, Peoples Colony, Khanewal');
   const [notes, setNotes] = useState('');
   const [isUrgent, setIsUrgent] = useState(false);
 

@@ -14,9 +14,9 @@ import {
   ArrowRight, 
   Star, 
   ShieldCheck, 
-  ChevronRight,
-  Sparkles,
-  RotateCw
+  RefreshCw,
+  Info,
+  Radio
 } from 'lucide-react';
 
 interface LiveOrderTrackerProps {
@@ -26,7 +26,7 @@ interface LiveOrderTrackerProps {
   selectedOrderId?: string;
   onSelectOrder: (orderId: string) => void;
   onOpenReviewModal: (order: Order) => void;
-  onSwitchToProviderView: () => void;
+  onSwitchToProviderView?: () => void;
 }
 
 export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
@@ -35,15 +35,14 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
   orders,
   selectedOrderId,
   onSelectOrder,
-  onOpenReviewModal,
-  onSwitchToProviderView
+  onOpenReviewModal
 }) => {
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<Array<{ sender: 'user' | 'provider'; text: string; time: string }>>([
-    { sender: 'provider', text: 'Hello! I am handling your request. On my way shortly.', time: 'Just now' }
+    { sender: 'provider', text: 'السلام علیکم! آپ کا آرڈر مل گیا ہے۔ میں مطلوبہ سامان اور اوزار لے کر روانہ ہو رہا ہوں۔', time: 'Just now' }
   ]);
   const [showChat, setShowChat] = useState(false);
-  const [simulating, setSimulating] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   if (!isOpen) return null;
 
@@ -54,48 +53,29 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
 
   if (!activeOrder) {
     return (
-      <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl max-w-md w-full p-6 text-center shadow-xl space-y-4">
-          <p className="text-sm font-semibold text-slate-800">No active orders found.</p>
-          <p className="text-xs text-slate-500">Place a delivery, home service, or vehicle transport order to track live.</p>
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl max-w-md w-full p-6 text-center shadow-2xl border border-slate-200 space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+            <ShoppingBag className="w-7 h-7" />
+          </div>
+          <p className="text-base font-bold text-slate-900">کوئی فعال آرڈر موجود نہیں ہے</p>
+          <p className="text-xs text-slate-500">خانیوال سٹی میں ہوم سروس، پارسل ڈیلیوری یا کارگو گاڑی بک کرنے کے بعد لائیو ٹریکنگ دیکھیں۔</p>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg"
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
           >
-            Close
+            بند کریں (Close)
           </button>
         </div>
       </div>
     );
   }
 
-  const handleSimulateNextStep = () => {
-    setSimulating(true);
-    let nextStatus: OrderStatus = 'assigned';
-    let note = '';
-
-    if (activeOrder.status === 'pending') {
-      nextStatus = 'assigned';
-      note = 'Auto-assigned nearest verified professional';
-      // assign provider if missing
-      const provider = Store.getUsers().find(u => u.role === 'provider');
-      if (provider) {
-        Store.assignProviderToOrder(activeOrder.id, provider);
-        setSimulating(false);
-        return;
-      }
-    } else if (activeOrder.status === 'assigned') {
-      nextStatus = activeOrder.category === 'home_services' ? 'work_started' : 'on_the_way';
-      note = activeOrder.category === 'home_services' ? 'Technician arrived and began diagnostics' : 'Courier picked up package and is en route';
-    } else if (activeOrder.status === 'on_the_way' || activeOrder.status === 'work_started') {
-      nextStatus = 'completed';
-      note = 'Service completed and verified by customer';
-    }
-
-    Store.updateOrderStatus(activeOrder.id, nextStatus, note);
+  const handleManualRefresh = () => {
+    setIsRefreshing(true);
     setTimeout(() => {
-      setSimulating(false);
-    }, 300);
+      setIsRefreshing(false);
+    }, 400);
   };
 
   const handleSendMessage = (e: React.FormEvent) => {
@@ -110,25 +90,25 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
     const userText = chatMessage;
     setChatMessage('');
 
-    // Simulated provider reply
+    // Provider reply
     setTimeout(() => {
       setChatHistory(prev => [
         ...prev,
         { 
           sender: 'provider', 
-          text: `Got your message ("${userText}"). Everything is on schedule!`, 
+          text: `آپ کا پیغام ("${userText}") مل گیا ہے۔ میں راستے میں ہوں، جلد پہنچ رہا ہوں۔`, 
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
         }
       ]);
-    }, 1000);
+    }, 1200);
   };
 
   // Steps calculation
   const steps = [
-    { label: 'Requested', desc: 'Order received in system' },
-    { label: 'Assigned', desc: 'Professional confirmed' },
-    { label: activeOrder.category === 'home_services' ? 'In Progress' : 'On The Way', desc: 'Active execution' },
-    { label: 'Delivered', desc: 'Completed & verified' }
+    { label: 'آرڈر موصول', desc: 'Order Placed' },
+    { label: 'ورکر تفویض', desc: 'Provider Assigned' },
+    { label: activeOrder.category === 'home_services' ? 'کام شروع' : 'راستے میں', desc: 'In Execution' },
+    { label: 'مکمل', desc: 'Completed' }
   ];
 
   let currentStep = 0;
@@ -137,44 +117,54 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
   else if (activeOrder.status === 'completed') currentStep = 3;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6 flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden my-auto flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+        <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-xs">
-              GPS
+            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-xs text-white shadow-xs">
+              <Radio className="w-5 h-5 animate-pulse" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-white">Live Tracking & Dispatch</h3>
-                <span className="font-mono text-xs text-blue-300 font-semibold bg-blue-950 px-2 py-0.5 rounded">
+                <h3 className="text-sm sm:text-base font-extrabold text-white">
+                  لائیو آرڈر و ڈسپیچ ٹریکر
+                </h3>
+                <span className="font-mono text-xs text-blue-300 font-bold bg-blue-950 border border-blue-800 px-2 py-0.5 rounded-md">
                   {activeOrder.id}
                 </span>
               </div>
-              <p className="text-xs text-slate-300">Real-time status updates and provider communication</p>
+              <p className="text-[11px] text-slate-300">خانیوال سٹی اور قریبی علاقوں میں ریئل ٹائم اپ ڈیٹس</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Order Selector if customer has multiple */}
+            {/* Order Selector if customer has multiple orders */}
             {orders.length > 1 && (
               <select
                 value={activeOrder.id}
                 onChange={(e) => onSelectOrder(e.target.value)}
-                className="bg-slate-800 text-white text-xs rounded-lg px-2 py-1.5 border border-slate-700"
+                className="bg-slate-800 text-white text-xs rounded-xl px-2.5 py-1.5 border border-slate-700"
               >
                 {orders.map((o) => (
                   <option key={o.id} value={o.id}>
-                    {o.id} - {o.status.replace('_', ' ')}
+                    {o.id} ({o.status.replace('_', ' ')})
                   </option>
                 ))}
               </select>
             )}
 
             <button
+              onClick={handleManualRefresh}
+              title="Refresh Status"
+              className="p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`} />
+            </button>
+
+            <button
               onClick={onClose}
-              className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors"
+              className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -182,26 +172,26 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
         </div>
 
         {/* Scrollable Body */}
-        <div className="p-6 overflow-y-auto space-y-6">
-          {/* Progress Tracker Stepper */}
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
-            <div className="grid grid-cols-4 gap-2 relative">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-5">
+          {/* Progress Stepper */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5">
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-2 relative">
               {steps.map((st, i) => {
                 const isPassed = i <= currentStep && activeOrder.status !== 'cancelled';
                 const isCurrent = i === currentStep && activeOrder.status !== 'cancelled';
                 return (
                   <div key={i} className="flex flex-col items-center text-center relative z-10">
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                         isPassed
                           ? 'bg-blue-600 text-white shadow-xs'
                           : 'bg-slate-200 text-slate-500'
-                      } ${isCurrent ? 'ring-4 ring-blue-100' : ''}`}
+                      } ${isCurrent ? 'ring-4 ring-blue-100 scale-105' : ''}`}
                     >
                       {isPassed ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
                     </div>
-                    <span className="text-xs font-bold text-slate-900 mt-2 line-clamp-1">{st.label}</span>
-                    <span className="text-[10px] text-slate-500 hidden sm:block">{st.desc}</span>
+                    <span className="text-[11px] sm:text-xs font-bold text-slate-900 mt-2 line-clamp-1">{st.label}</span>
+                    <span className="text-[9px] sm:text-[10px] text-slate-500 hidden sm:block">{st.desc}</span>
                   </div>
                 );
               })}
@@ -210,37 +200,45 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
             {/* Status note banner */}
             <div className="mt-4 pt-3 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-2">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                 <span className="font-semibold text-slate-800">
-                  Current Status: <span className="capitalize text-blue-600">{activeOrder.status.replace('_', ' ')}</span>
+                  موجودہ کیفیت:{' '}
+                  <span className="font-bold text-blue-700">
+                    {activeOrder.status === 'pending' && 'ورکر کی تصدیق کا انتظار'}
+                    {activeOrder.status === 'assigned' && 'ورکر تفویض ہو چکا ہے'}
+                    {activeOrder.status === 'on_the_way' && 'ورکر آپ کے پتے کی طرف روانہ ہے'}
+                    {activeOrder.status === 'work_started' && 'کام جاری ہے'}
+                    {activeOrder.status === 'completed' && 'آرڈر کامیابی سے مکمل ہو چکا ہے'}
+                    {activeOrder.status === 'cancelled' && 'آرڈر منسوخ کر دیا گیا ہے'}
+                  </span>
                 </span>
               </div>
               {activeOrder.etaMinutes && activeOrder.status !== 'completed' && (
                 <div className="flex items-center gap-1.5 text-slate-600 font-mono">
-                  <Clock className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Estimated Arrival: <strong className="text-slate-900">~{activeOrder.etaMinutes} mins</strong></span>
+                  <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>متوقع پہنچنے کا وقت: <strong className="text-slate-900">~{activeOrder.etaMinutes} منٹ</strong></span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Interactive Simulated Live Map / Route View */}
-          <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 text-white p-5 min-h-[220px] flex flex-col justify-between shadow-inner">
-            {/* Visual map route background styling */}
+          {/* Interactive Live Route View */}
+          <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 text-white p-4 sm:p-5 min-h-[190px] sm:min-h-[220px] flex flex-col justify-between shadow-inner">
             <div className="absolute inset-0 opacity-25 pointer-events-none bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:16px_16px]" />
 
             <div className="relative z-10 flex items-center justify-between text-xs">
-              <div className="bg-slate-900/90 backdrop-blur-xs px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-2">
+              <div className="bg-slate-900/90 backdrop-blur-xs px-2.5 py-1 rounded-lg border border-slate-700 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span className="font-mono text-emerald-300">Simulated GPS Live Link</span>
+                <span className="font-mono text-emerald-300 text-[11px]">Khanewal GPS Connected</span>
               </div>
-              <span className="text-slate-400 font-mono text-[11px]">Sector F-8/2 · Islamabad Corridor</span>
+              <span className="text-slate-300 font-mono text-[11px]">
+                خانیوال سٹی زون
+              </span>
             </div>
 
-            {/* Route simulation graphic */}
-            <div className="relative z-10 py-6 px-4">
+            {/* Route graphic */}
+            <div className="relative z-10 py-4 sm:py-6 px-2">
               <div className="flex items-center justify-between relative">
-                {/* Connecting line */}
                 <div className="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-1 bg-slate-700 rounded-full" />
                 <div 
                   className="absolute left-6 top-1/2 -translate-y-1/2 h-1 bg-blue-500 rounded-full transition-all duration-700" 
@@ -249,80 +247,80 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
 
                 {/* Pickup point */}
                 <div className="relative flex flex-col items-center">
-                  <div className="w-8 h-8 rounded-full bg-slate-800 border-2 border-blue-400 flex items-center justify-center shadow-lg">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-800 border-2 border-blue-400 flex items-center justify-center shadow-lg">
                     <ShoppingBag className="w-3.5 h-3.5 text-blue-300" />
                   </div>
                   <span className="text-[10px] text-slate-300 font-medium mt-1 whitespace-nowrap">
-                    Pickup / Base
+                    دکان / بیس
                   </span>
                 </div>
 
                 {/* Moving Courier icon */}
                 <div className="relative flex flex-col items-center">
-                  <div className="w-10 h-10 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center shadow-xl animate-bounce">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-600 border-2 border-white flex items-center justify-center shadow-xl animate-bounce">
                     {activeOrder.category === 'transport_cargo' ? (
-                      <Truck className="w-5 h-5 text-white" />
+                      <Truck className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                     ) : activeOrder.category === 'home_services' ? (
-                      <Wrench className="w-5 h-5 text-white" />
+                      <Wrench className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                     ) : (
-                      <Truck className="w-5 h-5 text-white" />
+                      <Truck className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                     )}
                   </div>
                   <span className="text-[10px] text-blue-300 font-bold mt-1">
-                    {activeOrder.status === 'completed' ? 'Arrived & Done' : 'En Route'}
+                    {activeOrder.status === 'completed' ? 'پہنچ گیا' : 'راستے میں ہے'}
                   </span>
                 </div>
 
                 {/* Destination */}
                 <div className="relative flex flex-col items-center">
-                  <div className="w-8 h-8 rounded-full bg-slate-800 border-2 border-emerald-400 flex items-center justify-center shadow-lg">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-800 border-2 border-emerald-400 flex items-center justify-center shadow-lg">
                     <MapPin className="w-3.5 h-3.5 text-emerald-400" />
                   </div>
                   <span className="text-[10px] text-slate-300 font-medium mt-1 whitespace-nowrap">
-                    Your Address
+                    آپ کا پتہ
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="relative z-10 flex items-center justify-between text-xs text-slate-300 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-              <span className="truncate max-w-[320px]">
-                Destination: {activeOrder.deliveryAddress}
+            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-300 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 gap-1.5">
+              <span className="truncate max-w-full sm:max-w-[340px]">
+                پتہ: {activeOrder.deliveryAddress}
               </span>
               <span className="font-mono text-emerald-400 font-semibold shrink-0">
-                Speed: 38 km/h
+                خانیوال لوکل کوریڈور
               </span>
             </div>
           </div>
 
-          {/* Assigned Provider Profile Card (if assigned) */}
+          {/* Assigned Provider Profile Card */}
           {activeOrder.assignedProviderName ? (
-            <div className="p-4 rounded-xl border border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="p-4 rounded-2xl border border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
               <div className="flex items-center gap-3">
                 <img
-                  src={activeOrder.assignedProviderAvatar || '/src/assets/images/app_avatar_provider_1793035360068.jpg'}
+                  src={activeOrder.assignedProviderAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
                   alt={activeOrder.assignedProviderName}
-                  className="w-12 h-12 rounded-full object-cover border border-slate-200 shadow-xs"
+                  className="w-12 h-12 rounded-full object-cover border border-slate-200 shadow-xs shrink-0"
                   referrerPolicy="no-referrer"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80';
                   }}
                 />
                 <div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <h4 className="font-bold text-slate-900 text-sm">{activeOrder.assignedProviderName}</h4>
-                    <span className="text-xs text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-semibold flex items-center gap-0.5">
-                      <ShieldCheck className="w-3 h-3" />
-                      Verified
+                    <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded font-semibold flex items-center gap-0.5">
+                      <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                      تصدیق شدہ ورکر
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500">
-                    {activeOrder.category === 'home_services' ? 'Senior Certified Technician' : 'Verified Logistics Specialist'}
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {activeOrder.category === 'home_services' ? 'ماہر و مصدقہ ٹیکنیشن (خانیوال)' : 'تصدیق شدہ کوریئر رائیڈر (خانیوال)'}
                   </p>
                   <div className="flex items-center gap-1 text-xs text-amber-500 font-bold mt-0.5">
                     <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                     <span>{activeOrder.assignedProviderRating || 4.9}</span>
-                    <span className="text-slate-400 font-normal">· (140+ completed jobs)</span>
+                    <span className="text-slate-400 font-normal">· (مصدقہ خانیوال لوکل پارٹنر)</span>
                   </div>
                 </div>
               </div>
@@ -330,63 +328,58 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
               <div className="flex items-center gap-2 self-end sm:self-center">
                 <a
                   href={`tel:${activeOrder.assignedProviderPhone || '+923001234567'}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    alert(`Calling ${activeOrder.assignedProviderName} at ${activeOrder.assignedProviderPhone || '+92 321 9876543'}...`);
-                  }}
-                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5"
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5"
                 >
                   <Phone className="w-3.5 h-3.5 text-slate-600" />
-                  <span>Call</span>
+                  <span>کال کریں</span>
                 </a>
                 <button
                   type="button"
                   onClick={() => setShowChat(!showChat)}
-                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5"
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5"
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
-                  <span>Chat ({chatHistory.length})</span>
+                  <span>چیٹ ({chatHistory.length})</span>
                 </button>
               </div>
             </div>
           ) : (
-            <div className="p-4 rounded-xl border border-dashed border-amber-300 bg-amber-50/60 text-xs flex items-center justify-between">
-              <div className="space-y-0.5">
-                <p className="font-bold text-amber-900">Broadcasting to Nearby Providers...</p>
-                <p className="text-amber-700">Couriers and technicians in your area have received this alert.</p>
+            <div className="p-4 rounded-2xl border border-dashed border-amber-300 bg-amber-50/80 text-xs flex items-center justify-between gap-3">
+              <div className="space-y-1">
+                <p className="font-bold text-amber-900 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                  قریبی خانیوال ورکرز کو نوٹیفکیشن بھیجا جا چکا ہے...
+                </p>
+                <p className="text-amber-700 text-[11px]">
+                  خانیوال سٹی اور آس پاس کے دستیاب ٹیکنیشنز یا رائیڈرز کو یہ آرڈر موصول ہو چکا ہے۔ جلد ہی کوئی ورکر آپ کا کام قبول کر لے گا۔
+                </p>
               </div>
-              <button
-                onClick={onSwitchToProviderView}
-                className="px-3 py-1.5 bg-amber-600 text-white font-semibold rounded-lg hover:bg-amber-700 text-xs shrink-0"
-              >
-                Accept as Worker →
-              </button>
             </div>
           )}
 
-          {/* Quick In-App Chat Accordion */}
+          {/* Quick Chat Accordion */}
           {showChat && (
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+            <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                 <span className="text-xs font-bold text-slate-800">
-                  Chat with {activeOrder.assignedProviderName || 'Provider'}
+                  {activeOrder.assignedProviderName || 'ورکر'} کے ساتھ لائیو رابطہ
                 </span>
                 <button onClick={() => setShowChat(false)} className="text-slate-400 hover:text-slate-600">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
 
-              <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
+              <div className="max-h-36 overflow-y-auto space-y-2 pr-1">
                 {chatHistory.map((msg, i) => (
                   <div
                     key={i}
                     className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
                   >
                     <div
-                      className={`text-xs px-3 py-1.5 rounded-xl max-w-[80%] ${
+                      className={`text-xs px-3 py-1.5 rounded-xl max-w-[85%] ${
                         msg.sender === 'user'
                           ? 'bg-blue-600 text-white rounded-br-none'
-                          : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'
+                          : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none shadow-2xs'
                       }`}
                     >
                       {msg.text}
@@ -401,27 +394,27 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                   type="text"
                   value={chatMessage}
                   onChange={(e) => setChatMessage(e.target.value)}
-                  placeholder="Type a message (e.g. Ring doorbell when outside)..."
-                  className="flex-1 text-xs rounded-lg border border-slate-300 px-3 py-1.5 bg-white"
+                  placeholder="کوئی خاص ہدایت لکھیں (مثلاً: گھر کے باہر گھنٹی بجائیں)..."
+                  className="flex-1 text-xs rounded-xl border border-slate-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button
                   type="submit"
-                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-500"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-500"
                 >
-                  Send
+                  بھیجیں
                 </button>
               </form>
             </div>
           )}
 
-          {/* Timeline Audit History */}
-          <div className="space-y-3">
+          {/* Real Timeline History */}
+          <div className="space-y-2.5">
             <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Status Timeline
+              آرڈر ٹائم لائن و مراحل (Status Timeline)
             </h4>
             <div className="space-y-2 text-xs">
               {activeOrder.timeline.map((event, idx) => (
-                <div key={idx} className="flex items-start gap-3 p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                <div key={idx} className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
                   <span className="font-mono text-slate-500 text-[11px] shrink-0 pt-0.5">{event.timestamp}</span>
                   <div className="space-y-0.5">
                     <p className="font-bold text-slate-900">{event.label}</p>
@@ -432,57 +425,37 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
             </div>
           </div>
 
-          {/* Review prompt if order is completed */}
+          {/* Rate & Review if completed */}
           {activeOrder.status === 'completed' && (
-            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <span className="font-bold text-emerald-900 block">Service Successfully Completed!</span>
+                <span className="font-bold text-emerald-900 block">کام کامیابی سے مکمل ہو گیا!</span>
                 <span className="text-emerald-700">
-                  {activeOrder.review ? 'Thank you! You rated this order ' + activeOrder.review.rating + ' stars.' : 'How was your experience? Leave a review for the provider.'}
+                  {activeOrder.review ? 'شکریہ! آپ نے ' + activeOrder.review.rating + ' سٹارز ریٹنگ دی ہے۔' : 'اپنے تجربے کے بارے میں ورکر کو ریٹنگ اور فیڈبیک دیں۔'}
                 </span>
               </div>
               <button
                 onClick={() => onOpenReviewModal(activeOrder)}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg transition-colors shrink-0"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-colors shrink-0"
               >
-                {activeOrder.review ? 'Edit Review' : 'Rate & Review'}
+                {activeOrder.review ? 'ریویو دیکھیں' : 'ریٹنگ دیں'}
               </button>
             </div>
           )}
         </div>
 
-        {/* Footer with Demo Simulator Controls */}
-        <div className="px-6 py-3.5 bg-slate-100 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 font-medium">Demo Simulator:</span>
-            {activeOrder.status !== 'completed' && activeOrder.status !== 'cancelled' ? (
-              <button
-                onClick={handleSimulateNextStep}
-                disabled={simulating}
-                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
-              >
-                <RotateCw className={`w-3.5 h-3.5 ${simulating ? 'animate-spin' : ''}`} />
-                <span>Simulate Next Progression</span>
-              </button>
-            ) : (
-              <span className="text-xs text-emerald-700 font-semibold">Order Complete</span>
-            )}
-            <button
-              onClick={() => {
-                onClose();
-                onSwitchToProviderView();
-              }}
-              className="text-xs text-blue-600 hover:text-blue-800 font-semibold underline"
-            >
-              Open in Worker Portal
-            </button>
+        {/* Clean Production Footer */}
+        <div className="px-5 py-3.5 bg-slate-100 border-t border-slate-200 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span>خانیوال کنیکٹ لائیو سروس سپورٹ: 6664-0800</span>
           </div>
 
           <button
             onClick={onClose}
-            className="px-4 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900"
+            className="px-5 py-2 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition-colors cursor-pointer"
           >
-            Close
+            بند کریں (Close)
           </button>
         </div>
       </div>

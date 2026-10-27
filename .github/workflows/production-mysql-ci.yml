@@ -1,4 +1,4 @@
-name: OmniServe Production Host & 5-Hour Cloudflare Tunnel with Persistent MySQL
+name: Khanewal Connect Production Host & 5-Hour Cloudflare Tunnel with Persistent MySQL
 
 on:
   push:
@@ -52,21 +52,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+     #     cache: 'npm'
 
       - name: Create Snapshot Backup Directory
         run: mkdir -p mysql-backup
 
-      # 2. Restore MySQL Snapshot from Previous Workflow Run (v3 clean key)
+      # 2. Restore MySQL Snapshot from Previous Workflow Run (Khanewal v1 clean key)
       - name: Restore Persistent MySQL Database Cache
         id: restore-mysql-cache
         uses: actions/cache/restore@v4
         with:
           path: mysql-backup
-          key: mysql-v3-snapshot-${{ runner.os }}-${{ github.run_id }}
+          key: khanewal-v1-snapshot-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
-            mysql-v3-snapshot-${{ runner.os }}-
-            mysql-v3-snapshot-
+            khanewal-v1-snapshot-${{ runner.os }}-
+            khanewal-v1-snapshot-
 
       # 3. Restore Database from Cached Snapshot OR Initialize Schema
       - name: Initialize or Restore MySQL Database
@@ -85,10 +85,10 @@ jobs:
             echo "Found existing cached MySQL snapshot! Attempting restore..."
             echo "=========================================================="
             
-            # Temporarily disable pipefail so an invalid snapshot safely falls back
+            # Filter any accidental system mysql database references & restore with --force
             set +e
             set +o pipefail
-            gunzip -c mysql-backup/snapshot.sql.gz | mysql -h 127.0.0.1 -u root 2>restore_err.log
+            zcat mysql-backup/snapshot.sql.gz | sed '/USE `mysql`;/,/CREATE DATABASE/d; /`mysql`\./d' | mysql -h 127.0.0.1 -u root --force omniserve_db 2>restore_err.log
             RESTORE_EXIT_CODE=$?
             set -e
             set -o pipefail
@@ -100,9 +100,16 @@ jobs:
                 cat mysql-backup/snapshot-meta.json
               fi
             else
-              echo "Warning: Cached snapshot restore returned code $RESTORE_EXIT_CODE (ignoring incompatible legacy dump):"
-              cat restore_err.log
-              echo "Safely falling back to clean schema initialization..."
+              echo "Notice: Non-fatal notice during snapshot restore (code $RESTORE_EXIT_CODE):"
+              cat restore_err.log || true
+              # Check if tables exist
+              TABLE_COUNT=$(mysql -h 127.0.0.1 -u root omniserve_db -e "SHOW TABLES;" | wc -l)
+              if [ "$TABLE_COUNT" -gt 1 ]; then
+                echo "Tables successfully exist ($TABLE_COUNT lines in SHOW TABLES). Continuing..."
+                RESTORE_SUCCESS=1
+              else
+                echo "Safely falling back to clean schema initialization..."
+              fi
             fi
           fi
 
@@ -304,7 +311,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: mysql-backup
-          key: mysql-v3-snapshot-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: khanewal-v1-snapshot-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       # 10. Upload Snapshot as Workflow Artifact (90-Day Retention)
       - name: Upload Snapshot as Redundant Workflow Artifact

@@ -16,10 +16,27 @@
 
 .rtl {
   direction: rtl;
-  font-family: 'Noto Sans Arabic', 'Noto Nastaliq Urdu', 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-family: 'Noto Sans Arabic', 'Noto Nastaliq Urdu', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  letter-spacing: 0;
+}
+
+.rtl h1, .rtl h2, .rtl h3, .rtl h4 {
+  line-height: 1.4;
+}
+
+.rtl p, .rtl li {
+  line-height: 1.7;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 640px) {
+  .rtl {
+    font-size: 0.95rem;
+  }
 }
 
 .ltr {
   direction: ltr;
 }
+
 

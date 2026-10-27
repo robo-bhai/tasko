@@ -45,7 +45,7 @@ export const HomeServiceBookingModal: React.FC<HomeServiceBookingModalProps> = (
   const [customDescription, setCustomDescription] = useState('');
   const [scheduledDate, setScheduledDate] = useState('Today (Immediate)');
   const [scheduledTimeSlot, setScheduledTimeSlot] = useState('10:00 AM - 01:00 PM');
-  const [serviceAddress, setServiceAddress] = useState(currentUser?.address || 'House 42, Street 7, Sector F-8/2, Islamabad');
+  const [serviceAddress, setServiceAddress] = useState(currentUser?.address || 'House 14, Street 3, Peoples Colony, Khanewal');
 
   useEffect(() => {
     if (preselectedServiceId) {

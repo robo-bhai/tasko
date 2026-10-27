@@ -21,6 +21,8 @@ import {
   Clock
 } from 'lucide-react';
 
+import { PWAInstallButton } from './PWAInstallButton';
+
 interface NavbarProps {
   currentUser: User | null;
   activePortal: 'customer' | 'provider' | 'admin';
@@ -62,19 +64,19 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
-      {/* Top Notification / Help Bar */}
-      <div className="bg-slate-900 text-slate-300 text-[11px] py-1.5 px-4 md:px-8">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+      {/* Top Location / Help Bar */}
+      <div className="bg-slate-900 text-slate-300 text-[11px] py-1.5 px-3 sm:px-6">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
           <div className="flex items-center gap-2 truncate">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-            <span className="truncate">
+            <span className="truncate font-medium">
               {isUrdu 
-                ? 'پاکستان بھر میں لائیو سروسز: کراچی، لاہور، اسلام آباد، راولپنڈی، پشاور' 
-                : 'Serving all major cities across Pakistan: Islamabad, Rawalpindi, Lahore, Karachi & Peshawar'}
+                ? '📍 خانیوال سٹی، کینٹ، پیپلز کالونی، سول لائنز، طارق آباد اور قریبی تحصیلوں میں دستیاب' 
+                : '📍 Operating exclusively in Khanewal City, Cantt, Peoples Colony & Nearby Areas'}
             </span>
           </div>
 
-          <div className="flex items-center gap-4 shrink-0">
+          <div className="flex items-center gap-3 sm:gap-4 shrink-0">
             {/* Language Switcher */}
             <button
               onClick={onToggleLang}
@@ -86,34 +88,34 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             <span className="hidden sm:inline text-slate-500">|</span>
-            <span className="hidden sm:inline text-slate-400">
-              {isUrdu ? 'ہیلپ لائن: 6664-0800' : 'Helpline: 0800-6664'}
+            <span className="hidden sm:inline text-slate-400 font-mono text-[11px]">
+              {isUrdu ? 'ہیلپ لائن: 6664-0800' : 'Khanewal: 0800-6664'}
             </span>
           </div>
         </div>
       </div>
 
       {/* Main Bar */}
-      <div className="max-w-7xl mx-auto px-4 md:px-8 py-3 flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-3">
         {/* Brand */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4 sm:gap-6">
           <button 
             onClick={() => setActivePortal('customer')} 
-            className="flex items-center gap-2.5 text-left group cursor-pointer"
+            className="flex items-center gap-2 sm:gap-2.5 text-left group cursor-pointer"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-700 to-blue-500 text-white flex items-center justify-center font-black text-sm shadow-md group-hover:scale-105 transition-transform">
-              OS
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-blue-700 via-blue-600 to-sky-500 text-white flex items-center justify-center font-black text-sm shadow-md group-hover:scale-105 transition-transform shrink-0">
+              KC
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-slate-900 text-lg tracking-tight group-hover:text-blue-600 transition-colors">
+                <span className="font-extrabold text-slate-900 text-base sm:text-lg tracking-tight group-hover:text-blue-600 transition-colors">
                   {t.appName}
                 </span>
-                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
-                  PK
+                <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider">
+                  خانیوال
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-medium hidden sm:block">
+              <p className="text-[10px] text-slate-400 font-medium hidden md:block">
                 {t.appSlogan}
               </p>
             </div>
@@ -146,14 +148,19 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Right Action Zone */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          {/* In-App PWA Install Button (Verified by Play Store) */}
+          <div className="hidden sm:block">
+            <PWAInstallButton isUrdu={isUrdu} variant="navbar" />
+          </div>
+
           {/* Order Tracker / History Button (always accessible) */}
           <button
             onClick={() => onOpenLiveTracker()}
-            className="relative px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
+            className="relative px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
           >
             <MapPin className="w-3.5 h-3.5 text-blue-600" />
-            <span className="hidden sm:inline">{t.trackOrder}</span>
+            <span className="hidden md:inline">{t.trackOrder}</span>
             {pendingOrActiveCount > 0 && (
               <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center font-bold">
                 {pendingOrActiveCount}
@@ -226,10 +233,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 onClick={() => onOpenAuth('login')}
-                className="px-3.5 py-1.5 rounded-xl text-slate-700 hover:text-blue-600 hover:bg-blue-50/70 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-2.5 sm:px-3.5 py-1.5 rounded-xl text-slate-700 hover:text-blue-600 hover:bg-blue-50/70 text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <LogIn className="w-3.5 h-3.5" />
                 <span>{t.login}</span>
@@ -237,7 +244,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               <button
                 onClick={() => onOpenAuth('customer_signup')}
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors shadow-xs hidden sm:flex items-center gap-1.5 cursor-pointer"
+                className="px-3 sm:px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors shadow-xs hidden sm:flex items-center gap-1.5 cursor-pointer"
               >
                 <span>{t.signup}</span>
               </button>
@@ -265,6 +272,11 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="lg:hidden border-t border-slate-200 bg-white px-4 py-4 space-y-3">
+          {/* Mobile PWA Install CTA Banner */}
+          <div className="pb-2 border-b border-slate-100">
+            <PWAInstallButton isUrdu={isUrdu} variant="banner" />
+          </div>
+
           <div className="grid grid-cols-1 gap-2 text-xs font-semibold">
             <button
               onClick={() => { onOpenOrderModal('custom_delivery'); setMobileMenuOpen(false); }}

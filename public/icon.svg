@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="50%" stop-color="#0369a1"/>
+      <stop offset="100%" stop-color="#0c4a6e"/>
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <filter id="dropShadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Base App Tile with Smooth Rounded Corners -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  
+  <!-- Subtle Internal Glow Ring -->
+  <rect x="16" y="16" width="480" height="480" rx="98" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="4"/>
+
+  <!-- Center Hexagon / Shield Backdrop -->
+  <g filter="url(#dropShadow)" transform="translate(256, 240)">
+    <!-- Location Pin combined with Connect Super App Emblem -->
+    <!-- Stylized "K" & "C" monogram connected with dynamic fast track -->
+    <circle r="140" fill="#ffffff" fill-opacity="0.08"/>
+    
+    <!-- Outer Shield / Location Marker -->
+    <path d="M 0 -130 C 65 -130 110 -80 110 -15 C 110 55 25 125 0 165 C -25 125 -110 55 -110 -15 C -110 -80 -65 -130 0 -130 Z" 
+          fill="#ffffff" />
+
+    <!-- Inner Core with Khanewal Connect Monogram -->
+    <circle cx="0" cy="-20" r="75" fill="#0284c7" />
+
+    <!-- Lightning Bolt & Spark / Fast Super App -->
+    <path d="M 10 -65 L -35 -10 L 0 -10 L -15 35 L 35 -20 L 0 -20 Z" 
+          fill="#facc15" />
+  </g>
+
+  <!-- Bottom Brand Ribbon Badge: "KC" Khanewal Connect -->
+  <g transform="translate(256, 435)">
+    <rect x="-120" y="-22" width="240" height="44" rx="22" fill="#0f172a" fill-opacity="0.85" stroke="#38bdf8" stroke-width="2"/>
+    <text x="0" y="7" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="22" fill="#ffffff" letter-spacing="2">
+      KHANEWAL
+    </text>
+  </g>
+</svg>

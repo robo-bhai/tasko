@@ -357,8 +357,8 @@ export default function App() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="space-y-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white font-black text-sm flex items-center justify-center">
-                  OS
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-sky-500 text-white font-black text-sm flex items-center justify-center shadow-md">
+                  KC
                 </div>
                 <span className="font-extrabold text-white text-base tracking-tight">
                   {t.appName}
@@ -366,12 +366,12 @@ export default function App() {
               </div>
               <p className="text-slate-400 text-xs leading-relaxed">
                 {isUrdu 
-                  ? 'پاکستان کا ملٹی سروس پلیٹ فارم: کسی بھی اسٹور سے خریداری، مصدقہ گھریلو مرمت و صفائی، اور کارگو ٹرانسپورٹ گاڑی کی فوری آن ڈیمانڈ بکنگ۔'
-                  : 'The unified multi-service platform for store deliveries, certified home repairs, and cargo transport booking.'}
+                  ? 'خانیوال سٹی اور آس پاس کے علاقوں کے لیے نمبر 1 آن ڈیمانڈ سپر ایپ: کسی بھی لوکل دکان سے خریداری، مصدقہ گھریلو مرمت و صفائی، اور کارگو ٹرانسپورٹ گاڑی کی فوری آن ڈیمانڈ بکنگ۔'
+                  : 'Khanewal City and surrounding tehsils unified on-demand super app for store deliveries, certified home repairs, and cargo transport.'}
               </p>
               <div className="text-[11px] text-slate-300 font-medium space-y-1">
-                <div>📞 {isUrdu ? 'ٹول فری ہیلپ لائن: 6664-0800' : 'Toll-Free Helpline: 0800-6664'}</div>
-                <div>✉️ support@omniserve.pk</div>
+                <div>📞 {isUrdu ? 'خانیوال ہیلپ لائن: 6664-0800' : 'Khanewal Helpline: 0800-6664'}</div>
+                <div>✉️ support@khanewalconnect.pk</div>
               </div>
             </div>
 
@@ -439,7 +439,7 @@ export default function App() {
                 <p>
                   {isUrdu 
                     ? 'سیف پے اسکرو پروٹیکشن — ادائیگی صرف کام کی تسلی بخش تکمیل پر منتقل ہوتی ہے۔'
-                    : 'OmniServe SafePay Escrow protection for complete buyer & worker security.'}
+                    : 'Khanewal SafePay Escrow protection for complete customer & worker security.'}
                 </p>
                 <div className="flex flex-wrap gap-2 pt-1 text-[11px] font-semibold text-slate-300">
                   <span className="bg-slate-800 border border-slate-700 px-2 py-0.5 rounded">Cash on Delivery</span>
@@ -452,8 +452,8 @@ export default function App() {
           </div>
 
           <div className="pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-500">
-            <span>© 2026 OmniServe (Private) Limited. All rights reserved.</span>
-            <span>Made for Pakistan · اسلام آباد · لاہور · کراچی · راولپنڈی · پشاور</span>
+            <span>© 2026 Khanewal Connect. All rights reserved.</span>
+            <span>خانیوال سٹی · کینٹ · پیپلز کالونی · سول لائنز · طارق آباد · کبیروالہ · میاں چنوں · جہانیاں</span>
           </div>
         </div>
       </footer>

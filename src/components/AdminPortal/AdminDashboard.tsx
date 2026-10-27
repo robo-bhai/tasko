@@ -61,7 +61,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newSkill, setNewSkill] = useState('HVAC & AC Master Service');
   const [newVehicle, setNewVehicle] = useState('Suzuki Bolan Mini-Pickup');
   const [newBalance, setNewBalance] = useState(5000);
-  const [newAddress, setNewAddress] = useState('Sector G-9 Commercial, Islamabad');
+  const [newAddress, setNewAddress] = useState('Block 5, Railway Road, Khanewal');
   const [userCreatedMessage, setUserCreatedMessage] = useState('');
 
   // Stats
