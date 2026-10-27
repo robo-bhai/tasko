@@ -15,7 +15,7 @@ import {
 interface TransportBookingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentUser: User;
+  currentUser: User | null;
   vehicles: TransportVehicleItem[];
   preselectedVehicleId?: string;
   onProceedToCheckout: (payload: {
@@ -38,7 +38,7 @@ export const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
     preselectedVehicleId || vehicles[1]?.id || 'veh-mini-pickup'
   );
   const [pickupLocation, setPickupLocation] = useState('Furniture Market, Golra Road, H-13, Islamabad');
-  const [dropoffLocation, setDropoffLocation] = useState(currentUser.address || 'House 42, Street 7, Sector F-8/2, Islamabad');
+  const [dropoffLocation, setDropoffLocation] = useState(currentUser?.address || 'House 42, Street 7, Sector F-8/2, Islamabad');
   const [cargoDescription, setCargoDescription] = useState('1x Solid Wood Dining Table with 6 Chairs, 2 Mattresses');
   const [loadWeightKg, setLoadWeightKg] = useState(380);
   const [estimatedDistanceKm, setEstimatedDistanceKm] = useState(14);

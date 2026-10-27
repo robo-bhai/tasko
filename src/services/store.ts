@@ -223,22 +223,30 @@ export const Store = {
     return loaded;
   },
 
-  getCurrentUser: (): User => {
-    const defaultUser = Store.getUsers()[0]; // Ahmed Khan or Admin
-    return loadFromStorage<User>(STORAGE_KEY_CURRENT_USER, defaultUser);
+  getCurrentUser: (): User | null => {
+    return loadFromStorage<User | null>(STORAGE_KEY_CURRENT_USER, null);
   },
 
-  setCurrentUser: (user: User) => {
-    saveToStorage(STORAGE_KEY_CURRENT_USER, user);
-    // Also sync in users list
-    const users = Store.getUsers();
-    const idx = users.findIndex(u => u.id === user.id);
-    if (idx >= 0) {
-      users[idx] = user;
+  setCurrentUser: (user: User | null) => {
+    if (user === null) {
+      localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
     } else {
-      users.push(user);
+      saveToStorage(STORAGE_KEY_CURRENT_USER, user);
+      // Also sync in users list
+      const users = Store.getUsers();
+      const idx = users.findIndex(u => u.id === user.id);
+      if (idx >= 0) {
+        users[idx] = user;
+      } else {
+        users.push(user);
+      }
+      saveToStorage(STORAGE_KEY_USERS, users);
     }
-    saveToStorage(STORAGE_KEY_USERS, users);
+    notifyStoreChanged();
+  },
+
+  logout: () => {
+    localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
     notifyStoreChanged();
   },
 
@@ -276,6 +284,59 @@ export const Store = {
     Store.setCurrentUser(newUser);
     notifyStoreChanged();
     return newUser;
+  },
+
+  registerProvider: (providerData: {
+    name: string;
+    email: string;
+    phone: string;
+    password: string;
+    cnic?: string;
+    city?: string;
+    providerCategory: any;
+    serviceSkill?: string;
+    vehicleType?: string;
+    address?: string;
+  }): User => {
+    const users = Store.getUsers();
+    const existing = users.find(
+      u => u.email.toLowerCase() === providerData.email.toLowerCase() || u.phone === providerData.phone
+    );
+    if (existing) {
+      throw new Error('An account with this email or phone number already exists.');
+    }
+
+    const avatar = providerData.providerCategory === 'cargo_driver'
+      ? '/src/assets/images/transport_cargo_vehicle_1793035359966.jpg'
+      : providerData.providerCategory === 'delivery_courier'
+      ? '/src/assets/images/hero_delivery_service_1793035359071.jpg'
+      : '/src/assets/images/app_avatar_provider_1793035360068.jpg';
+
+    const newProvider: User = {
+      id: 'usr-prov-' + Date.now(),
+      name: providerData.name.trim(),
+      email: providerData.email.trim().toLowerCase(),
+      phone: providerData.phone.trim(),
+      password: providerData.password.trim(),
+      role: 'provider',
+      avatar,
+      address: providerData.address?.trim() || `${providerData.city || 'Islamabad'}, Pakistan`,
+      walletBalance: 2000,
+      status: 'active',
+      joinedDate: new Date().toISOString().split('T')[0],
+      providerCategory: providerData.providerCategory,
+      serviceSkill: providerData.serviceSkill || (providerData.providerCategory === 'home_technician' ? 'AC & Electrical Specialist' : undefined),
+      vehicleType: providerData.vehicleType || (providerData.providerCategory === 'cargo_driver' ? 'Suzuki Bolan Pickup' : '125cc Motorbike'),
+      rating: 5.0,
+      completedJobsCount: 0,
+      isOnline: true
+    };
+
+    users.push(newProvider);
+    saveToStorage(STORAGE_KEY_USERS, users);
+    Store.setCurrentUser(newProvider);
+    notifyStoreChanged();
+    return newProvider;
   },
 
   createProviderByAdmin: (providerData: {
@@ -367,7 +428,7 @@ export const Store = {
       users[idx] = updatedUser;
       saveToStorage(STORAGE_KEY_USERS, users);
       const current = Store.getCurrentUser();
-      if (current.id === updatedUser.id) {
+      if (current && current.id === updatedUser.id) {
         saveToStorage(STORAGE_KEY_CURRENT_USER, updatedUser);
       }
       notifyStoreChanged();

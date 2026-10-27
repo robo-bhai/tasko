@@ -14,7 +14,7 @@ import {
 interface DeliveryOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentUser: User;
+  currentUser: User | null;
   onProceedToCheckout: (payload: {
     category: 'custom_delivery';
     deliveryDetails: CustomDeliveryDetails;
@@ -33,7 +33,7 @@ export const DeliveryOrderModal: React.FC<DeliveryOrderModalProps> = ({
   const [estimatedBudget, setEstimatedBudget] = useState(1200);
   const [storeName, setStoreName] = useState('Tehzeeb Bakers & Superstore / Any nearby branch');
   const [pickupAddress, setPickupAddress] = useState('Blue Area / F-6 Super Market');
-  const [deliveryAddress, setDeliveryAddress] = useState(currentUser.address || 'House 42, Street 7, Sector F-8/2, Islamabad');
+  const [deliveryAddress, setDeliveryAddress] = useState(currentUser?.address || 'House 42, Street 7, Sector F-8/2, Islamabad');
   const [notes, setNotes] = useState('');
   const [isUrgent, setIsUrgent] = useState(false);
 

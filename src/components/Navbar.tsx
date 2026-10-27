@@ -1,35 +1,37 @@
 import React, { useState } from 'react';
 import { 
   User, 
-  UserRole,
   Order
 } from '../types';
-import { 
-  Store 
-} from '../services/store';
+import { Store } from '../services/store';
+import { Language, translations } from '../i18n/translations';
 import { 
   Truck, 
   ShoppingBag, 
   Wrench, 
-  Clock, 
   ShieldCheck, 
   UserCheck, 
-  ChevronDown, 
-  RotateCcw,
   LogIn,
   LogOut,
-  MapPin
+  MapPin,
+  Globe,
+  Briefcase,
+  Menu,
+  X,
+  Clock
 } from 'lucide-react';
 
 interface NavbarProps {
-  currentUser: User;
+  currentUser: User | null;
   activePortal: 'customer' | 'provider' | 'admin';
   setActivePortal: (portal: 'customer' | 'provider' | 'admin') => void;
   onOpenOrderModal: (category: 'custom_delivery' | 'home_services' | 'transport_cargo') => void;
   onOpenHistory: () => void;
   onOpenLiveTracker: (order?: Order) => void;
-  onOpenAuth: () => void;
+  onOpenAuth: (tab?: 'login' | 'customer_signup' | 'provider_signup', notice?: string) => void;
   activeOrders: Order[];
+  lang: Language;
+  onToggleLang: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -40,278 +42,277 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenHistory,
   onOpenLiveTracker,
   onOpenAuth,
-  activeOrders
+  activeOrders,
+  lang,
+  onToggleLang
 }) => {
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [showRoleSwitcher, setShowRoleSwitcher] = useState(false);
-
-  const handleRoleSelect = (role: 'customer' | 'provider' | 'admin') => {
-    setActivePortal(role);
-    setShowRoleSwitcher(false);
-    
-    // Auto switch user persona if currently mismatched
-    if (role === 'admin' && currentUser.role !== 'admin') {
-      const admin = Store.getUsers().find(u => u.role === 'admin');
-      if (admin) Store.setCurrentUser(admin);
-    } else if (role === 'provider' && currentUser.role !== 'provider') {
-      const provider = Store.getUsers().find(u => u.role === 'provider');
-      if (provider) Store.setCurrentUser(provider);
-    } else if (role === 'customer' && currentUser.role !== 'customer') {
-      const customer = Store.getUsers().find(u => u.role === 'customer');
-      if (customer) Store.setCurrentUser(customer);
-    }
-  };
-
-  const handleResetData = () => {
-    if (window.confirm('Reset all demo orders, services, and users back to initial sample state?')) {
-      Store.resetToDemoData();
-      window.location.reload();
-    }
-  };
+  const t = translations[lang];
+  const isUrdu = lang === 'ur';
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const pendingOrActiveCount = activeOrders.filter(
     o => o.status !== 'completed' && o.status !== 'cancelled'
   ).length;
 
+  const handleLogout = () => {
+    Store.logout();
+    setActivePortal('customer');
+    setMobileMenuOpen(false);
+  };
+
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-slate-200">
-      {/* Quick Role & Persona Switcher Banner */}
-      <div className="bg-slate-900 text-slate-200 text-xs py-1.5 px-4 md:px-8 border-b border-slate-800">
+    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
+      {/* Top Notification / Help Bar */}
+      <div className="bg-slate-900 text-slate-300 text-[11px] py-1.5 px-4 md:px-8">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 overflow-x-auto py-0.5">
-            <span className="text-slate-400 font-medium whitespace-nowrap shrink-0">Demo Portal:</span>
-            <div className="inline-flex rounded-md bg-slate-800 p-0.5 shrink-0">
-              <button
-                onClick={() => handleRoleSelect('customer')}
-                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                  activePortal === 'customer'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                Customer Portal
-              </button>
-              <button
-                onClick={() => handleRoleSelect('provider')}
-                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                  activePortal === 'provider'
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                Worker / Driver Portal
-              </button>
-              <button
-                onClick={() => handleRoleSelect('admin')}
-                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                  activePortal === 'admin'
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                Admin Panel
-              </button>
-            </div>
+          <div className="flex items-center gap-2 truncate">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <span className="truncate">
+              {isUrdu 
+                ? 'پاکستان بھر میں لائیو سروسز: کراچی، لاہور، اسلام آباد، راولپنڈی، پشاور' 
+                : 'Serving all major cities across Pakistan: Islamabad, Rawalpindi, Lahore, Karachi & Peshawar'}
+            </span>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="hidden sm:flex items-center gap-1.5 text-slate-300">
-              <span className="text-slate-400">Logged in as:</span>
-              <span className="font-semibold text-white">{currentUser.name}</span>
-              <span className="text-slate-400 capitalize">({currentUser.role})</span>
-            </div>
+          <div className="flex items-center gap-4 shrink-0">
+            {/* Language Switcher */}
             <button
-              onClick={handleResetData}
-              title="Reset test data"
-              className="flex items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors"
+              onClick={onToggleLang}
+              className="flex items-center gap-1.5 text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-0.5 rounded-full text-xs font-semibold transition-colors border border-slate-700 cursor-pointer"
+              title="Change Language / زبان تبدیل کریں"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Reset Demo</span>
+              <Globe className="w-3.5 h-3.5 text-blue-400" />
+              <span>{isUrdu ? 'English' : 'اردو'}</span>
             </button>
+
+            <span className="hidden sm:inline text-slate-500">|</span>
+            <span className="hidden sm:inline text-slate-400">
+              {isUrdu ? 'ہیلپ لائن: 6664-0800' : 'Helpline: 0800-6664'}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Main Top Bar */}
-      <div className="max-w-7xl mx-auto px-4 md:px-8 py-3.5 flex items-center justify-between gap-8">
-        {/* Zone 1: Brand Wordmark */}
-        <a 
-          href="#" 
-          onClick={(e) => { e.preventDefault(); setActivePortal('customer'); }}
-          className="flex items-center gap-2.5 whitespace-nowrap shrink-0 group"
-        >
-          <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-lg shadow-sm group-hover:bg-blue-700 transition-colors">
-            OS
-          </div>
-          <div className="flex flex-col">
-            <span className="text-lg font-bold tracking-tight text-slate-900 leading-none">
-              OmniServe
-            </span>
-            <span className="text-[11px] text-slate-500 font-medium">
-              On-Demand Super App
-            </span>
-          </div>
-        </a>
+      {/* Main Bar */}
+      <div className="max-w-7xl mx-auto px-4 md:px-8 py-3 flex items-center justify-between gap-4">
+        {/* Brand */}
+        <div className="flex items-center gap-6">
+          <button 
+            onClick={() => setActivePortal('customer')} 
+            className="flex items-center gap-2.5 text-left group cursor-pointer"
+          >
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-700 to-blue-500 text-white flex items-center justify-center font-black text-sm shadow-md group-hover:scale-105 transition-transform">
+              OS
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-extrabold text-slate-900 text-lg tracking-tight group-hover:text-blue-600 transition-colors">
+                  {t.appName}
+                </span>
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                  PK
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 font-medium hidden sm:block">
+                {t.appSlogan}
+              </p>
+            </div>
+          </button>
 
-        {/* Zone 2: Navigation Links (Customer View) */}
-        {activePortal === 'customer' ? (
-          <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-600">
+          {/* Quick Categories navigation (Desktop) */}
+          <nav className="hidden lg:flex items-center gap-1 text-xs font-semibold text-slate-600">
             <button
               onClick={() => onOpenOrderModal('custom_delivery')}
-              className="flex items-center gap-1.5 hover:text-blue-600 transition-colors whitespace-nowrap shrink-0"
+              className="px-3 py-1.5 rounded-lg hover:text-blue-600 hover:bg-blue-50/70 transition-colors flex items-center gap-1.5"
             >
-              <ShoppingBag className="w-4 h-4 text-blue-500" />
-              <span>Order Anything</span>
+              <ShoppingBag className="w-3.5 h-3.5 text-blue-600" />
+              <span>{t.orderAnything}</span>
             </button>
             <button
               onClick={() => onOpenOrderModal('home_services')}
-              className="flex items-center gap-1.5 hover:text-emerald-600 transition-colors whitespace-nowrap shrink-0"
+              className="px-3 py-1.5 rounded-lg hover:text-blue-600 hover:bg-blue-50/70 transition-colors flex items-center gap-1.5"
             >
-              <Wrench className="w-4 h-4 text-emerald-500" />
-              <span>Home Services</span>
+              <Wrench className="w-3.5 h-3.5 text-emerald-600" />
+              <span>{t.homeServices}</span>
             </button>
             <button
               onClick={() => onOpenOrderModal('transport_cargo')}
-              className="flex items-center gap-1.5 hover:text-indigo-600 transition-colors whitespace-nowrap shrink-0"
+              className="px-3 py-1.5 rounded-lg hover:text-blue-600 hover:bg-blue-50/70 transition-colors flex items-center gap-1.5"
             >
-              <Truck className="w-4 h-4 text-indigo-500" />
-              <span>Cargo Transport</span>
-            </button>
-            <button
-              onClick={onOpenHistory}
-              className="flex items-center gap-1.5 hover:text-slate-900 transition-colors whitespace-nowrap shrink-0"
-            >
-              <Clock className="w-4 h-4 text-slate-400" />
-              <span>Order History</span>
+              <Truck className="w-3.5 h-3.5 text-amber-600" />
+              <span>{t.transportCargo}</span>
             </button>
           </nav>
-        ) : activePortal === 'provider' ? (
-          <div className="hidden lg:flex items-center gap-4 text-sm font-medium text-slate-600">
-            <span className="text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md text-xs font-semibold">
-              Worker Console Active
-            </span>
-            <span className="text-slate-500 text-xs">
-              Category: {currentUser.providerCategory?.replace('_', ' ') || 'Service Specialist'}
-            </span>
-          </div>
-        ) : (
-          <div className="hidden lg:flex items-center gap-4 text-sm font-medium text-slate-600">
-            <span className="text-purple-700 bg-purple-50 px-2.5 py-1 rounded-md text-xs font-semibold">
-              Administrator Console
-            </span>
-            <span className="text-slate-500 text-xs">
-              Live Dispatch & Catalog Controls
-            </span>
-          </div>
-        )}
+        </div>
 
-        {/* Zone 3: Primary Actions & User Pill */}
-        <div className="flex items-center gap-3 shrink-0">
-          {activePortal === 'customer' && (
-            <button
-              onClick={() => onOpenLiveTracker()}
-              className="relative px-3.5 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap shrink-0"
-            >
-              <MapPin className="w-3.5 h-3.5 text-blue-600" />
-              <span>Live Tracker</span>
-              {pendingOrActiveCount > 0 && (
-                <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center">
-                  {pendingOrActiveCount}
-                </span>
+        {/* Right Action Zone */}
+        <div className="flex items-center gap-2.5">
+          {/* Order Tracker / History Button (always accessible) */}
+          <button
+            onClick={() => onOpenLiveTracker()}
+            className="relative px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
+          >
+            <MapPin className="w-3.5 h-3.5 text-blue-600" />
+            <span className="hidden sm:inline">{t.trackOrder}</span>
+            {pendingOrActiveCount > 0 && (
+              <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center font-bold">
+                {pendingOrActiveCount}
+              </span>
+            )}
+          </button>
+
+          {/* User Logged In State vs Guest Visitor State */}
+          {currentUser ? (
+            <div className="flex items-center gap-2">
+              {/* Role Portal Switching Button */}
+              {currentUser.role === 'admin' && (
+                <button
+                  onClick={() => setActivePortal(activePortal === 'admin' ? 'customer' : 'admin')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    activePortal === 'admin'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{activePortal === 'admin' ? (isUrdu ? 'کسٹمر ویو' : 'Customer View') : t.adminPortal}</span>
+                </button>
               )}
-            </button>
-          )}
 
-          {/* User Profile / Switcher Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setShowUserDropdown(!showUserDropdown)}
-              className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white text-left transition-colors"
-            >
-              <img
-                src={currentUser.avatar}
-                alt={currentUser.name}
-                className="w-7 h-7 rounded-full object-cover border border-slate-200"
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80';
-                }}
-              />
-              <div className="hidden sm:flex flex-col text-xs leading-tight">
-                <span className="font-semibold text-slate-900 truncate max-w-[100px]">
+              {currentUser.role === 'provider' && (
+                <button
+                  onClick={() => setActivePortal(activePortal === 'provider' ? 'customer' : 'provider')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    activePortal === 'provider'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                  }`}
+                >
+                  <Briefcase className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{activePortal === 'provider' ? (isUrdu ? 'کسٹمر ویو' : 'Customer View') : t.providerPortal}</span>
+                </button>
+              )}
+
+              {/* User Profile Pill & Signout */}
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 pl-2 pr-1 py-1 rounded-2xl">
+                <img
+                  src={currentUser.avatar}
+                  alt={currentUser.name}
+                  className="w-6 h-6 rounded-full object-cover shrink-0 border border-slate-300"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80';
+                  }}
+                />
+                <span className="text-xs font-bold text-slate-800 max-w-[100px] truncate hidden md:inline">
                   {currentUser.name}
                 </span>
-                <span className="text-[10px] text-slate-500 capitalize">
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                  currentUser.role === 'admin'
+                    ? 'bg-purple-100 text-purple-800'
+                    : currentUser.role === 'provider'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-blue-100 text-blue-800'
+                }`}>
                   {currentUser.role}
                 </span>
+                <button
+                  onClick={handleLogout}
+                  title={t.logout}
+                  className="p-1 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
               </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-            </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onOpenAuth('login')}
+                className="px-3.5 py-1.5 rounded-xl text-slate-700 hover:text-blue-600 hover:bg-blue-50/70 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>{t.login}</span>
+              </button>
 
-            {showUserDropdown && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 text-xs">
-                <div className="px-3 py-2 border-b border-slate-100">
-                  <p className="font-bold text-slate-900">{currentUser.name}</p>
-                  <p className="text-slate-500 text-[11px] truncate">{currentUser.email}</p>
-                  <p className="text-slate-500 text-[11px]">{currentUser.phone}</p>
-                  <div className="mt-1 flex items-center justify-between text-slate-600 font-mono text-[11px]">
-                    <span>Wallet Balance:</span>
-                    <span className="font-bold text-slate-900">PKR {currentUser.walletBalance.toLocaleString()}</span>
-                  </div>
-                </div>
+              <button
+                onClick={() => onOpenAuth('customer_signup')}
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors shadow-xs hidden sm:flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>{t.signup}</span>
+              </button>
 
-                <div className="px-2 py-1.5">
-                  <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 px-2 py-1">
-                    Quick Switch Persona
-                  </p>
-                  {Store.getUsers().map((u) => (
-                    <button
-                      key={u.id}
-                      onClick={() => {
-                        Store.setCurrentUser(u);
-                        setActivePortal(u.role);
-                        setShowUserDropdown(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left transition-colors ${
-                        u.id === currentUser.id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <img 
-                          src={u.avatar} 
-                          alt="" 
-                          className="w-5 h-5 rounded-full object-cover shrink-0" 
-                          referrerPolicy="no-referrer" 
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80';
-                          }}
-                        />
-                        <span className="truncate">{u.name}</span>
-                      </div>
-                      <span className="text-[10px] text-slate-400 uppercase font-mono shrink-0 ml-1">
-                        {u.role === 'provider' ? (u.providerCategory === 'cargo_driver' ? 'Driver' : u.providerCategory === 'delivery_courier' ? 'Rider' : 'Tech') : u.role}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+              <button
+                onClick={() => onOpenAuth('provider_signup')}
+                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold rounded-xl transition-colors hidden md:flex items-center gap-1.5 cursor-pointer"
+              >
+                <Briefcase className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{isUrdu ? 'ورکر بنیں' : 'Join as Partner'}</span>
+              </button>
+            </div>
+          )}
 
-                <div className="border-t border-slate-100 px-2 pt-1.5">
-                  <button
-                    onClick={() => {
-                      setShowUserDropdown(false);
-                      onOpenAuth();
-                    }}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 text-slate-700 hover:bg-slate-50 rounded-lg text-left font-medium"
-                  >
-                    <LogIn className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Login with Another Account</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Mobile hamburger menu toggle */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="lg:hidden p-1.5 text-slate-600 hover:text-slate-900 rounded-lg border border-slate-200"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
       </div>
+
+      {/* Mobile Drawer */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden border-t border-slate-200 bg-white px-4 py-4 space-y-3">
+          <div className="grid grid-cols-1 gap-2 text-xs font-semibold">
+            <button
+              onClick={() => { onOpenOrderModal('custom_delivery'); setMobileMenuOpen(false); }}
+              className="p-2.5 rounded-xl bg-blue-50 text-blue-900 flex items-center gap-2 text-left"
+            >
+              <ShoppingBag className="w-4 h-4 text-blue-600" />
+              <span>{t.orderAnything}</span>
+            </button>
+            <button
+              onClick={() => { onOpenOrderModal('home_services'); setMobileMenuOpen(false); }}
+              className="p-2.5 rounded-xl bg-emerald-50 text-emerald-900 flex items-center gap-2 text-left"
+            >
+              <Wrench className="w-4 h-4 text-emerald-600" />
+              <span>{t.homeServices}</span>
+            </button>
+            <button
+              onClick={() => { onOpenOrderModal('transport_cargo'); setMobileMenuOpen(false); }}
+              className="p-2.5 rounded-xl bg-amber-50 text-amber-900 flex items-center gap-2 text-left"
+            >
+              <Truck className="w-4 h-4 text-amber-600" />
+              <span>{t.transportCargo}</span>
+            </button>
+          </div>
+
+          {!currentUser && (
+            <div className="pt-2 border-t border-slate-100 flex gap-2">
+              <button
+                onClick={() => { onOpenAuth('login'); setMobileMenuOpen(false); }}
+                className="flex-1 py-2 text-center rounded-xl border border-slate-300 text-xs font-bold text-slate-700"
+              >
+                {t.login}
+              </button>
+              <button
+                onClick={() => { onOpenAuth('customer_signup'); setMobileMenuOpen(false); }}
+                className="flex-1 py-2 text-center rounded-xl bg-blue-600 text-white text-xs font-bold"
+              >
+                {t.signup}
+              </button>
+              <button
+                onClick={() => { onOpenAuth('provider_signup'); setMobileMenuOpen(false); }}
+                className="flex-1 py-2 text-center rounded-xl bg-emerald-600 text-white text-xs font-bold"
+              >
+                {isUrdu ? 'ورکر بنیں' : 'Join'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </header>
   );
 };

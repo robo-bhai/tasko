@@ -52,21 +52,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-       #   cache: 'npm'
+          cache: 'npm'
 
       - name: Create Snapshot Backup Directory
         run: mkdir -p mysql-backup
 
-      # 2. Restore MySQL Snapshot from Previous Workflow Run (using v2 key to bypass legacy system-schema dumps)
+      # 2. Restore MySQL Snapshot from Previous Workflow Run (v3 clean key)
       - name: Restore Persistent MySQL Database Cache
         id: restore-mysql-cache
         uses: actions/cache/restore@v4
         with:
           path: mysql-backup
-          key: mysql-v2-snapshot-${{ runner.os }}-${{ github.run_id }}
+          key: mysql-v3-snapshot-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
-            mysql-v2-snapshot-${{ runner.os }}-
-            mysql-v2-snapshot-
+            mysql-v3-snapshot-${{ runner.os }}-
+            mysql-v3-snapshot-
 
       # 3. Restore Database from Cached Snapshot OR Initialize Schema
       - name: Initialize or Restore MySQL Database
@@ -82,20 +82,27 @@ jobs:
           RESTORE_SUCCESS=0
           if [ -f "mysql-backup/snapshot.sql.gz" ]; then
             echo "=========================================================="
-            echo "Found existing cached MySQL snapshot! Restoring data..."
+            echo "Found existing cached MySQL snapshot! Attempting restore..."
             echo "=========================================================="
             
-            # Decompress and import application database
-            if gunzip -c mysql-backup/snapshot.sql.gz | mysql -h 127.0.0.1 -u root 2>restore_err.log; then
-              echo "Database successfully restored from cache!"
+            # Temporarily disable pipefail so an invalid snapshot safely falls back
+            set +e
+            set +o pipefail
+            gunzip -c mysql-backup/snapshot.sql.gz | mysql -h 127.0.0.1 -u root 2>restore_err.log
+            RESTORE_EXIT_CODE=$?
+            set -e
+            set -o pipefail
+
+            if [ $RESTORE_EXIT_CODE -eq 0 ]; then
+              echo "Database successfully restored from cache snapshot!"
               RESTORE_SUCCESS=1
               if [ -f "mysql-backup/snapshot-meta.json" ]; then
                 cat mysql-backup/snapshot-meta.json
               fi
             else
-              echo "Warning: Snapshot restoration returned an error (likely old format):"
+              echo "Warning: Cached snapshot restore returned code $RESTORE_EXIT_CODE (ignoring incompatible legacy dump):"
               cat restore_err.log
-              echo "Falling back to fresh schema initialization to ensure zero downtime..."
+              echo "Safely falling back to clean schema initialization..."
             fi
           fi
 
@@ -132,11 +139,7 @@ jobs:
 
       - name: Install Application Dependencies
         run: |
-          if [ -f "package-lock.json" ]; then
-            npm ci --legacy-peer-deps || npm install --legacy-peer-deps
-          else
-            npm install --legacy-peer-deps
-          fi
+          npm install --legacy-peer-deps --no-audit --no-fund
 
       - name: Build Production Frontend Assets
         env:
@@ -301,7 +304,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: mysql-backup
-          key: mysql-v2-snapshot-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: mysql-v3-snapshot-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       # 10. Upload Snapshot as Workflow Artifact (90-Day Retention)
       - name: Upload Snapshot as Redundant Workflow Artifact

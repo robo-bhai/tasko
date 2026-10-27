@@ -19,7 +19,7 @@ import {
 interface HomeServiceBookingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentUser: User;
+  currentUser: User | null;
   services: HomeServiceItem[];
   preselectedServiceId?: string;
   onProceedToCheckout: (payload: {
@@ -45,7 +45,7 @@ export const HomeServiceBookingModal: React.FC<HomeServiceBookingModalProps> = (
   const [customDescription, setCustomDescription] = useState('');
   const [scheduledDate, setScheduledDate] = useState('Today (Immediate)');
   const [scheduledTimeSlot, setScheduledTimeSlot] = useState('10:00 AM - 01:00 PM');
-  const [serviceAddress, setServiceAddress] = useState(currentUser.address || 'House 42, Street 7, Sector F-8/2, Islamabad');
+  const [serviceAddress, setServiceAddress] = useState(currentUser?.address || 'House 42, Street 7, Sector F-8/2, Islamabad');
 
   useEffect(() => {
     if (preselectedServiceId) {

@@ -33,7 +33,7 @@ export interface PendingCheckoutOrder {
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentUser: User;
+  currentUser: User | null;
   pendingOrder: PendingCheckoutOrder | null;
   onOrderPlaced: (newOrder: Order) => void;
 }
@@ -46,7 +46,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onOrderPlaced
 }) => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
-  const [mobileNumber, setMobileNumber] = useState(currentUser.phone || '+92 300 1234567');
+  const [mobileNumber, setMobileNumber] = useState(currentUser?.phone || '+92 300 1234567');
   const [cardNumber, setCardNumber] = useState('4242 •••• •••• 9012');
   const [cardExpiry, setCardExpiry] = useState('08/28');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,9 +62,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
       const newOrder = Store.createOrder({
         category: pendingOrder.category,
-        customerId: currentUser.id,
-        customerName: currentUser.name,
-        customerPhone: currentUser.phone,
+        customerId: currentUser?.id || 'usr-guest-' + Date.now(),
+        customerName: currentUser?.name || 'Customer',
+        customerPhone: currentUser?.phone || mobileNumber,
         deliveryAddress: pendingOrder.deliveryAddress,
         status: 'pending',
         deliveryDetails: pendingOrder.deliveryDetails,

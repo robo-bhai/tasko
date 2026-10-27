@@ -13,3 +13,13 @@
   font-family: 'JetBrains Mono', monospace;
   font-variant-numeric: tabular-nums;
 }
+
+.rtl {
+  direction: rtl;
+  font-family: 'Noto Sans Arabic', 'Noto Nastaliq Urdu', 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+.ltr {
+  direction: ltr;
+}
+
