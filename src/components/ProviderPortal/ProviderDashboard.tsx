@@ -95,6 +95,34 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
     }
   };
 
+  if (currentUser.role !== 'provider' && providers.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 p-8 md:p-12 text-center max-w-2xl mx-auto my-12 shadow-sm space-y-6">
+        <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+          <Truck className="w-8 h-8" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl md:text-2xl font-bold text-slate-900">
+            No Service Providers or Drivers Created Yet
+          </h2>
+          <p className="text-xs md:text-sm text-slate-500 max-w-md mx-auto leading-relaxed">
+            As requested, all workers (AC technicians, couriers, and cargo drivers) are created manually by the Super Admin.
+          </p>
+        </div>
+        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 text-left space-y-2.5">
+          <p className="font-bold text-slate-800">Quick Steps to Add a Worker / Provider:</p>
+          <ol className="list-decimal list-inside space-y-1.5 text-slate-600">
+            <li>Switch to the <strong className="text-purple-700">Admin Panel</strong> using the top bar.</li>
+            <li>Click the <strong className="text-slate-800">Users & Providers</strong> section.</li>
+            <li>Click the blue <strong className="text-blue-600">+ Create Worker / Provider</strong> button to add a technician, courier rider, or truck driver.</li>
+          </ol>
+        </div>
+      </div>
+    );
+  }
+
+  const activeWorker = currentUser.role === 'provider' ? currentUser : providers[0];
+
   return (
     <div className="space-y-8 pb-16">
       {/* Header Profile & Mode Bar */}
@@ -103,8 +131,8 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
           <div className="flex items-center gap-4">
             <div className="relative">
               <img
-                src={currentUser.avatar}
-                alt={currentUser.name}
+                src={activeWorker.avatar}
+                alt={activeWorker.name}
                 className="w-16 h-16 rounded-2xl object-cover border-2 border-slate-700 shadow-md"
                 referrerPolicy="no-referrer"
                 onError={(e) => {
@@ -120,24 +148,24 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
 
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl md:text-2xl font-bold">{currentUser.name}</h1>
+                <h1 className="text-xl md:text-2xl font-bold">{activeWorker.name}</h1>
                 <span className="text-xs bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded font-medium flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5" />
                   Verified
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-0.5">
-                {currentUser.serviceSkill || currentUser.vehicleType || 'Professional Partner'}
+                {activeWorker.serviceSkill || activeWorker.vehicleType || 'Professional Partner'}
               </p>
               <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400">
                 <span className="flex items-center gap-1 text-amber-400 font-bold">
                   <Star className="w-3.5 h-3.5 fill-amber-400" />
-                  {currentUser.rating || 4.9}
+                  {activeWorker.rating || 5.0}
                 </span>
                 <span>·</span>
-                <span>{currentUser.completedJobsCount || 148} Total Jobs</span>
+                <span>{activeWorker.completedJobsCount || 0} Total Jobs</span>
                 <span>·</span>
-                <span className="text-emerald-400">98% Acceptance</span>
+                <span className="text-emerald-400">100% Acceptance</span>
               </div>
             </div>
           </div>

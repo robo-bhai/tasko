@@ -14,78 +14,26 @@ const STORAGE_KEY_SERVICES = 'omniserve_services_v1';
 const STORAGE_KEY_VEHICLES = 'omniserve_vehicles_v1';
 const STORAGE_KEY_CURRENT_USER = 'omniserve_current_user_v1';
 
+// Super Admin credentials dynamically loaded from environment / GitHub secrets
+export const DEFAULT_ADMIN_USERNAME = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_ADMIN_USERNAME) 
+  ? String(import.meta.env.VITE_ADMIN_USERNAME) 
+  : 'admin@omniserve.com';
+
+export const DEFAULT_ADMIN_PASSWORD = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_ADMIN_PASSWORD) 
+  ? String(import.meta.env.VITE_ADMIN_PASSWORD) 
+  : 'Admin@12345';
+
 export const INITIAL_USERS: User[] = [
   {
-    id: 'usr-customer-1',
-    name: 'Ahmed Khan',
-    email: 'ahmed.khan@example.com',
-    phone: '+92 300 1234567',
-    role: 'customer',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    address: 'House 42, Street 7, Sector F-8/2, Islamabad',
-    walletBalance: 4500,
-    status: 'active',
-    joinedDate: '2025-08-15'
-  },
-  {
-    id: 'usr-provider-tech',
-    name: 'Sarah Jenkins',
-    email: 'sarah.tech@omniserve.com',
-    phone: '+92 321 9876543',
-    role: 'provider',
-    avatar: '/src/assets/images/app_avatar_provider_1793035360068.jpg',
-    address: 'G-9 Commercial Area, Islamabad',
-    walletBalance: 18450,
-    status: 'active',
-    joinedDate: '2025-03-10',
-    providerCategory: 'home_technician',
-    serviceSkill: 'HVAC & Master AC Repair Specialist',
-    rating: 4.9,
-    completedJobsCount: 148,
-    isOnline: true
-  },
-  {
-    id: 'usr-provider-driver',
-    name: 'Tariq Mehmood',
-    email: 'tariq.transport@omniserve.com',
-    phone: '+92 333 4567890',
-    role: 'provider',
-    avatar: '/src/assets/images/transport_cargo_vehicle_1793035359966.jpg',
-    address: 'I-9 Industrial Zone, Islamabad',
-    walletBalance: 24300,
-    status: 'active',
-    joinedDate: '2025-01-20',
-    providerCategory: 'cargo_driver',
-    vehicleType: 'Suzuki Bolan Mini-Pickup (1 Ton)',
-    rating: 4.85,
-    completedJobsCount: 312,
-    isOnline: true
-  },
-  {
-    id: 'usr-provider-courier',
-    name: 'Bilal Vance',
-    email: 'bilal.delivery@omniserve.com',
-    phone: '+92 312 5550192',
-    role: 'provider',
-    avatar: '/src/assets/images/hero_delivery_service_1793035359071.jpg',
-    address: 'Blue Area Commercial Hub, Islamabad',
-    walletBalance: 9800,
-    status: 'active',
-    joinedDate: '2025-05-12',
-    providerCategory: 'delivery_courier',
-    vehicleType: 'Express 125cc Motorbike',
-    rating: 4.92,
-    completedJobsCount: 524,
-    isOnline: true
-  },
-  {
     id: 'usr-admin-1',
-    name: 'Zubair Tariq',
-    email: 'admin@omniserve.com',
+    name: 'Super Administrator',
+    email: DEFAULT_ADMIN_USERNAME,
     phone: '+92 300 0009988',
+    password: DEFAULT_ADMIN_PASSWORD,
     role: 'admin',
     avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-    walletBalance: 125000,
+    address: 'Corporate Headquarters, Blue Area, Islamabad',
+    walletBalance: 150000,
     status: 'active',
     joinedDate: '2024-11-01'
   }
@@ -201,178 +149,7 @@ export const INITIAL_VEHICLES: TransportVehicleItem[] = [
   }
 ];
 
-export const INITIAL_ORDERS: Order[] = [
-  {
-    id: 'OS-9104',
-    category: 'home_services',
-    customerId: 'usr-customer-1',
-    customerName: 'Ahmed Khan',
-    customerPhone: '+92 300 1234567',
-    deliveryAddress: 'House 42, Street 7, Sector F-8/2, Islamabad',
-    status: 'work_started',
-    createdAt: '2026-10-26T09:15:00Z',
-    updatedAt: '2026-10-26T09:55:00Z',
-    serviceDetails: {
-      serviceId: 'srv-ac-repair',
-      serviceName: 'AC Master Service & Repair',
-      category: 'HVAC & Cooling',
-      issueDescription: 'Master bedroom split AC not throwing cold air and slight water dripping from indoor unit.',
-      selectedIssues: ['Not cooling properly', 'Water leakage / dripping'],
-      scheduledDate: 'Today (Immediate)',
-      scheduledTimeSlot: '10:00 AM - 12:00 PM',
-      serviceAddress: 'House 42, Street 7, Sector F-8/2, Islamabad'
-    },
-    pricing: {
-      baseFee: 1800,
-      serviceOrDeliveryFee: 400,
-      itemOrDistanceBudget: 0,
-      helperFee: 0,
-      platformFee: 150,
-      total: 2350
-    },
-    paymentMethod: 'jazzcash',
-    paymentStatus: 'paid',
-    assignedProviderId: 'usr-provider-tech',
-    assignedProviderName: 'Sarah Jenkins',
-    assignedProviderPhone: '+92 321 9876543',
-    assignedProviderAvatar: '/src/assets/images/app_avatar_provider_1793035360068.jpg',
-    assignedProviderRating: 4.9,
-    etaMinutes: 20,
-    currentStepIndex: 2,
-    timeline: [
-      { status: 'pending', label: 'Booking Received', timestamp: '09:15 AM', note: 'Customer booked AC Master Service' },
-      { status: 'assigned', label: 'Sarah Jenkins Assigned', timestamp: '09:22 AM', note: 'Technician accepted with diagnostic kit' },
-      { status: 'work_started', label: 'Diagnostic & Chemical Wash in Progress', timestamp: '09:50 AM', note: 'Technician on-site testing coil pressure' }
-    ]
-  },
-  {
-    id: 'OS-9102',
-    category: 'custom_delivery',
-    customerId: 'usr-customer-1',
-    customerName: 'Ahmed Khan',
-    customerPhone: '+92 300 1234567',
-    deliveryAddress: 'House 42, Street 7, Sector F-8/2, Islamabad',
-    status: 'on_the_way',
-    createdAt: '2026-10-26T08:30:00Z',
-    updatedAt: '2026-10-26T09:40:00Z',
-    deliveryDetails: {
-      itemName: '2x Panadol Extra, 1x Betadine liquid, 1x Sterile Cotton Roll 100g',
-      estimatedBudget: 850,
-      storeName: 'Shaheen Chemist & Superstore (F-6 Super Market)',
-      pickupAddress: 'Block 14, Super Market, F-6, Islamabad',
-      deliveryAddress: 'House 42, Street 7, Sector F-8/2, Islamabad',
-      notes: 'Please check expiry dates and collect original printed receipt from store.',
-      isUrgent: true
-    },
-    pricing: {
-      baseFee: 250,
-      serviceOrDeliveryFee: 150,
-      itemOrDistanceBudget: 850,
-      helperFee: 0,
-      platformFee: 50,
-      total: 1300
-    },
-    paymentMethod: 'cod',
-    paymentStatus: 'pending',
-    assignedProviderId: 'usr-provider-courier',
-    assignedProviderName: 'Bilal Vance',
-    assignedProviderPhone: '+92 312 5550192',
-    assignedProviderAvatar: '/src/assets/images/hero_delivery_service_1793035359071.jpg',
-    assignedProviderRating: 4.92,
-    etaMinutes: 12,
-    currentStepIndex: 2,
-    timeline: [
-      { status: 'pending', label: 'Order Broadcasted', timestamp: '08:30 AM', note: 'Store delivery request created' },
-      { status: 'assigned', label: 'Courier Bilal Vance Dispatched', timestamp: '08:35 AM', note: 'Rider en route to Shaheen Chemist' },
-      { status: 'on_the_way', label: 'Items Purchased & On The Way', timestamp: '09:30 AM', note: 'Items verified against customer list' }
-    ]
-  },
-  {
-    id: 'OS-9088',
-    category: 'transport_cargo',
-    customerId: 'usr-customer-1',
-    customerName: 'Ahmed Khan',
-    customerPhone: '+92 300 1234567',
-    deliveryAddress: 'Plot 18, Commercial Broadway, DHA Phase 2, Islamabad',
-    status: 'completed',
-    createdAt: '2026-10-25T14:00:00Z',
-    updatedAt: '2026-10-25T16:20:00Z',
-    transportDetails: {
-      vehicleId: 'veh-mini-pickup',
-      vehicleName: 'Mini Pickup (Suzuki Bolan / Ravi)',
-      pickupLocation: 'Furniture Market, Golra Road, H-13, Islamabad',
-      dropoffLocation: 'Plot 18, Commercial Broadway, DHA Phase 2, Islamabad',
-      estimatedDistanceKm: 18,
-      cargoDescription: '1x Solid Oak Dining Table with 6 Chairs and 1 Display Sideboard',
-      loadWeightKg: 420,
-      needsHelper: true,
-      helperCount: 1
-    },
-    pricing: {
-      baseFee: 1200,
-      serviceOrDeliveryFee: 1350,
-      itemOrDistanceBudget: 0,
-      helperFee: 500,
-      platformFee: 150,
-      total: 3200
-    },
-    paymentMethod: 'easypaisa',
-    paymentStatus: 'paid',
-    assignedProviderId: 'usr-provider-driver',
-    assignedProviderName: 'Tariq Mehmood',
-    assignedProviderPhone: '+92 333 4567890',
-    assignedProviderAvatar: '/src/assets/images/transport_cargo_vehicle_1793035359966.jpg',
-    assignedProviderRating: 4.85,
-    currentStepIndex: 4,
-    timeline: [
-      { status: 'pending', label: 'Booking Placed', timestamp: '02:00 PM', note: 'Transport request registered' },
-      { status: 'assigned', label: 'Driver Tariq Confirmed', timestamp: '02:10 PM', note: 'Suzuki Mini-Pickup assigned' },
-      { status: 'on_the_way', label: 'Goods Loaded & Transit Started', timestamp: '02:50 PM', note: 'Securely tied with cargo ropes' },
-      { status: 'completed', label: 'Delivered and Unloaded', timestamp: '04:15 PM', note: 'Delivered in mint condition' }
-    ],
-    review: {
-      rating: 5,
-      comment: 'Tariq and his helper were extremely courteous and took immense care while moving our fragile wooden dining set. Highly recommended!',
-      tags: ['Careful Handling', 'Punctual', 'Great Equipment'],
-      reviewedAt: '2026-10-25T16:30:00Z'
-    }
-  },
-  {
-    id: 'OS-9108',
-    category: 'custom_delivery',
-    customerId: 'usr-customer-1',
-    customerName: 'Ahmed Khan',
-    customerPhone: '+92 300 1234567',
-    deliveryAddress: 'House 42, Street 7, Sector F-8/2, Islamabad',
-    status: 'pending',
-    createdAt: '2026-10-26T10:10:00Z',
-    updatedAt: '2026-10-26T10:10:00Z',
-    deliveryDetails: {
-      itemName: 'Hot Garlic Naan (5 pcs) and Chicken Karahi half from Tehzeeb Bakers & BBQ',
-      estimatedBudget: 1650,
-      storeName: 'Tehzeeb Foods, Blue Area',
-      pickupAddress: 'Blue Area Jinnah Avenue, Islamabad',
-      deliveryAddress: 'House 42, Street 7, Sector F-8/2, Islamabad',
-      notes: 'Keep food in thermal bag so it stays piping hot please.',
-      isUrgent: false
-    },
-    pricing: {
-      baseFee: 200,
-      serviceOrDeliveryFee: 150,
-      itemOrDistanceBudget: 1650,
-      helperFee: 0,
-      platformFee: 50,
-      total: 2050
-    },
-    paymentMethod: 'cod',
-    paymentStatus: 'pending',
-    etaMinutes: 35,
-    currentStepIndex: 0,
-    timeline: [
-      { status: 'pending', label: 'Broadcasted to Nearby Couriers', timestamp: '10:10 AM', note: 'Looking for available riders' }
-    ]
-  }
-];
+export const INITIAL_ORDERS: Order[] = [];
 
 // Helper functions for safe storage
 function loadFromStorage<T>(key: string, fallback: T): T {
@@ -411,12 +188,43 @@ export const subscribeToStore = (listener: StoreListener) => {
 
 // Store API
 export const Store = {
+  getSuperAdminCredentials: () => {
+    return {
+      username: DEFAULT_ADMIN_USERNAME,
+      password: DEFAULT_ADMIN_PASSWORD
+    };
+  },
+
   getUsers: (): User[] => {
-    return loadFromStorage<User[]>(STORAGE_KEY_USERS, INITIAL_USERS);
+    const loaded = loadFromStorage<User[]>(STORAGE_KEY_USERS, INITIAL_USERS);
+    // Ensure Super Admin is always present and updated with environment secrets
+    let admin = loaded.find(u => u.role === 'admin');
+    if (!admin) {
+      admin = {
+        id: 'usr-admin-1',
+        name: 'Super Administrator',
+        email: DEFAULT_ADMIN_USERNAME,
+        phone: '+92 300 0009988',
+        password: DEFAULT_ADMIN_PASSWORD,
+        role: 'admin',
+        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+        address: 'Corporate Headquarters, Islamabad',
+        walletBalance: 150000,
+        status: 'active',
+        joinedDate: '2024-11-01'
+      };
+      loaded.push(admin);
+      saveToStorage(STORAGE_KEY_USERS, loaded);
+    } else if (admin.email !== DEFAULT_ADMIN_USERNAME || admin.password !== DEFAULT_ADMIN_PASSWORD) {
+      admin.email = DEFAULT_ADMIN_USERNAME;
+      admin.password = DEFAULT_ADMIN_PASSWORD;
+      saveToStorage(STORAGE_KEY_USERS, loaded);
+    }
+    return loaded;
   },
 
   getCurrentUser: (): User => {
-    const defaultUser = INITIAL_USERS[0]; // Ahmed Khan
+    const defaultUser = Store.getUsers()[0]; // Ahmed Khan or Admin
     return loadFromStorage<User>(STORAGE_KEY_CURRENT_USER, defaultUser);
   },
 
@@ -432,6 +240,114 @@ export const Store = {
     }
     saveToStorage(STORAGE_KEY_USERS, users);
     notifyStoreChanged();
+  },
+
+  registerCustomer: (customerData: {
+    name: string;
+    email: string;
+    phone: string;
+    password?: string;
+    address?: string;
+  }): User => {
+    const users = Store.getUsers();
+    const existing = users.find(
+      u => u.email.toLowerCase() === customerData.email.toLowerCase() || u.phone === customerData.phone
+    );
+    if (existing) {
+      throw new Error('An account with this email or phone number already exists.');
+    }
+
+    const newUser: User = {
+      id: 'usr-cust-' + Date.now(),
+      name: customerData.name.trim(),
+      email: customerData.email.trim().toLowerCase(),
+      phone: customerData.phone.trim(),
+      password: customerData.password || 'Customer@123',
+      role: 'customer',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      address: customerData.address?.trim() || 'Sector F-8/2, Islamabad',
+      walletBalance: 3000,
+      status: 'active',
+      joinedDate: new Date().toISOString().split('T')[0]
+    };
+
+    users.push(newUser);
+    saveToStorage(STORAGE_KEY_USERS, users);
+    Store.setCurrentUser(newUser);
+    notifyStoreChanged();
+    return newUser;
+  },
+
+  createProviderByAdmin: (providerData: {
+    name: string;
+    email: string;
+    phone: string;
+    password?: string;
+    providerCategory: any;
+    serviceSkill?: string;
+    vehicleType?: string;
+    walletBalance?: number;
+    address?: string;
+  }): User => {
+    const users = Store.getUsers();
+    const avatar = providerData.providerCategory === 'cargo_driver'
+      ? '/src/assets/images/transport_cargo_vehicle_1793035359966.jpg'
+      : providerData.providerCategory === 'delivery_courier'
+      ? '/src/assets/images/hero_delivery_service_1793035359071.jpg'
+      : '/src/assets/images/app_avatar_provider_1793035360068.jpg';
+
+    const newProvider: User = {
+      id: 'usr-prov-' + Date.now(),
+      name: providerData.name.trim(),
+      email: providerData.email.trim().toLowerCase(),
+      phone: providerData.phone.trim(),
+      password: providerData.password || 'Worker@123',
+      role: 'provider',
+      avatar,
+      address: providerData.address?.trim() || 'Commercial Hub, Islamabad',
+      walletBalance: providerData.walletBalance || 5000,
+      status: 'active',
+      joinedDate: new Date().toISOString().split('T')[0],
+      providerCategory: providerData.providerCategory,
+      serviceSkill: providerData.serviceSkill || (providerData.providerCategory === 'home_technician' ? 'AC & Electrical Specialist' : undefined),
+      vehicleType: providerData.vehicleType || (providerData.providerCategory === 'cargo_driver' ? 'Suzuki Bolan Pickup' : '125cc Motorbike'),
+      rating: 5.0,
+      completedJobsCount: 0,
+      isOnline: true
+    };
+
+    users.push(newProvider);
+    saveToStorage(STORAGE_KEY_USERS, users);
+    notifyStoreChanged();
+    return newProvider;
+  },
+
+  authenticateUser: (identifier: string, password?: string): { success: boolean; user?: User; error?: string } => {
+    const users = Store.getUsers();
+    const cleanId = identifier.trim().toLowerCase();
+
+    // Check by email or phone
+    const user = users.find(u => 
+      u.email.toLowerCase() === cleanId || 
+      u.phone.replace(/\s+/g, '') === cleanId.replace(/\s+/g, '')
+    );
+
+    if (!user) {
+      return { success: false, error: 'No account found with this email or phone number.' };
+    }
+
+    if (user.status === 'blocked') {
+      return { success: false, error: 'This account has been suspended by the administrator.' };
+    }
+
+    // If password provided, verify it
+    if (password && user.password && user.password !== password) {
+      return { success: false, error: 'Incorrect password. Please verify credentials.' };
+    }
+
+    Store.setCurrentUser(user);
+    notifyStoreChanged();
+    return { success: true, user };
   },
 
   switchUserById: (userId: string): User | null => {

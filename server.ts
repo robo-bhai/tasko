@@ -10,6 +10,29 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+async function syncSuperAdminFromEnv() {
+  if (!isDbConnected()) return;
+  const adminEmail = process.env.ADMIN_USERNAME || 'admin@omniserve.com';
+  const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@12345';
+
+  try {
+    const existing = await query('SELECT id FROM users WHERE id = ? OR email = ? LIMIT 1', ['usr-admin-1', adminEmail]);
+    if (existing && existing.length > 0) {
+      const existingId = (existing[0] as any).id;
+      await query('UPDATE users SET email = ?, password = ? WHERE id = ?', [adminEmail, adminPassword, existingId]);
+      console.log(`[OmniServe] Verified & synced Super Admin credentials in MySQL for: ${adminEmail}`);
+    } else {
+      await query(`
+        INSERT INTO users (id, name, email, phone, password, role, avatar, address, wallet_balance, status)
+        VALUES (?, 'Super Administrator', ?, '+92 300 0009988', ?, 'admin', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80', 'Headquarters, Blue Area, Islamabad', 150000.00, 'active')
+      `, ['usr-admin-1', adminEmail, adminPassword]);
+      console.log(`[OmniServe] Provisioned initial Super Admin in MySQL for: ${adminEmail}`);
+    }
+  } catch (err: any) {
+    console.warn('[OmniServe] Note syncing admin credentials:', err.message);
+  }
+}
+
 async function startServer() {
   const app = express();
   const PORT = process.env.PORT || 3000;
@@ -18,14 +41,23 @@ async function startServer() {
 
   // Attempt MySQL database connection
   await initDbPool();
+  await syncSuperAdminFromEnv();
 
   // API Routes
   app.get('/api/health', (req: Request, res: Response) => {
     res.json({
       status: 'healthy',
       database: isDbConnected() ? 'mysql_connected' : 'memory_fallback',
+      adminUser: process.env.ADMIN_USERNAME ? 'configured_from_secret' : 'default_admin',
       timestamp: new Date().toISOString(),
       uptime: process.uptime()
+    });
+  });
+
+  app.get('/api/config/auth-info', (req: Request, res: Response) => {
+    res.json({
+      adminConfigured: Boolean(process.env.ADMIN_USERNAME),
+      adminUsername: process.env.ADMIN_USERNAME || 'admin@omniserve.com'
     });
   });
 

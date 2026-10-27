@@ -107,6 +107,18 @@ jobs:
             echo "Fresh schema and sample data initialized."
           fi
 
+          # Sync Admin credentials from GitHub Secrets if provided
+          ADMIN_USER_SECRET="${{ secrets.ADMIN_USERNAME }}"
+          ADMIN_PASS_SECRET="${{ secrets.ADMIN_PASSWORD }}"
+          if [ -n "$ADMIN_USER_SECRET" ]; then
+            echo "Applying configured ADMIN_USERNAME from GitHub secrets to MySQL..."
+            mysql -h 127.0.0.1 -u root omniserve_db -e "UPDATE users SET email = '$ADMIN_USER_SECRET' WHERE id = 'usr-admin-1';" || true
+          fi
+          if [ -n "$ADMIN_PASS_SECRET" ]; then
+            echo "Applying configured ADMIN_PASSWORD from GitHub secrets to MySQL..."
+            mysql -h 127.0.0.1 -u root omniserve_db -e "UPDATE users SET password = '$ADMIN_PASS_SECRET' WHERE id = 'usr-admin-1';" || true
+          fi
+
           echo "Database tables verified:"
           mysql -h 127.0.0.1 -u omniserve -pomniserve_secure_password omniserve_db -e "
             SELECT 'users' AS table_name, COUNT(*) AS total_rows FROM users
@@ -127,6 +139,9 @@ jobs:
           fi
 
       - name: Build Production Frontend Assets
+        env:
+          VITE_ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME || 'admin@omniserve.com' }}
+          VITE_ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'Admin@12345' }}
         run: npm run build
 
       # 4. Install Cloudflare Tunnel Client (cloudflared)
@@ -147,6 +162,10 @@ jobs:
           MYSQL_USER: omniserve
           MYSQL_PASSWORD: omniserve_secure_password
           MYSQL_DATABASE: omniserve_db
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME || 'admin@omniserve.com' }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'Admin@12345' }}
+          VITE_ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME || 'admin@omniserve.com' }}
+          VITE_ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'Admin@12345' }}
         run: |
           echo "Launching OmniServe Express server..."
           npx tsx server.ts > app.log 2>&1 &

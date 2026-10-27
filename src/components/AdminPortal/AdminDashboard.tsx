@@ -50,6 +50,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [editingVehicles, setEditingVehicles] = useState<TransportVehicleItem[]>(vehicles);
   const [catalogSavedMessage, setCatalogSavedMessage] = useState('');
 
+  // Admin User Creation Modal State
+  const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPhone, setNewUserPhone] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('Worker@123');
+  const [newUserRole, setNewUserRole] = useState<'provider' | 'customer' | 'admin'>('provider');
+  const [newProviderCategory, setNewProviderCategory] = useState<'home_technician' | 'cargo_driver' | 'delivery_courier'>('home_technician');
+  const [newSkill, setNewSkill] = useState('HVAC & AC Master Service');
+  const [newVehicle, setNewVehicle] = useState('Suzuki Bolan Mini-Pickup');
+  const [newBalance, setNewBalance] = useState(5000);
+  const [newAddress, setNewAddress] = useState('Sector G-9 Commercial, Islamabad');
+  const [userCreatedMessage, setUserCreatedMessage] = useState('');
+
   // Stats
   const activeOrdersCount = orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length;
   const completedOrdersCount = orders.filter(o => o.status === 'completed').length;
@@ -122,6 +136,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const updated = [...editingServices, newService];
     setEditingServices(updated);
     Store.updateServicesCatalog(updated);
+  };
+
+  const handleCreateUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName.trim() || !newUserEmail.trim() || !newUserPhone.trim()) {
+      alert('Please fill out all required fields.');
+      return;
+    }
+
+    try {
+      if (newUserRole === 'provider') {
+        Store.createProviderByAdmin({
+          name: newUserName.trim(),
+          email: newUserEmail.trim(),
+          phone: newUserPhone.trim(),
+          password: newUserPassword.trim() || 'Worker@123',
+          providerCategory: newProviderCategory,
+          serviceSkill: newProviderCategory === 'home_technician' ? newSkill : undefined,
+          vehicleType: newProviderCategory === 'cargo_driver' ? newVehicle : (newProviderCategory === 'delivery_courier' ? '125cc Motorbike' : undefined),
+          walletBalance: Number(newBalance) || 0,
+          address: newAddress.trim()
+        });
+      } else {
+        Store.registerCustomer({
+          name: newUserName.trim(),
+          email: newUserEmail.trim(),
+          phone: newUserPhone.trim(),
+          password: newUserPassword.trim() || 'Customer@123',
+          address: newAddress.trim()
+        });
+      }
+
+      setUserCreatedMessage(`Account for ${newUserName} created successfully! Assigned Password: ${newUserPassword}`);
+      setTimeout(() => setUserCreatedMessage(''), 6000);
+      setIsCreateUserModalOpen(false);
+      setNewUserName('');
+      setNewUserEmail('');
+      setNewUserPhone('');
+    } catch (err: any) {
+      alert(err.message || 'Error creating user account');
+    }
   };
 
   return (
@@ -422,10 +477,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* SECTION 2: USERS & PROVIDERS MANAGEMENT */}
       {activeSection === 'users' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-900">Registered Accounts & Partner Verification</h3>
-            <span className="text-xs text-slate-500 font-mono">{users.length} Total Users</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Registered Accounts & Partner Verification</h3>
+              <p className="text-xs text-slate-500">Super Admin can create verified drivers, technicians, couriers, and staff accounts</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 font-mono">{users.length} Total Users</span>
+              <button
+                onClick={() => setIsCreateUserModalOpen(true)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Create Worker / Provider</span>
+              </button>
+            </div>
           </div>
+
+          {userCreatedMessage && (
+            <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{userCreatedMessage}</span>
+            </div>
+          )}
 
           <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto shadow-2xs">
             <table className="w-full text-left border-collapse text-xs">
@@ -701,6 +775,169 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE USER / SERVICE PROVIDER MODAL (Admin Only) */}
+      {isCreateUserModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 my-6">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div>
+                <h4 className="font-bold text-slate-900 text-base">Create Worker / Provider Account</h4>
+                <p className="text-xs text-slate-500">Super Admin can register certified technicians, cargo drivers, and couriers</p>
+              </div>
+              <button onClick={() => setIsCreateUserModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateUser} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Account Role *</label>
+                  <select
+                    value={newUserRole}
+                    onChange={(e) => setNewUserRole(e.target.value as any)}
+                    className="w-full text-xs rounded-xl border border-slate-300 px-3 py-2 bg-white font-medium"
+                  >
+                    <option value="provider">Service Provider / Worker</option>
+                    <option value="customer">Registered Customer</option>
+                  </select>
+                </div>
+
+                {newUserRole === 'provider' && (
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Provider Category *</label>
+                    <select
+                      value={newProviderCategory}
+                      onChange={(e) => setNewProviderCategory(e.target.value as any)}
+                      className="w-full text-xs rounded-xl border border-slate-300 px-3 py-2 bg-white font-medium"
+                    >
+                      <option value="home_technician">Home Technician (AC/Electric/Plumbing)</option>
+                      <option value="cargo_driver">Cargo / Transport Driver</option>
+                      <option value="delivery_courier">Delivery Courier / Bike Rider</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  placeholder="e.g. Tariq Mehmood"
+                  className="w-full text-xs rounded-xl border border-slate-300 px-3 py-2"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Email Address *</label>
+                  <input
+                    type="email"
+                    required
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                    placeholder="tariq@omniserve.com"
+                    className="w-full text-xs font-mono rounded-xl border border-slate-300 px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Phone Number *</label>
+                  <input
+                    type="tel"
+                    required
+                    value={newUserPhone}
+                    onChange={(e) => setNewUserPhone(e.target.value)}
+                    placeholder="+92 333 4567890"
+                    className="w-full text-xs font-mono rounded-xl border border-slate-300 px-3 py-2"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Assigned Login Password *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newUserPassword}
+                    onChange={(e) => setNewUserPassword(e.target.value)}
+                    placeholder="Worker@123"
+                    className="w-full text-xs font-mono rounded-xl border border-slate-300 px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Starting Wallet Balance (PKR)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={500}
+                    value={newBalance}
+                    onChange={(e) => setNewBalance(Number(e.target.value))}
+                    className="w-full text-xs font-mono rounded-xl border border-slate-300 px-3 py-2"
+                  />
+                </div>
+              </div>
+
+              {newUserRole === 'provider' && newProviderCategory === 'home_technician' && (
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Specialized Skill / Trade</label>
+                  <input
+                    type="text"
+                    value={newSkill}
+                    onChange={(e) => setNewSkill(e.target.value)}
+                    placeholder="e.g. Master AC Chemical Washing & Refrigerant Leak Diagnostics"
+                    className="w-full text-xs rounded-xl border border-slate-300 px-3 py-2"
+                  />
+                </div>
+              )}
+
+              {newUserRole === 'provider' && newProviderCategory === 'cargo_driver' && (
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Vehicle Model & Registration</label>
+                  <input
+                    type="text"
+                    value={newVehicle}
+                    onChange={(e) => setNewVehicle(e.target.value)}
+                    placeholder="e.g. Suzuki Bolan Pickup (ICT-9921)"
+                    className="w-full text-xs rounded-xl border border-slate-300 px-3 py-2"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Operating Location / Base Address</label>
+                <input
+                  type="text"
+                  value={newAddress}
+                  onChange={(e) => setNewAddress(e.target.value)}
+                  placeholder="Commercial area, Islamabad"
+                  className="w-full text-xs rounded-xl border border-slate-300 px-3 py-2"
+                />
+              </div>
+
+              <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateUserModalOpen(false)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-xs"
+                >
+                  Create & Activate Account
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
