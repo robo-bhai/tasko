@@ -319,8 +319,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
                 <p className="leading-relaxed">
                   {isUrdu 
-                    ? 'ایڈمن لاگ ان کے لیے اپنے GitHub Secrets والے ADMIN_USERNAME اور ADMIN_PASSWORD درج کریں۔'
-                    : 'Log in with your configured ADMIN_USERNAME and ADMIN_PASSWORD secrets to access the master control panel.'}
+                    ? 'ایڈمن لاگ ان کے لیے اپنے والے  اور  درج کریں۔'
+                    : 'Log in with your configured to access the master control panel.'}
                 </p>
               </div>
 
