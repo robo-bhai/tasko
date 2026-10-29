@@ -29,6 +29,31 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   supportHelpline: '0800-6664'
 };
 
+export interface KhanewalArea {
+  id: string;
+  nameUr: string;
+  nameEn: string;
+  sector: string;
+}
+
+export const KHANEWAL_LOCAL_AREAS: KhanewalArea[] = [
+  { id: 'peoples_colony', nameUr: 'پیپلز کالونی، خانیوال', nameEn: 'Peoples Colony, Khanewal', sector: 'Residential Zone A' },
+  { id: 'civil_lines', nameUr: 'سیول لائنز و کچہری روڈ', nameEn: 'Civil Lines & Katchery Rd', sector: 'Official & Central' },
+  { id: 'block_1_5', nameUr: 'بلاک 1 تا 5 (سینٹرل خانیوال)', nameEn: 'Block 1 - 5 (Central)', sector: 'City Center' },
+  { id: 'block_6_10', nameUr: 'بلاک 6 تا 10 (جناح چوک ایریا)', nameEn: 'Block 6 - 10 (Jinnah Chowk)', sector: 'Commercial Hub' },
+  { id: 'block_11_15', nameUr: 'بلاک 11 تا 15 (لالہ زار و ماڈل ٹاؤن)', nameEn: 'Block 11 - 15 (Lalazar)', sector: 'Residential Zone B' },
+  { id: 'tariqabad', nameUr: 'طارق آباد و گلبرگ کالونی', nameEn: 'Tariqabad & Gulberg Colony', sector: 'North Sector' },
+  { id: 'railway_colony', nameUr: 'ریلوے کالونی و لوکو شیڈ روڈ', nameEn: 'Railway Colony & Loco Shed', sector: 'Railway Belt' },
+  { id: 'model_town', nameUr: 'ماڈل ٹاؤن و کینٹ ایریا', nameEn: 'Model Town & Cantt Area', sector: 'Cantt Suburb' },
+  { id: 'old_khanewal', nameUr: 'پرانا خانیوال و پل بازار', nameEn: 'Old Khanewal & Pull Bazaar', sector: 'Old Heritage Area' },
+  { id: 'shamkot_road', nameUr: 'شام کوٹ روڈ و اسٹیڈیم ایریا', nameEn: 'Shamkot Road & Stadium Area', sector: 'South Corridor' },
+  { id: 'al_haram_city', nameUr: 'الحرم سٹی و آفیسرز کالونی', nameEn: 'Al-Haram City & Officers Colony', sector: 'New Housing Zone' },
+  { id: 'kabirwala_road', nameUr: 'کبیر والا روڈ و بائی پاس لنک', nameEn: 'Kabirwala Road & Bypass', sector: 'Highway Outskirts' },
+  { id: 'jahanian_road', nameUr: 'جہانیاں روڈ و لودھراں بائی پاس', nameEn: 'Jahanian Road Bypass', sector: 'Expressway Belt' },
+  { id: 'chak_84_10r', nameUr: 'چک 84/10-R (نواحی چکنبر)', nameEn: 'Chak 84/10-R Rural Sector', sector: 'Chak 84' },
+  { id: 'chak_86_88', nameUr: 'چک 86/10-R اور 88/10-R', nameEn: 'Chak 86/10-R & 88/10-R', sector: 'East Chaks' }
+];
+
 // Super Admin credentials dynamically loaded from environment / GitHub secrets
 export const DEFAULT_ADMIN_USERNAME = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_ADMIN_USERNAME) 
   ? String(import.meta.env.VITE_ADMIN_USERNAME) 
@@ -702,6 +727,97 @@ export const Store = {
       const pIdx = users.findIndex(u => u.id === updatedOrder.assignedProviderId);
       if (pIdx >= 0) {
         // Provider gets 85% of total earnings (platform takes 15%)
+        const providerEarnings = Math.round(updatedOrder.pricing.total * 0.85);
+        users[pIdx].walletBalance += providerEarnings;
+        users[pIdx].completedJobsCount = (users[pIdx].completedJobsCount || 0) + 1;
+        saveToStorage(STORAGE_KEY_USERS, users);
+      }
+    }
+
+    notifyStoreChanged();
+    return updatedOrder;
+  },
+
+  adminUpdateOrderDispatch: (
+    orderId: string, 
+    params: {
+      status: OrderStatus;
+      providerName?: string;
+      providerPhone?: string;
+      etaMinutes?: number;
+      customNote?: string;
+      providerId?: string;
+    }
+  ): Order | null => {
+    const orders = Store.getOrders();
+    const idx = orders.findIndex(o => o.id === orderId);
+    if (idx === -1) return null;
+
+    const currentOrder = orders[idx];
+    const timeFormatted = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    let stepIndex = currentOrder.currentStepIndex;
+    let label = 'Status Updated';
+
+    switch (params.status) {
+      case 'pending':
+        stepIndex = 0;
+        label = 'Pending Dispatch';
+        break;
+      case 'assigned':
+        stepIndex = 1;
+        label = `Assigned to ${params.providerName || currentOrder.assignedProviderName || 'Verified Worker'}`;
+        break;
+      case 'on_the_way':
+        stepIndex = 2;
+        label = currentOrder.category === 'home_services' 
+          ? `Technician En Route (${params.etaMinutes ? `~${params.etaMinutes} mins` : 'Dispatched'})`
+          : `Rider / Driver In Transit (${params.etaMinutes ? `~${params.etaMinutes} mins` : 'On The Way'})`;
+        break;
+      case 'work_started':
+        stepIndex = 2;
+        label = 'Work In Progress On-Site';
+        break;
+      case 'completed':
+        stepIndex = 3;
+        label = 'Service Delivered & Completed';
+        break;
+      case 'cancelled':
+        stepIndex = -1;
+        label = 'Order Cancelled';
+        break;
+    }
+
+    const updatedTimeline = [
+      ...currentOrder.timeline,
+      {
+        status: params.status,
+        label,
+        timestamp: timeFormatted,
+        note: params.customNote || (params.providerPhone ? `Contact: ${params.providerPhone}` : undefined)
+      }
+    ];
+
+    const updatedOrder: Order = {
+      ...currentOrder,
+      status: params.status,
+      currentStepIndex: stepIndex,
+      assignedProviderName: params.providerName !== undefined ? params.providerName : currentOrder.assignedProviderName,
+      assignedProviderPhone: params.providerPhone !== undefined ? params.providerPhone : currentOrder.assignedProviderPhone,
+      assignedProviderId: params.providerId !== undefined ? params.providerId : currentOrder.assignedProviderId,
+      etaMinutes: params.etaMinutes !== undefined ? params.etaMinutes : currentOrder.etaMinutes,
+      updatedAt: new Date().toISOString(),
+      timeline: updatedTimeline,
+      paymentStatus: params.status === 'completed' ? 'paid' : currentOrder.paymentStatus
+    };
+
+    orders[idx] = updatedOrder;
+    saveToStorage(STORAGE_KEY_ORDERS, orders);
+
+    if (params.status === 'completed' && updatedOrder.assignedProviderId) {
+      const users = Store.getUsers();
+      const pIdx = users.findIndex(u => u.id === updatedOrder.assignedProviderId);
+      if (pIdx >= 0) {
         const providerEarnings = Math.round(updatedOrder.pricing.total * 0.85);
         users[pIdx].walletBalance += providerEarnings;
         users[pIdx].completedJobsCount = (users[pIdx].completedJobsCount || 0) + 1;

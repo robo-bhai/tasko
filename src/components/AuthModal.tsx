@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { User, ProviderCategory } from '../types';
-import { Store, DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD } from '../services/store';
+import { User } from '../types';
+import { Store, DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD, KHANEWAL_LOCAL_AREAS } from '../services/store';
 import { Language, translations } from '../i18n/translations';
 import { 
   X, 
@@ -12,11 +12,9 @@ import {
   CheckCircle2, 
   AlertCircle,
   MapPin,
-  Truck,
-  Wrench,
   ShoppingBag,
-  CreditCard,
-  Briefcase
+  MessageCircle,
+  Sparkles
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -35,7 +33,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   lang
 }) => {
   const t = translations[lang];
-  const [activeTab, setActiveTab] = useState<'login' | 'customer_signup' | 'provider_signup'>('login');
+  const isUrdu = lang === 'ur';
+
+  const [activeTab, setActiveTab] = useState<'login' | 'customer_signup'>('login');
   
   // Login fields
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -47,19 +47,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [custPhone, setCustPhone] = useState('');
   const [custPassword, setCustPassword] = useState('');
   const [custAddress, setCustAddress] = useState('');
-  const [custCity, setCustCity] = useState('Islamabad');
-
-  // Provider Signup fields
-  const [provName, setProvName] = useState('');
-  const [provEmail, setProvEmail] = useState('');
-  const [provPhone, setProvPhone] = useState('');
-  const [provCnic, setProvCnic] = useState('');
-  const [provPassword, setProvPassword] = useState('');
-  const [provCategory, setProvCategory] = useState<ProviderCategory>('home_technician');
-  const [provSkill, setProvSkill] = useState('AC Master Service & Chemical Wash');
-  const [provVehicle, setProvVehicle] = useState('Suzuki Ravi / Bolan Pickup (800kg)');
-  const [provAddress, setProvAddress] = useState('');
-  const [provCity, setProvCity] = useState('Islamabad');
+  const [custAreaId, setCustAreaId] = useState(KHANEWAL_LOCAL_AREAS[0].id);
 
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -67,35 +55,36 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
+  const selectedArea = KHANEWAL_LOCAL_AREAS.find(a => a.id === custAreaId) || KHANEWAL_LOCAL_AREAS[0];
+
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
     setSuccessMessage('');
 
     if (!loginIdentifier.trim()) {
-      setErrorMessage(lang === 'ur' ? 'برائے مہربانی ای میل یا فون نمبر درج کریں۔' : 'Please enter your email or phone number.');
+      setErrorMessage(isUrdu ? 'برائے مہربانی ای میل یا فون نمبر درج کریں۔' : 'Please enter your email or phone number.');
       return;
     }
     if (!loginPassword.trim()) {
-      setErrorMessage(lang === 'ur' ? 'برائے مہربانی اپنا پاس ورڈ درج کریں۔' : 'Please enter your password.');
+      setErrorMessage(isUrdu ? 'برائے مہربانی اپنا پاس ورڈ درج کریں۔' : 'Please enter your password.');
       return;
     }
 
     setIsSubmitting(true);
     setTimeout(() => {
-      // Authenticate
       const authRes = Store.authenticateUser(loginIdentifier.trim(), loginPassword.trim());
       setIsSubmitting(false);
 
       if (!authRes.success || !authRes.user) {
         setErrorMessage(
           authRes.error || 
-          (lang === 'ur' ? 'غلط تفصیلات۔ ای میل / فون اور پاس ورڈ دوبارہ چیک کریں۔' : 'Invalid credentials. Please verify your email/phone and password.')
+          (isUrdu ? 'غلط تفصیلات۔ ای میل / فون اور پاس ورڈ دوبارہ چیک کریں۔' : 'Invalid credentials. Please verify your email/phone and password.')
         );
         return;
       }
 
-      setSuccessMessage(lang === 'ur' ? `خوش آمدید! آپ کامیابی سے لاگ ان ہو چکے ہیں۔` : `Welcome back, ${authRes.user.name}!`);
+      setSuccessMessage(isUrdu ? `خوش آمدید! آپ کامیابی سے لاگ ان ہو چکے ہیں۔` : `Welcome back, ${authRes.user.name}!`);
       setTimeout(() => {
         onSuccess(authRes.user!);
         onClose();
@@ -109,26 +98,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setSuccessMessage('');
 
     if (!custName.trim() || !custEmail.trim() || !custPhone.trim() || !custPassword.trim()) {
-      setErrorMessage(lang === 'ur' ? 'تمام ضروری خانے پر کریں۔' : 'Please fill in all required fields.');
+      setErrorMessage(isUrdu ? 'تمام ضروری خانے پر کریں۔' : 'Please fill in all required fields.');
       return;
     }
 
     if (custPassword.length < 6) {
-      setErrorMessage(lang === 'ur' ? 'پاس ورڈ کم از کم 6 ہندسوں کا ہونا چاہیے۔' : 'Password must be at least 6 characters.');
+      setErrorMessage(isUrdu ? 'پاس ورڈ کم از کم 6 ہندسوں کا ہونا چاہیے۔' : 'Password must be at least 6 characters.');
       return;
     }
 
     setIsSubmitting(true);
     try {
+      const areaLabel = isUrdu ? selectedArea.nameUr : selectedArea.nameEn;
+      const formattedAddress = custAddress.trim() 
+        ? `${custAddress.trim()}, ${areaLabel}` 
+        : `${areaLabel}, Khanewal`;
+
       const newCustomer = Store.registerCustomer({
         name: custName.trim(),
         email: custEmail.trim(),
         phone: custPhone.trim(),
         password: custPassword.trim(),
-        address: custAddress.trim() ? `${custAddress.trim()}, ${custCity}` : `${custCity}, Pakistan`
+        address: formattedAddress
       });
 
-      setSuccessMessage(lang === 'ur' ? 'کسٹمر اکاؤنٹ کامیابی سے بن گیا!' : 'Customer profile created successfully!');
+      setSuccessMessage(isUrdu ? 'خانیوال کسٹمر اکاؤنٹ کامیابی سے بن گیا!' : 'Khanewal Customer profile created successfully!');
       setTimeout(() => {
         setIsSubmitting(false);
         onSuccess(newCustomer);
@@ -136,75 +130,43 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }, 600);
     } catch (err: any) {
       setIsSubmitting(false);
-      setErrorMessage(err.message || (lang === 'ur' ? 'اکاؤنٹ بنانے میں خرابی۔' : 'Failed to register account.'));
+      setErrorMessage(err.message || (isUrdu ? 'اکاؤنٹ بنانے میں خرابی۔' : 'Failed to register account.'));
     }
   };
 
-  const handleProviderSignUp = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage('');
-    setSuccessMessage('');
-
-    if (!provName.trim() || !provEmail.trim() || !provPhone.trim() || !provPassword.trim()) {
-      setErrorMessage(lang === 'ur' ? 'تمام ضروری معلومات فراہم کریں۔' : 'Please fill in all required fields.');
-      return;
-    }
-
-    if (provPassword.length < 6) {
-      setErrorMessage(lang === 'ur' ? 'پاس ورڈ کم از کم 6 ہندسوں کا ہونا چاہیے۔' : 'Password must be at least 6 characters.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const newProvider = Store.registerProvider({
-        name: provName.trim(),
-        email: provEmail.trim(),
-        phone: provPhone.trim(),
-        password: provPassword.trim(),
-        cnic: provCnic.trim(),
-        city: provCity,
-        providerCategory: provCategory,
-        serviceSkill: provCategory === 'home_technician' ? provSkill : undefined,
-        vehicleType: provCategory === 'cargo_driver' ? provVehicle : provCategory === 'delivery_courier' ? '125cc Delivery Bike' : undefined,
-        address: provAddress.trim() ? `${provAddress.trim()}, ${provCity}` : `${provCity}, Pakistan`
-      });
-
-      setSuccessMessage(lang === 'ur' ? 'ورکر / ڈرائیور پروفائل رجسٹر ہو گئی۔ خوش آمدید!' : 'Provider profile created successfully! Welcome aboard.');
-      setTimeout(() => {
-        setIsSubmitting(false);
-        onSuccess(newProvider);
-        onClose();
-      }, 600);
-    } catch (err: any) {
-      setIsSubmitting(false);
-      setErrorMessage(err.message || (lang === 'ur' ? 'رجسٹریشن ناکام ہو گئی۔' : 'Failed to register provider.'));
-    }
-  };
-
-  const isUrdu = lang === 'ur';
+  const whatsappAdminNumber = (Store.getSettings().whatsappSupportPhone || '+923000009988').replace(/[^0-9]/g, '');
+  const partnerOnboardUrl = `https://wa.me/${whatsappAdminNumber}?text=${encodeURIComponent(
+    isUrdu 
+      ? 'السلام علیکم! میں Khanewal Connect پر بطور سروس پارٹنر / کاریگر / ڈرائیور آن بورڈ ہونا چاہتا ہوں۔ برائے مہربانی مجھے رجسٹر کریں۔'
+      : 'Hello Admin, I want to onboard as a verified service partner on Khanewal Connect. Please register me.'
+  )}`;
 
   return (
-    <div className={`fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 ${isUrdu ? 'rtl' : 'ltr'}`}>
-      <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-6">
+    <div className={`fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 ${isUrdu ? 'rtl' : 'ltr'}`}>
+      <div className="bg-[#0f1118] text-white rounded-3xl max-w-lg w-full shadow-2xl border border-amber-500/30 overflow-hidden my-6">
         {/* Header */}
-        <div className="px-6 py-5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+        <div className="px-6 py-5 bg-[#090a0f] text-white flex items-center justify-between border-b border-amber-500/20">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-sm shadow-md text-white">
-              OS
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 text-slate-950 flex items-center justify-center font-black text-sm shadow-md">
+              KC
             </div>
             <div>
-              <h3 className="text-base font-bold text-white tracking-tight">
-                {isUrdu ? 'اومنی سروس پورٹل' : 'OmniServe Account'}
-              </h3>
-              <p className="text-xs text-slate-300">
-                {isUrdu ? 'کسٹمر اور سروس پارٹنرز کے لیے محفوظ رسائی' : 'Secure Access for Customers, Providers & Admins'}
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-extrabold text-white tracking-tight">
+                  {isUrdu ? 'خانیوال کنیکٹ اکاؤنٹ پورٹل' : 'Khanewal Connect Portal'}
+                </h3>
+                <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full">
+                  خانیوال لوکل
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                {isUrdu ? 'صرف خانیوال شہر اور قریبی علاقوں کے لیے محفوظ لاگ ان' : 'Secure Access for Khanewal City & Surrounding Areas'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1.5 rounded-lg transition-colors hover:bg-slate-800"
+            className="text-slate-400 hover:text-amber-400 p-1.5 rounded-xl transition-colors hover:bg-slate-800"
           >
             <X className="w-5 h-5" />
           </button>
@@ -212,36 +174,36 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* Notice reason banner if redirected */}
         {noticeReason && (
-          <div className="bg-blue-50 border-b border-blue-100 px-6 py-3 flex items-center gap-2.5 text-xs text-blue-900 font-medium">
-            <AlertCircle className="w-4 h-4 text-blue-600 shrink-0" />
+          <div className="bg-amber-950/40 border-b border-amber-500/30 px-6 py-3 flex items-center gap-2.5 text-xs text-amber-300 font-medium">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
             <span>{noticeReason}</span>
           </div>
         )}
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-200 bg-slate-50/70 p-1.5 gap-1 text-xs font-semibold">
+        <div className="flex border-b border-slate-800 bg-[#0a0c12] p-1.5 gap-1.5 text-xs font-semibold">
           <button
             onClick={() => { setActiveTab('login'); setErrorMessage(''); }}
-            className={`flex-1 py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'login'
-                ? 'bg-white text-blue-700 shadow-xs border border-slate-200/80'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
             }`}
           >
             <UserCheck className="w-3.5 h-3.5" />
-            <span>{t.loginTab}</span>
+            <span>{isUrdu ? 'لاگ ان کریں (Sign In)' : 'Sign In'}</span>
           </button>
           
           <button
             onClick={() => { setActiveTab('customer_signup'); setErrorMessage(''); }}
-            className={`flex-1 py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'customer_signup'
-                ? 'bg-white text-blue-700 shadow-xs border border-slate-200/80'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
             }`}
           >
             <ShoppingBag className="w-3.5 h-3.5" />
-            <span>{isUrdu ? 'نیا کسٹمر اکاؤنٹ' : 'Customer Sign Up'}</span>
+            <span>{isUrdu ? 'نیا کسٹمر اکاؤنٹ بنائیں' : 'Create Customer Account'}</span>
           </button>
         </div>
 
@@ -249,85 +211,101 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <div className="p-6">
           {/* Alerts */}
           {errorMessage && (
-            <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+            <div className="mb-4 p-3 bg-red-950/60 border border-red-500/40 rounded-xl text-red-200 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
               <span>{errorMessage}</span>
             </div>
           )}
 
           {successMessage && (
-            <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <div className="mb-4 p-3 bg-emerald-950/60 border border-emerald-500/40 rounded-xl text-emerald-200 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
               <span>{successMessage}</span>
             </div>
           )}
 
           {/* TAB 1: LOGIN */}
           {activeTab === 'login' && (
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  {t.emailOrPhone} *
+                <label className="block text-slate-300 font-bold mb-1.5">
+                  {isUrdu ? 'رجسٹرڈ ای میل یا موبائل فون نمبر' : 'Registered Email or Mobile Phone'} *
                 </label>
                 <div className="relative">
-                  <Mail className={`w-4 h-4 text-slate-400 absolute ${isUrdu ? 'right-3' : 'left-3'} top-3`} />
+                  <Mail className={`w-3.5 h-3.5 text-slate-500 absolute ${isUrdu ? 'right-3' : 'left-3'} top-3`} />
                   <input
                     type="text"
                     required
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
-                    placeholder={isUrdu ? 'مثلاً user@example.com یا 03001234567' : 'e.g. user@example.com or +92 300 1234567'}
-                    className={`w-full text-xs rounded-xl border border-slate-300 py-2.5 ${isUrdu ? 'pr-9 pl-3' : 'pl-9 pr-3'} focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-sans`}
+                    placeholder={isUrdu ? 'admin@omniserve.com یا +923001234567' : 'admin@omniserve.com or phone'}
+                    className={`w-full rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 py-2.5 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-hidden ${
+                      isUrdu ? 'pr-9 pl-3 font-mono text-left' : 'pl-9 pr-3 font-mono'
+                    }`}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  {t.password} *
+                <label className="block text-slate-300 font-bold mb-1.5">
+                  {isUrdu ? 'پاس ورڈ (Password)' : 'Password'} *
                 </label>
                 <div className="relative">
-                  <Lock className={`w-4 h-4 text-slate-400 absolute ${isUrdu ? 'right-3' : 'left-3'} top-3`} />
+                  <Lock className={`w-3.5 h-3.5 text-slate-500 absolute ${isUrdu ? 'right-3' : 'left-3'} top-3`} />
                   <input
                     type="password"
                     required
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="••••••••"
-                    className={`w-full text-xs rounded-xl border border-slate-300 py-2.5 ${isUrdu ? 'pr-9 pl-3' : 'pl-9 pr-3'} focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600`}
+                    className={`w-full rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 py-2.5 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-hidden ${
+                      isUrdu ? 'pr-9 pl-3' : 'pl-9 pr-3'
+                    }`}
                   />
                 </div>
               </div>
 
-              {/* Admin Note */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-[11px] text-slate-500 space-y-1">
-                <div className="flex items-center gap-1.5 font-semibold text-slate-700">
-                  <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-                  <span>{isUrdu ? 'ایڈمن اور کنٹرول پینل تک رسائی:' : 'Admin & Master Access:'}</span>
+              {/* Helper Quick Fill for Admin & Verified Worker */}
+              <div className="bg-slate-900/90 border border-amber-500/20 rounded-xl p-3 text-[11px] text-slate-300 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-400">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>{isUrdu ? 'ایڈمن لاگ ان کواڈینشلز:' : 'Admin & Staff Access:'}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginIdentifier(DEFAULT_ADMIN_USERNAME);
+                      setLoginPassword(DEFAULT_ADMIN_PASSWORD);
+                    }}
+                    className="text-[10px] text-amber-400 hover:text-amber-300 underline font-semibold cursor-pointer"
+                  >
+                    {isUrdu ? 'خودکار درج کریں' : 'Auto Fill Admin'}
+                  </button>
                 </div>
-                <p className="leading-relaxed">
+                <p className="text-slate-400 leading-relaxed">
                   {isUrdu 
-                    ? 'ایڈمن لاگ ان کے لیے اپنے GitHub Secrets والے ADMIN_USERNAME اور ADMIN_PASSWORD درج کریں۔'
-                    : 'Log in with your configured ADMIN_USERNAME and ADMIN_PASSWORD secrets to access the master control panel.'}
+                    ? `ایڈمن صارف نام: ${DEFAULT_ADMIN_USERNAME} | پاس ورڈ GitHub Secrets سے سنک ہے۔`
+                    : `Admin: ${DEFAULT_ADMIN_USERNAME} (Loaded from GitHub Secrets).`}
                 </p>
               </div>
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors shadow-sm disabled:opacity-50"
+                className="w-full py-3 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 text-xs font-black rounded-xl transition-all shadow-lg hover:shadow-amber-500/20 disabled:opacity-50 cursor-pointer"
               >
-                {isSubmitting ? (isUrdu ? 'تصدیق ہو رہی ہے...' : 'Authenticating...') : t.loginBtn}
+                {isSubmitting ? (isUrdu ? 'تصدیق ہو رہی ہے...' : 'Authenticating...') : (isUrdu ? 'لاگ ان کریں' : 'Sign In Now')}
               </button>
             </form>
           )}
 
-          {/* TAB 2: CUSTOMER SIGN UP */}
+          {/* TAB 2: CUSTOMER SIGN UP WITH KHANEWAL LOCAL AREAS */}
           {activeTab === 'customer_signup' && (
             <form onSubmit={handleCustomerSignUp} className="space-y-3.5 text-xs">
               <div>
-                <label className="block text-slate-700 font-bold mb-1">
-                  {t.fullName} *
+                <label className="block text-slate-300 font-bold mb-1">
+                  {isUrdu ? 'مکمل نام (Full Name)' : 'Full Name'} *
                 </label>
                 <input
                   type="text"
@@ -335,28 +313,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   value={custName}
                   onChange={(e) => setCustName(e.target.value)}
                   placeholder={isUrdu ? 'مثلاً محمد علی خان' : 'e.g. Muhammad Ali Khan'}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                  className="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3 py-2 focus:border-amber-400 focus:outline-hidden"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">
-                    {t.emailAddress} *
+                  <label className="block text-slate-300 font-bold mb-1">
+                    {isUrdu ? 'ای میل ایڈریس' : 'Email Address'} *
                   </label>
                   <input
                     type="email"
                     required
                     value={custEmail}
                     onChange={(e) => setCustEmail(e.target.value)}
-                    placeholder="name@gmail.com"
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono"
+                    placeholder="khanewal.user@gmail.com"
+                    className="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3 py-2 font-mono focus:border-amber-400 focus:outline-hidden"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">
-                    {t.mobilePhone} *
+                  <label className="block text-slate-300 font-bold mb-1">
+                    {isUrdu ? 'موبائل نمبر (خانیوال)' : 'Mobile Phone'} *
                   </label>
                   <input
                     type="tel"
@@ -364,15 +342,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={custPhone}
                     onChange={(e) => setCustPhone(e.target.value)}
                     placeholder="+92 300 1234567"
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono"
+                    className="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3 py-2 font-mono focus:border-amber-400 focus:outline-hidden"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">
-                    {t.password} *
+                  <label className="block text-slate-300 font-bold mb-1">
+                    {isUrdu ? 'پاس ورڈ (Password)' : 'Password'} *
                   </label>
                   <input
                     type="password"
@@ -380,42 +358,44 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={custPassword}
                     onChange={(e) => setCustPassword(e.target.value)}
                     placeholder={isUrdu ? 'کم از کم 6 ہندسے' : 'Min 6 characters'}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2"
+                    className="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3 py-2 focus:border-amber-400 focus:outline-hidden"
                   />
                 </div>
 
+                {/* KHANEWAL LOCAL OPERATIONAL AREAS (Replaced Lahore/Karachi) */}
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">
-                    {t.city} *
+                  <label className="block text-amber-400 font-bold mb-1 flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{isUrdu ? 'خانیوال کا علاقہ / سیکٹر *' : 'Khanewal Local Area *'}</span>
                   </label>
                   <select
-                    value={custCity}
-                    onChange={(e) => setCustCity(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 bg-white"
+                    value={custAreaId}
+                    onChange={(e) => setCustAreaId(e.target.value)}
+                    className="w-full rounded-xl bg-slate-900 border border-amber-500/50 text-white px-3 py-2 font-medium focus:border-amber-400 focus:outline-hidden cursor-pointer"
                   >
-                    <option value="Islamabad">Islamabad (اسلام آباد)</option>
-                    <option value="Rawalpindi">Rawalpindi (راولپنڈی)</option>
-                    <option value="Lahore">Lahore (لاہور)</option>
-                    <option value="Karachi">Karachi (کراچی)</option>
-                    <option value="Peshawar">Peshawar (پشاور)</option>
-                    <option value="Faisalabad">Faisalabad (فیصل آباد)</option>
-                    <option value="Multan">Multan (ملتان)</option>
+                    {KHANEWAL_LOCAL_AREAS.map(area => (
+                      <option key={area.id} value={area.id} className="bg-slate-900 text-white">
+                        {isUrdu ? area.nameUr : area.nameEn} ({area.sector})
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">
-                  {t.deliveryAddress}
+                <label className="block text-slate-300 font-bold mb-1">
+                  {isUrdu ? 'گھر / دکان کا مکمل پتہ (گلی، مکان نمبر)' : 'Street & House Address in Khanewal'}
                 </label>
                 <div className="relative">
-                  <MapPin className={`w-3.5 h-3.5 text-slate-400 absolute ${isUrdu ? 'right-3' : 'left-3'} top-2.5`} />
+                  <MapPin className={`w-3.5 h-3.5 text-slate-500 absolute ${isUrdu ? 'right-3' : 'left-3'} top-2.5`} />
                   <input
                     type="text"
                     value={custAddress}
                     onChange={(e) => setCustAddress(e.target.value)}
-                    placeholder={isUrdu ? 'مکان نمبر، گلی نمبر، سیکٹر یا علاقہ' : 'House #, Street #, Sector / Area'}
-                    className={`w-full rounded-xl border border-slate-300 py-2 ${isUrdu ? 'pr-8 pl-3' : 'pl-8 pr-3'}`}
+                    placeholder={isUrdu ? 'مثلاً مکان 12، گلی 4، بالمقابل جامع مسجد' : 'e.g. House #12, Street #4'}
+                    className={`w-full rounded-xl bg-slate-900 border border-slate-700 text-white py-2 focus:border-amber-400 focus:outline-hidden ${
+                      isUrdu ? 'pr-8 pl-3' : 'pl-8 pr-3'
+                    }`}
                   />
                 </div>
               </div>
@@ -423,54 +403,33 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors shadow-sm mt-2 disabled:opacity-50"
+                className="w-full py-3 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black rounded-xl transition-all shadow-lg hover:shadow-amber-500/20 mt-2 disabled:opacity-50 cursor-pointer"
               >
-                {isSubmitting ? (isUrdu ? 'اکاؤنٹ بن رہا ہے...' : 'Creating...') : t.createAccountBtn}
+                {isSubmitting ? (isUrdu ? 'اکاؤنٹ بن رہا ہے...' : 'Creating...') : (isUrdu ? 'کسٹمر اکاؤنٹ مکمل کریں' : 'Complete Registration')}
               </button>
             </form>
           )}
 
-          {/* TAB 3: PROVIDER NOTICE (RESTRICTED TO ADMIN ONBOARDING ONLY) */}
-          {activeTab === 'provider_signup' && (
-            <div className="space-y-4 text-center py-4">
-              <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto shadow-xs">
-                <ShieldCheck className="w-8 h-8" />
-              </div>
-              <div>
-                <h4 className="text-base font-bold text-slate-900 mb-1">
-                  {isUrdu ? 'پرووائیڈر اکاؤنٹ رجسٹریشن ایڈمن کے ذریعے محدود ہے' : 'Provider Registration is Admin-Restricted'}
-                </h4>
-                <p className="text-xs text-slate-600 leading-relaxed max-w-sm mx-auto">
-                  {isUrdu
-                    ? 'سیکیورٹی اور کوالٹی کے پیشِ نظر سروس پرووائیڈرز (ٹیکنیشن، پلمبر، رائیڈر) کے اکاؤنٹس صرف خانیوال کنیکٹ ایڈمن پینل سے تصدیق کے بعد بنتے ہیں۔ براہِ کرم تصدیق کے لیے ایڈمن سے رابطہ کریں۔'
-                    : 'For security and service quality, service provider accounts (technicians, plumbers, drivers) are strictly created and onboarded by Khanewal Connect Administration. Please contact Admin via WhatsApp to join.'}
-                </p>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 text-start space-y-1">
-                <div className="font-semibold text-slate-900">{isUrdu ? 'ضروری دستاویزات برائے ایڈمن:' : 'Required for Admin Onboarding:'}</div>
-                <div className="text-[11px] text-slate-600">• {isUrdu ? 'اصل قومی شناختی کارڈ (CNIC)' : 'Valid CNIC Copy'}</div>
-                <div className="text-[11px] text-slate-600">• {isUrdu ? 'موبائل نمبر اور متعلقہ سروس کی مہارت کا ثبوت' : 'Active Mobile Number & Verified Trade Experience'}</div>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('login')}
-                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-colors"
-                >
-                  {isUrdu ? 'لاگ ان صفحہ پر جائیں' : 'Back to Login'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('customer_signup')}
-                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
-                >
-                  {isUrdu ? 'کسٹمر اکاؤنٹ بنائیں' : 'Sign Up as Customer'}
-                </button>
-              </div>
+          {/* Provider / Driver Onboarding Banner (Strictly directs to Admin WhatsApp) */}
+          <div className="mt-5 pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
+            <div className="text-center sm:text-start">
+              <span className="font-bold text-amber-400 block">
+                {isUrdu ? 'کاریگر، رائیڈر یا لوڈر ڈرائیور ہیں؟' : 'Are you a technician, rider, or cargo driver?'}
+              </span>
+              <span className="text-[11px] text-slate-400">
+                {isUrdu ? 'تصدیق اور آن بورڈنگ کے لیے ایڈمن واٹس ایپ پر رابطہ کریں۔' : 'Contact Khanewal Connect admin on WhatsApp to get registered.'}
+              </span>
             </div>
-          )}
+            <a
+              href={partnerOnboardUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-[11px] flex items-center gap-1.5 transition-colors shrink-0 shadow-xs"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              <span>{isUrdu ? 'ایڈمن واٹس ایپ آن بورڈنگ' : 'WhatsApp Admin'}</span>
+            </a>
+          </div>
         </div>
       </div>
     </div>

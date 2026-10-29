@@ -36,7 +36,8 @@ import {
   Clock,
   MapPin,
   ExternalLink,
-  Shield
+  Shield,
+  X
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -101,6 +102,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newAddress, setNewAddress] = useState('Block 5, Railway Road, Khanewal');
   const [newNotes, setNewNotes] = useState('Verified by Khanewal Ops Desk');
 
+  // Dispatch & Live Status Update Modal State
+  const [dispatchOrder, setDispatchOrder] = useState<Order | null>(null);
+  const [dispatchStatus, setDispatchStatus] = useState<OrderStatus>('assigned');
+  const [dispatchProviderName, setDispatchProviderName] = useState('');
+  const [dispatchProviderPhone, setDispatchProviderPhone] = useState('');
+  const [dispatchEtaMinutes, setDispatchEtaMinutes] = useState<number>(20);
+  const [dispatchNote, setDispatchNote] = useState('');
+  const [dispatchProviderId, setDispatchProviderId] = useState<string>('');
+
   // Stats
   const activeOrdersCount = orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length;
   const completedOrdersCount = orders.filter(o => o.status === 'completed').length;
@@ -157,6 +167,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleUpdateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
     Store.updateOrderStatus(orderId, newStatus, `Admin manual override to ${newStatus}`);
+  };
+
+  const handleOpenDispatchModal = (order: Order) => {
+    setDispatchOrder(order);
+    setDispatchStatus(order.status === 'pending' ? 'assigned' : order.status);
+    setDispatchProviderName(order.assignedProviderName || '');
+    setDispatchProviderPhone(order.assignedProviderPhone || '');
+    setDispatchEtaMinutes(order.etaMinutes || 20);
+    setDispatchNote('');
+    setDispatchProviderId(order.assignedProviderId || '');
+  };
+
+  const handleSelectProviderForDispatch = (provId: string) => {
+    setDispatchProviderId(provId);
+    if (!provId) return;
+    const target = users.find(u => u.id === provId);
+    if (target) {
+      setDispatchProviderName(target.name);
+      setDispatchProviderPhone(target.phone);
+    }
+  };
+
+  const handleSaveDispatchModal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dispatchOrder) return;
+
+    Store.adminUpdateOrderDispatch(dispatchOrder.id, {
+      status: dispatchStatus,
+      providerName: dispatchProviderName.trim() || undefined,
+      providerPhone: dispatchProviderPhone.trim() || undefined,
+      etaMinutes: Number(dispatchEtaMinutes) || undefined,
+      customNote: dispatchNote.trim() || undefined,
+      providerId: dispatchProviderId || undefined
+    });
+
+    setUserActionNotice(`Order ${dispatchOrder.id} dispatch updated! Assigned: ${dispatchProviderName || 'Worker'}, ETA: ${dispatchEtaMinutes}m, Status: ${dispatchStatus}. Customer live tracker updated!`);
+    setTimeout(() => setUserActionNotice(''), 5000);
+    setDispatchOrder(null);
   };
 
   const handleSaveSettings = (e: React.FormEvent) => {
@@ -578,51 +626,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                       <td className="py-3.5 px-4">
                         {order.assignedProviderName ? (
-                          <div>
-                            <span className="font-semibold text-emerald-700 block">
+                          <div className="space-y-0.5">
+                            <span className="font-bold text-emerald-800 flex items-center gap-1">
+                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                               {order.assignedProviderName}
                             </span>
-                            <span className="text-[11px] text-slate-400 font-mono">
-                              {order.assignedProviderPhone}
+                            <span className="text-[11px] text-slate-500 font-mono block">
+                              {order.assignedProviderPhone || 'No phone recorded'}
                             </span>
+                            {order.etaMinutes ? (
+                              <span className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded font-semibold inline-block">
+                                ETA: ~{order.etaMinutes} mins
+                              </span>
+                            ) : null}
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1.5">
-                            <select
-                              onChange={(e) => handleManualAssign(order.id, e.target.value)}
-                              defaultValue=""
-                              className="text-xs bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-slate-700 max-w-[140px]"
-                            >
-                              <option value="" disabled>Manual Dispatch...</option>
-                              {providersList.map(p => (
-                                <option key={p.id} value={p.id}>
-                                  {p.name} ({p.serviceSkill || p.vehicleType || 'Worker'})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                          <button
+                            onClick={() => handleOpenDispatchModal(order)}
+                            className="text-[11px] text-amber-700 hover:text-amber-900 font-bold bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>+ Assign Worker</span>
+                          </button>
                         )}
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <select
-                          value={order.status}
-                          onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value as OrderStatus)}
-                          className={`text-xs font-semibold px-2 py-1 rounded-lg border ${
+                        <button
+                          onClick={() => handleOpenDispatchModal(order)}
+                          className={`text-xs font-bold px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer ${
                             order.status === 'completed'
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
                               : order.status === 'cancelled'
-                              ? 'bg-red-50 text-red-800 border-red-200'
-                              : 'bg-blue-50 text-blue-800 border-blue-200'
+                              ? 'bg-red-50 text-red-800 border-red-300 hover:bg-red-100'
+                              : order.status === 'on_the_way'
+                              ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                              : 'bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100'
                           }`}
+                          title="Click to Assign Provider, Phone, ETA & Status Live"
                         >
-                          <option value="pending">Pending</option>
-                          <option value="assigned">Assigned</option>
-                          <option value="on_the_way">On The Way</option>
-                          <option value="work_started">Work Started</option>
-                          <option value="completed">Completed</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
+                          <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
+                          <span className="capitalize">{order.status.replace('_', ' ')}</span>
+                          <span className="text-[10px] opacity-70">✎</span>
+                        </button>
                       </td>
 
                       <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">
@@ -2028,6 +2073,186 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-xs cursor-pointer"
                 >
                   Create & Activate Account
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DISPATCH & LIVE STATUS UPDATE MODAL */}
+      {dispatchOrder && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-6">
+            <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-xs">
+                  ⚡
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>Dispatch & Live Status Broadcast</span>
+                    <span className="font-mono text-xs text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800">
+                      {dispatchOrder.id}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Customer: {dispatchOrder.customerName} ({dispatchOrder.customerPhone})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDispatchOrder(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDispatchModal} className="p-6 space-y-4 text-xs">
+              {/* Order Context */}
+              <div className="bg-slate-50 border border-slate-200 p-3 rounded-2xl space-y-1">
+                <div className="flex items-center justify-between text-slate-700">
+                  <span className="font-semibold capitalize">{dispatchOrder.category.replace('_', ' ')}</span>
+                  <span className="font-mono font-bold text-slate-900">PKR {dispatchOrder.pricing.total.toLocaleString()}</span>
+                </div>
+                <p className="text-slate-500 text-[11px] truncate">
+                  Address: {dispatchOrder.deliveryAddress}
+                </p>
+              </div>
+
+              {/* Status Selector */}
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  1. Live Order Status (Customer will see this real-time) *
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { val: 'pending', label: 'Pending', color: 'border-slate-300' },
+                    { val: 'assigned', label: 'Assigned', color: 'border-blue-400 text-blue-800' },
+                    { val: 'on_the_way', label: 'On The Way (روانہ)', color: 'border-amber-400 text-amber-800' },
+                    { val: 'work_started', label: 'Work Started', color: 'border-purple-400 text-purple-800' },
+                    { val: 'completed', label: 'Completed (مکمل)', color: 'border-emerald-400 text-emerald-800' },
+                    { val: 'cancelled', label: 'Cancelled', color: 'border-red-400 text-red-800' }
+                  ].map(st => (
+                    <button
+                      type="button"
+                      key={st.val}
+                      onClick={() => setDispatchStatus(st.val as OrderStatus)}
+                      className={`py-2 px-2 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer ${
+                        dispatchStatus === st.val
+                          ? 'bg-slate-900 text-white shadow-xs border-slate-900 ring-2 ring-blue-500/30'
+                          : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {st.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick Select Provider or Type Custom */}
+              <div className="pt-2 border-t border-slate-100">
+                <label className="block text-slate-700 font-bold mb-1">
+                  2. Select Verified Worker / Driver (or Type Custom Name)
+                </label>
+                <select
+                  value={dispatchProviderId}
+                  onChange={(e) => handleSelectProviderForDispatch(e.target.value)}
+                  className="w-full text-xs rounded-xl border border-slate-300 px-3 py-2 bg-white mb-2 cursor-pointer"
+                >
+                  <option value="">-- Choose from Registered Fleet (Optional) --</option>
+                  {providersList.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.phone}) - {p.serviceSkill || p.vehicleType || p.providerCategory}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">
+                    Worker / Rider / Driver Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={dispatchProviderName}
+                    onChange={(e) => setDispatchProviderName(e.target.value)}
+                    placeholder="e.g. Muhammad Tariq (Electrician)"
+                    className="w-full text-xs rounded-xl border border-slate-300 px-3 py-2 font-medium focus:border-blue-600 focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">
+                    Worker Direct Contact Phone *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={dispatchProviderPhone}
+                    onChange={(e) => setDispatchProviderPhone(e.target.value)}
+                    placeholder="+92 301 7766554"
+                    className="w-full text-xs rounded-xl border border-slate-300 px-3 py-2 font-mono focus:border-blue-600 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">
+                    Estimated Time to Reach (ETA in minutes)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="300"
+                    value={dispatchEtaMinutes}
+                    onChange={(e) => setDispatchEtaMinutes(Number(e.target.value) || 0)}
+                    placeholder="20"
+                    className="w-full text-xs rounded-xl border border-slate-300 px-3 py-2 font-mono font-bold focus:border-blue-600 focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">
+                    ETA Live Customer Preview
+                  </label>
+                  <div className="h-9 rounded-xl bg-amber-50 border border-amber-200 px-3 flex items-center text-[11px] font-bold text-amber-900">
+                    ~ {dispatchEtaMinutes || 0} منٹ میں پہنچ جائے گا (ETA)
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Custom Status Note / Message for Customer (Urdu / English)
+                </label>
+                <textarea
+                  rows={2}
+                  value={dispatchNote}
+                  onChange={(e) => setDispatchNote(e.target.value)}
+                  placeholder="مثلاً: ٹیکنیشن اوزار اور تار لے کر روانہ ہو چکا ہے، 20 منٹ میں آپ کے پتے پر ہو گا۔"
+                  className="w-full text-xs rounded-xl border border-slate-300 px-3 py-2 focus:border-blue-600 focus:outline-hidden"
+                />
+              </div>
+
+              <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setDispatchOrder(null)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-bold shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>Broadcast Live to Customer</span>
+                  <span>→</span>
                 </button>
               </div>
             </form>

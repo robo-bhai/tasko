@@ -185,15 +185,26 @@ export default function App() {
   const publishedServices = services.filter(s => Store.isServiceAvailable(s));
   const publishedVehicles = vehicles.filter(v => Store.isVehicleAvailable(v));
 
+  // Customer order tracking visibility: strictly only orders placed by the logged-in customer are visible
+  const customerOrders = currentUser
+    ? orders.filter(o => o.customerId === currentUser.id)
+    : [];
+
+  const navbarActiveOrders = currentUser?.role === 'admin'
+    ? orders
+    : currentUser?.role === 'provider'
+    ? orders.filter(o => o.assignedProviderId === currentUser.id)
+    : customerOrders;
+
   const whatsappAdminNumber = (Store.getSettings().whatsappSupportPhone || '+923000009988').replace(/[^0-9]/g, '');
   const partnerOnboardUrl = `https://wa.me/${whatsappAdminNumber}?text=${encodeURIComponent(
     isUrdu 
-      ? 'السلام علیکم! میں خانewal Connect پر بطور سروس پارٹنر / ورکر کام کرنا چاہتا ہوں۔ برائے مہربانی مجھے آن بورڈ کریں۔'
+      ? 'السلام علیکم! میں Khanewal Connect پر بطور سروس پارٹنر / کاریگر / ڈرائیور آن بورڈ ہونا چاہتا ہوں۔ برائے مہربانی مجھے رجسٹر کریں۔'
       : 'Hello Admin, I want to onboard as a verified service partner on Khanewal Connect. Please register me.'
   )}`;
 
   return (
-    <div className={`min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900 ${isUrdu ? 'rtl' : 'ltr'}`}>
+    <div className={`min-h-screen bg-[#07080c] flex flex-col font-sans text-slate-100 selection:bg-amber-400 selection:text-slate-950 ${isUrdu ? 'rtl' : 'ltr'}`}>
       {/* Top Bar Navigation */}
       <Navbar
         currentUser={currentUser}
@@ -203,7 +214,7 @@ export default function App() {
         onOpenHistory={() => setIsHistoryModalOpen(true)}
         onOpenLiveTracker={handleOpenLiveTracker}
         onOpenAuth={handleOpenAuthModal}
-        activeOrders={orders}
+        activeOrders={navbarActiveOrders}
         lang={lang}
         onToggleLang={handleToggleLang}
       />
@@ -212,10 +223,11 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 md:px-8 pt-6">
         {activePortal === 'customer' && (
           <CustomerHome
+            currentUser={currentUser}
             onOpenOrderModal={handleOpenOrderModal}
             onOpenLiveTracker={handleOpenLiveTracker}
             onOpenAuth={handleOpenAuthModal}
-            activeOrders={orders}
+            activeOrders={customerOrders}
             services={publishedServices}
             vehicles={publishedVehicles}
             lang={lang}
