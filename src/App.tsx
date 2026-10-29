@@ -181,6 +181,17 @@ export default function App() {
     setIsLiveTrackerOpen(true);
   };
 
+  // Only services and vehicles with active available providers are published to store & customers
+  const publishedServices = services.filter(s => Store.isServiceAvailable(s));
+  const publishedVehicles = vehicles.filter(v => Store.isVehicleAvailable(v));
+
+  const whatsappAdminNumber = (Store.getSettings().whatsappSupportPhone || '+923000009988').replace(/[^0-9]/g, '');
+  const partnerOnboardUrl = `https://wa.me/${whatsappAdminNumber}?text=${encodeURIComponent(
+    isUrdu 
+      ? 'السلام علیکم! میں خانewal Connect پر بطور سروس پارٹنر / ورکر کام کرنا چاہتا ہوں۔ برائے مہربانی مجھے آن بورڈ کریں۔'
+      : 'Hello Admin, I want to onboard as a verified service partner on Khanewal Connect. Please register me.'
+  )}`;
+
   return (
     <div className={`min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900 ${isUrdu ? 'rtl' : 'ltr'}`}>
       {/* Top Bar Navigation */}
@@ -205,8 +216,8 @@ export default function App() {
             onOpenLiveTracker={handleOpenLiveTracker}
             onOpenAuth={handleOpenAuthModal}
             activeOrders={orders}
-            services={services}
-            vehicles={vehicles}
+            services={publishedServices}
+            vehicles={publishedVehicles}
             lang={lang}
           />
         )}
@@ -249,12 +260,14 @@ export default function App() {
               >
                 {t.login}
               </button>
-              <button
-                onClick={() => handleOpenAuthModal('provider_signup')}
-                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              <a
+                href={partnerOnboardUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors inline-flex items-center gap-1.5"
               >
-                {isUrdu ? 'نیا پارٹنر اکاؤنٹ بنائیں' : 'Join as Partner'}
-              </button>
+                <span>{isUrdu ? 'آن بورڈنگ برائے ورکرز (WhatsApp)' : 'Onboard as Worker (WhatsApp)'}</span>
+              </a>
             </div>
           </div>
         )}
@@ -296,7 +309,7 @@ export default function App() {
         isOpen={isHomeServiceModalOpen}
         onClose={() => setIsHomeServiceModalOpen(false)}
         currentUser={currentUser}
-        services={services}
+        services={publishedServices}
         preselectedServiceId={preselectedServiceId}
         onProceedToCheckout={handleProceedToCheckout}
       />
@@ -305,7 +318,7 @@ export default function App() {
         isOpen={isTransportModalOpen}
         onClose={() => setIsTransportModalOpen(false)}
         currentUser={currentUser}
-        vehicles={vehicles}
+        vehicles={publishedVehicles}
         preselectedVehicleId={preselectedVehicleId}
         onProceedToCheckout={handleProceedToCheckout}
       />
@@ -425,9 +438,14 @@ export default function App() {
                   </button>
                 </li>
                 <li>
-                  <button onClick={() => handleOpenAuthModal('provider_signup')} className="hover:text-emerald-400 transition-colors cursor-pointer text-slate-400">
-                    {isUrdu ? 'پارٹنر آن بورڈنگ (ایڈمن تصدیق)' : 'Partner Onboarding (Admin Only)'}
-                  </button>
+                  <a
+                    href={partnerOnboardUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-emerald-400 transition-colors cursor-pointer text-slate-400"
+                  >
+                    {isUrdu ? 'ورکر آن بورڈنگ (ایڈمن واٹس ایپ)' : 'Partner Onboarding (Admin WhatsApp)'}
+                  </a>
                 </li>
               </ul>
             </div>

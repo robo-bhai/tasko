@@ -149,6 +149,9 @@ export interface HomeServiceItem {
   description: string;
   popularIssues: string[];
   icon: string;
+  assignedProviderId?: string;
+  assignedProviderName?: string;
+  isPublished?: boolean;
 }
 
 export interface TransportVehicleItem {
@@ -161,4 +164,7 @@ export interface TransportVehicleItem {
   helperRate: number;
   bestFor: string;
   icon: string;
+  assignedProviderId?: string;
+  assignedProviderName?: string;
+  isPublished?: boolean;
 }

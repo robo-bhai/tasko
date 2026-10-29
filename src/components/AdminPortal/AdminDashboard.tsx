@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Order, 
   User, 
@@ -64,6 +64,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [editingServices, setEditingServices] = useState<HomeServiceItem[]>(services);
   const [editingVehicles, setEditingVehicles] = useState<TransportVehicleItem[]>(vehicles);
   const [catalogSavedMessage, setCatalogSavedMessage] = useState('');
+  const [catalogFilter, setCatalogFilter] = useState<'all' | 'published' | 'unpublished'>('all');
+
+  useEffect(() => {
+    setEditingServices(services);
+  }, [services]);
+
+  useEffect(() => {
+    setEditingVehicles(vehicles);
+  }, [vehicles]);
 
   // Dynamic Settings State
   const [settings, setSettings] = useState<SystemSettings>(() => Store.getSettings());
@@ -101,6 +110,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const registeredCustomersCount = users.filter(u => u.role === 'customer' && !u.isDeleted).length;
 
   const providersList = users.filter(u => u.role === 'provider' && !u.isDeleted && u.status === 'active');
+  const techniciansList = providersList.filter(u => u.providerCategory === 'home_technician' || !u.providerCategory);
+  const driversList = providersList.filter(u => u.providerCategory === 'cargo_driver' || !u.providerCategory);
 
   // Filtered orders
   const filteredOrders = orders.filter((o) => {
@@ -230,6 +241,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     Store.updateVehiclesCatalog(editingVehicles);
     setCatalogSavedMessage('Service & Transport Catalog saved and deployed successfully!');
     setTimeout(() => setCatalogSavedMessage(''), 4000);
+  };
+
+  const handleAssignServiceSource = (serviceId: string, providerId: string) => {
+    Store.assignSourceToService(serviceId, providerId);
+    setEditingServices([...Store.getServicesCatalog()]);
+    setCatalogSavedMessage(
+      providerId ? 'Provider source assigned! Service is now Published on the Customer Store.' : 'Provider source unassigned. Service is now Hidden from Customer Store.'
+    );
+    setTimeout(() => setCatalogSavedMessage(''), 4500);
+  };
+
+  const handleDeleteService = (serviceId: string) => {
+    if (window.confirm('Are you sure you want to delete this service permanently from the catalog?')) {
+      Store.deleteServiceFromCatalog(serviceId);
+      setEditingServices([...Store.getServicesCatalog()]);
+      setCatalogSavedMessage('Service deleted permanently from catalog.');
+      setTimeout(() => setCatalogSavedMessage(''), 4000);
+    }
+  };
+
+  const handleAssignVehicleSource = (vehicleId: string, driverId: string) => {
+    Store.assignSourceToVehicle(vehicleId, driverId);
+    setEditingVehicles([...Store.getVehiclesCatalog()]);
+    setCatalogSavedMessage(
+      driverId ? 'Driver source assigned! Vehicle is now Published on the Customer Store.' : 'Driver source unassigned. Vehicle is now Hidden from Customer Store.'
+    );
+    setTimeout(() => setCatalogSavedMessage(''), 4500);
+  };
+
+  const handleDeleteVehicle = (vehicleId: string) => {
+    if (window.confirm('Are you sure you want to delete this vehicle permanently from the fleet catalog?')) {
+      Store.deleteVehicleFromCatalog(vehicleId);
+      setEditingVehicles([...Store.getVehiclesCatalog()]);
+      setCatalogSavedMessage('Vehicle deleted permanently from fleet catalog.');
+      setTimeout(() => setCatalogSavedMessage(''), 4000);
+    }
   };
 
   const handleAddNewService = () => {
@@ -1093,13 +1140,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </form>
       )}
 
-      {/* SECTION 4: SERVICE CATALOG & VEHICLE PRICING MANAGER */}
+      {/* SECTION 4: SERVICE CATALOG, STORE VISIBILITY & SOURCE PROVIDER MANAGER */}
       {activeSection === 'catalog' && (
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h3 className="text-base font-bold text-slate-900">Service Catalog & Vehicle Pricing Manager</h3>
-              <p className="text-xs text-slate-500">Edit base prices, add new services, and configure vehicle per-km fares dynamically</p>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">
+                  Storefront Availability Rule Active
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-slate-900 mt-0.5">Service Catalog & Source Provider Manager</h3>
+              <p className="text-xs text-slate-500">
+                Services and vehicles ONLY appear on customer storefronts when an active verified provider or driver is assigned as a source.
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -1107,16 +1162,56 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Plus className="w-4 h-4 text-slate-600" />
-                <span>Add New Service</span>
+                <span>Add Custom Service</span>
               </button>
               <button
                 onClick={handleSaveCatalog}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
               >
                 <Save className="w-4 h-4" />
-                <span>Save All Changes</span>
+                <span>Save All Rates</span>
               </button>
             </div>
+          </div>
+
+          {/* Quick Visibility Filter */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-slate-500 font-semibold text-xs">Show in Catalog:</span>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCatalogFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-colors cursor-pointer ${
+                    catalogFilter === 'all' ? 'bg-slate-900 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  All ({editingServices.length + editingVehicles.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCatalogFilter('published')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-colors cursor-pointer ${
+                    catalogFilter === 'published' ? 'bg-emerald-600 text-white shadow-2xs' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                  }`}
+                >
+                  ● Published & Live ({editingServices.filter(s => Store.isServiceAvailable(s)).length + editingVehicles.filter(v => Store.isVehicleAvailable(v)).length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCatalogFilter('unpublished')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-colors cursor-pointer ${
+                    catalogFilter === 'unpublished' ? 'bg-amber-600 text-white shadow-2xs' : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
+                  }`}
+                >
+                  ○ Hidden / Needs Source ({editingServices.filter(s => !Store.isServiceAvailable(s)).length + editingVehicles.filter(v => !Store.isVehicleAvailable(v)).length})
+                </button>
+              </div>
+            </div>
+
+            <span className="text-[11px] text-slate-400 font-mono">
+              {techniciansList.length} Technicians · {driversList.length} Drivers Online
+            </span>
           </div>
 
           {catalogSavedMessage && (
@@ -1126,83 +1221,258 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           )}
 
-          {/* Home Services Editor */}
+          {/* 1. Home Services Catalog & Source Management */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              1. Home Services Base Pricing & Catalog
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <Wrench className="w-4 h-4 text-emerald-600" />
+                <span>1. Home Services & Source Provider Assignment</span>
+              </h4>
+              <span className="text-[11px] text-slate-400">
+                {editingServices.filter(s => Store.isServiceAvailable(s)).length} of {editingServices.length} Published
+              </span>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {editingServices.map((srv) => (
-                <div key={srv.id} className="bg-white rounded-xl border border-slate-200 p-4 space-y-3 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-900">{srv.name}</span>
-                    <span className="text-[10px] text-slate-400 font-mono">{srv.estimatedDuration}</span>
-                  </div>
-                  <p className="text-slate-500 text-[11px] line-clamp-2">{srv.description}</p>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                      Base Starting Price (PKR)
-                    </label>
-                    <input
-                      type="number"
-                      step={100}
-                      value={srv.basePrice}
-                      onChange={(e) => handleServicePriceChange(srv.id, Number(e.target.value))}
-                      className="w-full text-xs font-mono font-bold rounded-lg border border-slate-300 px-3 py-1.5 bg-slate-50"
-                    />
-                  </div>
-                </div>
-              ))}
+              {editingServices
+                .filter(srv => {
+                  const isAvail = Store.isServiceAvailable(srv);
+                  if (catalogFilter === 'published') return isAvail;
+                  if (catalogFilter === 'unpublished') return !isAvail;
+                  return true;
+                })
+                .map((srv) => {
+                  const isLive = Store.isServiceAvailable(srv);
+                  return (
+                    <div
+                      key={srv.id}
+                      className={`bg-white rounded-2xl border p-4 space-y-3 text-xs transition-all ${
+                        isLive ? 'border-emerald-300 shadow-2xs' : 'border-slate-200 bg-slate-50/50'
+                      }`}
+                    >
+                      {/* Status Header */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="font-bold text-slate-900 block text-sm">{srv.name}</span>
+                          <span className="text-[11px] text-slate-400">{srv.category} · {srv.estimatedDuration}</span>
+                        </div>
+                        {isLive ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Live on Store
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                            Hidden from Store
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-slate-500 text-[11px] line-clamp-2">{srv.description}</p>
+
+                      {/* Source Provider Assignment Dropdown */}
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+                        <label className="block text-[11px] font-bold text-slate-800">
+                          Assigned Provider / Source:
+                        </label>
+                        <select
+                          value={srv.assignedProviderId || ''}
+                          onChange={(e) => handleAssignServiceSource(srv.id, e.target.value)}
+                          className="w-full text-xs rounded-lg border border-slate-300 px-2.5 py-1.5 bg-white font-medium focus:ring-2 focus:ring-blue-500/20"
+                        >
+                          <option value="">-- No Source (Unpublished / Hidden) --</option>
+                          {techniciansList.map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.name} ({t.phone}) - {t.serviceSkill || 'Technician'}
+                            </option>
+                          ))}
+                        </select>
+
+                        {!srv.assignedProviderId && (
+                          <div className="flex items-center justify-between pt-1">
+                            <span className="text-[10px] text-amber-800">Assign a worker to publish this.</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNewUserRole('provider');
+                                setNewProviderCategory('home_technician');
+                                setNewSkill(srv.name);
+                                setIsCreateUserModalOpen(true);
+                              }}
+                              className="text-[10px] text-blue-700 font-bold hover:underline cursor-pointer"
+                            >
+                              + Onboard Worker
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Base Price & Delete Action */}
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-3">
+                        <div className="flex-1">
+                          <label className="block text-[10px] font-semibold text-slate-500">
+                            Starting Price (PKR)
+                          </label>
+                          <input
+                            type="number"
+                            step={100}
+                            value={srv.basePrice}
+                            onChange={(e) => handleServicePriceChange(srv.id, Number(e.target.value))}
+                            className="w-full text-xs font-mono font-bold rounded-lg border border-slate-300 px-2 py-1 bg-white"
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteService(srv.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors mt-3.5 cursor-pointer"
+                          title="Delete service permanently from catalog"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </div>
 
-          {/* Transport Vehicles Pricing */}
-          <div className="space-y-3 pt-4 border-t border-slate-200">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              2. Cargo & Transport Fleet Rates
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {editingVehicles.map((veh) => (
-                <div key={veh.id} className="bg-white rounded-xl border border-slate-200 p-4 space-y-3 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-900 text-xs">{veh.name}</span>
-                    <span className="text-[10px] text-indigo-600 font-mono font-semibold">Max {veh.capacityKg}kg</span>
-                  </div>
+          {/* 2. Transport & Cargo Fleet Catalog & Driver Assignment */}
+          <div className="space-y-3 pt-6 border-t border-slate-200">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <Truck className="w-4 h-4 text-blue-600" />
+                <span>2. Cargo Fleet & Driver Source Assignment</span>
+              </h4>
+              <span className="text-[11px] text-slate-400">
+                {editingVehicles.filter(v => Store.isVehicleAvailable(v)).length} of {editingVehicles.length} Published
+              </span>
+            </div>
 
-                  <div className="space-y-2">
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-500">Base Fare (PKR)</label>
-                      <input
-                        type="number"
-                        step={50}
-                        value={veh.baseFare}
-                        onChange={(e) => handleVehicleRateChange(veh.id, 'baseFare', Number(e.target.value))}
-                        className="w-full text-xs font-mono font-bold rounded-lg border border-slate-300 px-2 py-1 bg-slate-50"
-                      />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {editingVehicles
+                .filter(veh => {
+                  const isAvail = Store.isVehicleAvailable(veh);
+                  if (catalogFilter === 'published') return isAvail;
+                  if (catalogFilter === 'unpublished') return !isAvail;
+                  return true;
+                })
+                .map((veh) => {
+                  const isLive = Store.isVehicleAvailable(veh);
+                  return (
+                    <div
+                      key={veh.id}
+                      className={`bg-white rounded-2xl border p-4 space-y-3 text-xs transition-all ${
+                        isLive ? 'border-emerald-300 shadow-2xs' : 'border-slate-200 bg-slate-50/50'
+                      }`}
+                    >
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="font-bold text-slate-900 block text-xs">{veh.name}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">Capacity: {veh.capacityKg}kg</span>
+                        </div>
+                        {isLive ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Live
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                            Hidden
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Driver Source Selector */}
+                      <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5">
+                        <label className="block text-[10px] font-bold text-slate-800">
+                          Assigned Driver / Fleet Source:
+                        </label>
+                        <select
+                          value={veh.assignedProviderId || ''}
+                          onChange={(e) => handleAssignVehicleSource(veh.id, e.target.value)}
+                          className="w-full text-xs rounded-lg border border-slate-300 px-2 py-1 bg-white font-medium"
+                        >
+                          <option value="">-- No Driver (Hidden) --</option>
+                          {driversList.map(d => (
+                            <option key={d.id} value={d.id}>
+                              {d.name} ({d.phone}) - {d.vehicleType || 'Driver'}
+                            </option>
+                          ))}
+                        </select>
+
+                        {!veh.assignedProviderId && (
+                          <div className="flex items-center justify-between pt-0.5">
+                            <span className="text-[10px] text-amber-800">Requires driver to publish.</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNewUserRole('provider');
+                                setNewProviderCategory('cargo_driver');
+                                setNewVehicle(veh.name);
+                                setIsCreateUserModalOpen(true);
+                              }}
+                              className="text-[10px] text-blue-700 font-bold hover:underline cursor-pointer"
+                            >
+                              + Onboard Driver
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Rates Editor */}
+                      <div className="space-y-2">
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-500">Base Fare (PKR)</label>
+                          <input
+                            type="number"
+                            step={50}
+                            value={veh.baseFare}
+                            onChange={(e) => handleVehicleRateChange(veh.id, 'baseFare', Number(e.target.value))}
+                            className="w-full text-xs font-mono font-bold rounded-lg border border-slate-300 px-2 py-1 bg-white"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-500">Per KM (PKR)</label>
+                            <input
+                              type="number"
+                              step={5}
+                              value={veh.perKmRate}
+                              onChange={(e) => handleVehicleRateChange(veh.id, 'perKmRate', Number(e.target.value))}
+                              className="w-full text-xs font-mono font-bold rounded-lg border border-slate-300 px-2 py-1 bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-500">Helper (PKR)</label>
+                            <input
+                              type="number"
+                              step={50}
+                              value={veh.helperRate}
+                              onChange={(e) => handleVehicleRateChange(veh.id, 'helperRate', Number(e.target.value))}
+                              className="w-full text-xs font-mono font-bold rounded-lg border border-slate-300 px-2 py-1 bg-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Delete button */}
+                      <div className="pt-2 border-t border-slate-100 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteVehicle(veh.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Delete vehicle permanently from catalog"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete Vehicle</span>
+                        </button>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-500">Per KM Rate (PKR/km)</label>
-                      <input
-                        type="number"
-                        step={5}
-                        value={veh.perKmRate}
-                        onChange={(e) => handleVehicleRateChange(veh.id, 'perKmRate', Number(e.target.value))}
-                        className="w-full text-xs font-mono font-bold rounded-lg border border-slate-300 px-2 py-1 bg-slate-50"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-500">Helper Labor Fee (PKR)</label>
-                      <input
-                        type="number"
-                        step={50}
-                        value={veh.helperRate}
-                        onChange={(e) => handleVehicleRateChange(veh.id, 'helperRate', Number(e.target.value))}
-                        className="w-full text-xs font-mono font-bold rounded-lg border border-slate-300 px-2 py-1 bg-slate-50"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
             </div>
           </div>
         </div>

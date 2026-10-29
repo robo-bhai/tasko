@@ -4,6 +4,7 @@ import {
   HomeServiceItem, 
   TransportVehicleItem 
 } from '../../types';
+import { Store } from '../../services/store';
 import { Language, translations } from '../../i18n/translations';
 import { 
   ShoppingBag, 
@@ -25,7 +26,8 @@ import {
   Headphones,
   PhoneCall,
   Download,
-  Building
+  Building,
+  MessageSquare
 } from 'lucide-react';
 import { PWAInstallButton } from '../PWAInstallButton';
 
@@ -410,54 +412,75 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {services.map((srv) => (
-            <div
-              key={srv.id}
-              onClick={() => onOpenOrderModal('home_services', srv.id)}
-              className="cursor-pointer bg-white border border-slate-200 rounded-2xl p-5 hover:border-blue-400 hover:shadow-xs transition-all flex flex-col justify-between"
-            >
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                    {getServiceIcon(srv.icon)}
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">
-                      {isUrdu ? 'ابتدائی ریٹ' : 'Starting at'}
-                    </span>
-                    <p className="font-bold text-slate-900 font-mono text-sm">
-                      {isUrdu ? `${srv.basePrice.toLocaleString()} روپے` : `PKR ${srv.basePrice.toLocaleString()}`}
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-bold text-slate-900 text-sm">{getServiceName(srv)}</h4>
-                  <p className="text-xs text-slate-500 mt-1 line-clamp-2">{srv.description}</p>
-                </div>
-
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {srv.popularIssues.slice(0, 2).map((issue, i) => (
-                    <span key={i} className="text-[11px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                      {issue}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{srv.estimatedDuration}</span>
-                </span>
-                <span className="font-bold text-blue-600">
-                  {isUrdu ? 'بک کریں ←' : 'Book Slot →'}
-                </span>
-              </div>
+        {services.length === 0 ? (
+          <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-8 text-center space-y-3">
+            <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center mx-auto">
+              <Wrench className="w-6 h-6" />
             </div>
-          ))}
-        </div>
+            <h4 className="font-bold text-slate-800 text-sm">
+              {isUrdu ? 'فی الوقت ورکرز کی فزیکل تصدیق جاری ہے' : 'Provider Verification in Progress'}
+            </h4>
+            <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+              {isUrdu
+                ? 'خانیوال کے علاقے میں اس وقت ٹیکنیشنز کی فزیکل جانچ پڑتال جاری ہے۔ سسٹم میں وہی سروس دستیاب ہوتی ہے جس کا مصدقہ کاریگر موجود ہو۔ فوری کام کے لیے ایڈمن سے واٹس ایپ پر رابطہ کریں۔'
+                : 'Services will appear here automatically as soon as verified local professionals are onboarded and assigned by Admin.'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {services.map((srv) => (
+              <div
+                key={srv.id}
+                onClick={() => onOpenOrderModal('home_services', srv.id)}
+                className="cursor-pointer bg-white border border-slate-200 rounded-2xl p-5 hover:border-blue-400 hover:shadow-xs transition-all flex flex-col justify-between"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                      {getServiceIcon(srv.icon)}
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 uppercase font-semibold">
+                        {isUrdu ? 'ابتدائی ریٹ' : 'Starting at'}
+                      </span>
+                      <p className="font-bold text-slate-900 font-mono text-sm">
+                        {isUrdu ? `${srv.basePrice.toLocaleString()} روپے` : `PKR ${srv.basePrice.toLocaleString()}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <h4 className="font-bold text-slate-900 text-sm">{getServiceName(srv)}</h4>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">{srv.description}</p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-2 py-0.5 rounded-full font-semibold">
+                      ● {isUrdu ? 'مصدقہ کاریگر دستیاب ہے' : 'Verified Pro Available'}
+                    </span>
+                    {srv.popularIssues.slice(0, 1).map((issue, i) => (
+                      <span key={i} className="text-[11px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                        {issue}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{srv.estimatedDuration}</span>
+                  </span>
+                  <span className="font-bold text-blue-600">
+                    {isUrdu ? 'بک کریں ←' : 'Book Slot →'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Transport Fleet Preview Section */}
@@ -471,53 +494,77 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
               {t.vehiclesSub}
             </p>
           </div>
-          <button
-            onClick={() => onOpenOrderModal('transport_cargo')}
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl transition-colors whitespace-nowrap w-fit cursor-pointer"
-          >
-            {t.catTransportBtn}
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {vehicles.map((veh) => (
-            <div
-              key={veh.id}
-              onClick={() => onOpenOrderModal('transport_cargo', veh.id)}
-              className="cursor-pointer bg-white rounded-2xl p-4 border border-slate-200 hover:border-indigo-400 hover:shadow-xs transition-all flex flex-col justify-between"
+          {vehicles.length > 0 && (
+            <button
+              onClick={() => onOpenOrderModal('transport_cargo')}
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl transition-colors whitespace-nowrap w-fit cursor-pointer"
             >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-                    {isUrdu ? `زیادہ سے زیادہ ${veh.capacityKg} کلو` : `Max ${veh.capacityKg} kg`}
-                  </span>
-                  <span className="text-xs font-mono font-bold text-slate-900">
-                    {isUrdu ? `${veh.baseFare} روپے` : `PKR ${veh.baseFare}`}
-                  </span>
-                </div>
-
-                <div>
-                  <h4 className="font-bold text-slate-900 text-xs md:text-sm">{getVehicleName(veh)}</h4>
-                  <p className="text-[11px] text-slate-500 font-mono mt-0.5">{veh.dimensions}</p>
-                </div>
-
-                <p className="text-xs text-slate-600 line-clamp-2">
-                  {veh.bestFor}
-                </p>
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
-                <span>{isUrdu ? `${veh.perKmRate} روپے / کلومیٹر` : `PKR ${veh.perKmRate}/km`}</span>
-                <span className="font-bold text-indigo-600">
-                  {isUrdu ? 'انتخاب کریں' : 'Select Vehicle'}
-                </span>
-              </div>
-            </div>
-          ))}
+              {t.catTransportBtn}
+            </button>
+          )}
         </div>
+
+        {vehicles.length === 0 ? (
+          <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-8 text-center space-y-3">
+            <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center mx-auto">
+              <Truck className="w-6 h-6" />
+            </div>
+            <h4 className="font-bold text-slate-800 text-sm">
+              {isUrdu ? 'کارگو فلیٹ کی آن بورڈنگ جاری ہے' : 'Fleet Drivers Being Verified'}
+            </h4>
+            <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+              {isUrdu
+                ? 'خانیوال کے علاقے میں لوڈر رکشہ اور پک اپ ڈرائیورز کی فزیکل جانچ پڑتال ہو رہی ہے۔ گاڑیاں تصدیق کے بعد لائیو کی جائیں گی۔'
+                : 'Vehicles will appear here as soon as verified cargo drivers are onboarded by the administration.'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {vehicles.map((veh) => (
+              <div
+                key={veh.id}
+                onClick={() => onOpenOrderModal('transport_cargo', veh.id)}
+                className="cursor-pointer bg-white rounded-2xl p-4 border border-slate-200 hover:border-indigo-400 hover:shadow-xs transition-all flex flex-col justify-between"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                      {isUrdu ? `زیادہ سے زیادہ ${veh.capacityKg} کلو` : `Max ${veh.capacityKg} kg`}
+                    </span>
+                    <span className="text-xs font-mono font-bold text-slate-900">
+                      {isUrdu ? `${veh.baseFare} روپے` : `PKR ${veh.baseFare}`}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-xs md:text-sm">{getVehicleName(veh)}</h4>
+                    <p className="text-[11px] text-slate-500 font-mono mt-0.5">{veh.dimensions}</p>
+                  </div>
+
+                  <p className="text-xs text-slate-600 line-clamp-2">
+                    {veh.bestFor}
+                  </p>
+
+                  <div>
+                    <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">
+                      ● {isUrdu ? 'ڈرائیور دستیاب ہے' : 'Driver Available'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
+                  <span>{isUrdu ? `${veh.perKmRate} روپے / کلومیٹر` : `PKR ${veh.perKmRate}/km`}</span>
+                  <span className="font-bold text-indigo-600">
+                    {isUrdu ? 'انتخاب کریں' : 'Select Vehicle'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
-      {/* Become a Partner / Driver Callout Banner */}
+      {/* Become a Partner / Driver Callout Banner (Direct WhatsApp Redirection) */}
       <section className="bg-gradient-to-r from-emerald-800 to-teal-900 rounded-3xl p-6 md:p-8 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-2 max-w-2xl">
           <div className="inline-flex items-center gap-1.5 bg-emerald-700/60 text-emerald-200 text-xs font-bold px-3 py-1 rounded-full border border-emerald-600/40">
@@ -529,17 +576,30 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
           </h3>
           <p className="text-xs md:text-sm text-emerald-100 leading-relaxed">
             {isUrdu 
-              ? 'اومنی سروس کے ساتھ رجسٹر ہوں اور اپنے شہر میں روزانہ آرڈرز حاصل کر کے اپنی آمدنی بڑھائیں۔ فوری رجسٹریشن اور آسان موبائل کنٹرول۔'
-              : 'Join OmniServe today and start receiving customer requests directly in your local area with guaranteed fast payouts.'}
+              ? 'خانیوال کنیکٹ کے ساتھ وابستہ ہوں اور اپنے شہر میں روزانہ باوقار روزگار کمائیں۔ پرووائیڈرز کی رجسٹریشن اور تصدیق صرف ایڈمن کے ذریعے واٹس ایپ پر کی جاتی ہے۔'
+              : 'Join Khanewal Connect as a verified service partner. Provider registration is managed directly by Admin via WhatsApp.'}
           </p>
         </div>
 
-        <button
-          onClick={() => onOpenAuth('provider_signup')}
-          className="px-6 py-3 bg-white text-emerald-900 hover:bg-emerald-50 text-xs md:text-sm font-extrabold rounded-2xl shadow-md transition-colors shrink-0 cursor-pointer"
-        >
-          {isUrdu ? 'بطور ورکر / ڈرائیور رجسٹر ہوں' : 'Register as Service Partner'}
-        </button>
+        {(() => {
+          const waPhone = (Store.getSettings().whatsappSupportPhone || '+923000009988').replace(/[^0-9]/g, '');
+          const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(
+            isUrdu
+              ? 'السلام علیکم! میں Khanewal Connect پر بطور سروس پارٹنر / ورکر (الیکٹریشن / پلمبر / ڈرائیور) آن بورڈ ہونا چاہتا ہوں۔ برائے مہربانی مجھے رجسٹر کریں۔'
+              : 'Hello Admin, I want to onboard as a verified service partner on Khanewal Connect. Please register me.'
+          )}`;
+          return (
+            <a
+              href={waUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-3.5 bg-white text-emerald-900 hover:bg-emerald-50 text-xs md:text-sm font-extrabold rounded-2xl shadow-md transition-colors shrink-0 flex items-center gap-2 cursor-pointer"
+            >
+              <MessageSquare className="w-4 h-4 text-emerald-600" />
+              <span>{isUrdu ? 'ایڈمن سے واٹس ایپ پر رابطہ کریں (آن بورڈنگ)' : 'Contact Admin on WhatsApp (Onboarding)'}</span>
+            </a>
+          );
+        })()}
       </section>
 
       {/* Trust & Guarantee Badges */}
