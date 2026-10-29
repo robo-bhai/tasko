@@ -248,14 +248,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <span>{t.signup}</span>
               </button>
-
-              <button
-                onClick={() => onOpenAuth('provider_signup')}
-                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold rounded-xl transition-colors hidden md:flex items-center gap-1.5 cursor-pointer"
-              >
-                <Briefcase className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{isUrdu ? 'ورکر بنیں' : 'Join as Partner'}</span>
-              </button>
             </div>
           )}
 
@@ -314,12 +306,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="flex-1 py-2 text-center rounded-xl bg-blue-600 text-white text-xs font-bold"
               >
                 {t.signup}
-              </button>
-              <button
-                onClick={() => { onOpenAuth('provider_signup'); setMobileMenuOpen(false); }}
-                className="flex-1 py-2 text-center rounded-xl bg-emerald-600 text-white text-xs font-bold"
-              >
-                {isUrdu ? 'ورکر بنیں' : 'Join'}
               </button>
             </div>
           )}

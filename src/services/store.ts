@@ -4,8 +4,9 @@ import {
   HomeServiceItem, 
   TransportVehicleItem, 
   OrderStatus, 
-  PaymentMethod,
-  OrderReview
+  PaymentMethod, 
+  OrderReview,
+  SystemSettings
 } from '../types';
 
 const STORAGE_KEY_ORDERS = 'omniserve_orders_v1';
@@ -13,6 +14,20 @@ const STORAGE_KEY_USERS = 'omniserve_users_v1';
 const STORAGE_KEY_SERVICES = 'omniserve_services_v1';
 const STORAGE_KEY_VEHICLES = 'omniserve_vehicles_v1';
 const STORAGE_KEY_CURRENT_USER = 'omniserve_current_user_v1';
+const STORAGE_KEY_SETTINGS = 'omniserve_settings_v1';
+
+export const DEFAULT_SETTINGS: SystemSettings = {
+  deliveryBaseFee: 200,
+  deliveryPerKmFee: 35,
+  deliveryUrgentFee: 150,
+  technicianVisitingFee: 500,
+  technicianHourlyRate: 800,
+  platformCommissionRate: 15,
+  platformFixedFee: 50,
+  whatsappSupportPhone: '+92 300 0009988',
+  whatsappDefaultMessage: 'السلام علیکم! مجھے سروس کے بارے میں کچھ معلومات چاہیے/مدد چاہیے۔',
+  supportHelpline: '0800-6664'
+};
 
 // Super Admin credentials dynamically loaded from environment / GitHub secrets
 export const DEFAULT_ADMIN_USERNAME = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_ADMIN_USERNAME) 
@@ -224,7 +239,14 @@ export const Store = {
   },
 
   getCurrentUser: (): User | null => {
-    return loadFromStorage<User | null>(STORAGE_KEY_CURRENT_USER, null);
+    const user = loadFromStorage<User | null>(STORAGE_KEY_CURRENT_USER, null);
+    if (!user) return null;
+    const freshUser = Store.getUsers().find(u => u.id === user.id);
+    if (!freshUser || freshUser.status === 'blocked' || freshUser.status === 'suspended' || freshUser.isDeleted) {
+      localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
+      return null;
+    }
+    return freshUser;
   },
 
   setCurrentUser: (user: User | null) => {
@@ -286,17 +308,23 @@ export const Store = {
     return newUser;
   },
 
-  registerProvider: (providerData: {
+  // Service Providers cannot self-register. Provider accounts can ONLY be manually created by Admin.
+  registerProvider: (_providerData: any): User => {
+    throw new Error('Public registration for Service Providers is strictly disabled. Provider accounts can ONLY be manually created, configured, and onboarded by the Admin through the Admin Panel.');
+  },
+
+  createProviderByAdmin: (providerData: {
     name: string;
     email: string;
     phone: string;
-    password: string;
-    cnic?: string;
-    city?: string;
+    password?: string;
     providerCategory: any;
     serviceSkill?: string;
     vehicleType?: string;
+    walletBalance?: number;
     address?: string;
+    cnic?: string;
+    notes?: string;
   }): User => {
     const users = Store.getUsers();
     const existing = users.find(
@@ -317,61 +345,18 @@ export const Store = {
       name: providerData.name.trim(),
       email: providerData.email.trim().toLowerCase(),
       phone: providerData.phone.trim(),
-      password: providerData.password.trim(),
-      role: 'provider',
-      avatar,
-      address: providerData.address?.trim() || `${providerData.city || 'Islamabad'}, Pakistan`,
-      walletBalance: 2000,
-      status: 'active',
-      joinedDate: new Date().toISOString().split('T')[0],
-      providerCategory: providerData.providerCategory,
-      serviceSkill: providerData.serviceSkill || (providerData.providerCategory === 'home_technician' ? 'AC & Electrical Specialist' : undefined),
-      vehicleType: providerData.vehicleType || (providerData.providerCategory === 'cargo_driver' ? 'Suzuki Bolan Pickup' : '125cc Motorbike'),
-      rating: 5.0,
-      completedJobsCount: 0,
-      isOnline: true
-    };
-
-    users.push(newProvider);
-    saveToStorage(STORAGE_KEY_USERS, users);
-    Store.setCurrentUser(newProvider);
-    notifyStoreChanged();
-    return newProvider;
-  },
-
-  createProviderByAdmin: (providerData: {
-    name: string;
-    email: string;
-    phone: string;
-    password?: string;
-    providerCategory: any;
-    serviceSkill?: string;
-    vehicleType?: string;
-    walletBalance?: number;
-    address?: string;
-  }): User => {
-    const users = Store.getUsers();
-    const avatar = providerData.providerCategory === 'cargo_driver'
-      ? '/src/assets/images/transport_cargo_vehicle_1793035359966.jpg'
-      : providerData.providerCategory === 'delivery_courier'
-      ? '/src/assets/images/hero_delivery_service_1793035359071.jpg'
-      : '/src/assets/images/app_avatar_provider_1793035360068.jpg';
-
-    const newProvider: User = {
-      id: 'usr-prov-' + Date.now(),
-      name: providerData.name.trim(),
-      email: providerData.email.trim().toLowerCase(),
-      phone: providerData.phone.trim(),
       password: providerData.password || 'Worker@123',
       role: 'provider',
       avatar,
-      address: providerData.address?.trim() || 'Commercial Hub, Islamabad',
-      walletBalance: providerData.walletBalance || 5000,
+      address: providerData.address?.trim() || 'Commercial Hub, Khanewal',
+      walletBalance: providerData.walletBalance ?? 5000,
       status: 'active',
       joinedDate: new Date().toISOString().split('T')[0],
       providerCategory: providerData.providerCategory,
       serviceSkill: providerData.serviceSkill || (providerData.providerCategory === 'home_technician' ? 'AC & Electrical Specialist' : undefined),
       vehicleType: providerData.vehicleType || (providerData.providerCategory === 'cargo_driver' ? 'Suzuki Bolan Pickup' : '125cc Motorbike'),
+      cnic: providerData.cnic?.trim(),
+      notes: providerData.notes?.trim(),
       rating: 5.0,
       completedJobsCount: 0,
       isOnline: true
@@ -397,8 +382,12 @@ export const Store = {
       return { success: false, error: 'No account found with this email or phone number.' };
     }
 
-    if (user.status === 'blocked') {
-      return { success: false, error: 'This account has been suspended by the administrator.' };
+    if (user.isDeleted) {
+      return { success: false, error: 'This account has been removed by the administrator.' };
+    }
+
+    if (user.status === 'blocked' || user.status === 'suspended') {
+      return { success: false, error: 'This account has been banned or suspended by the administrator.' };
     }
 
     // If password provided, verify it
@@ -433,6 +422,127 @@ export const Store = {
       }
       notifyStoreChanged();
     }
+  },
+
+  // Comprehensive User Management methods
+  adminUpdateUser: (userIdOrData: string | (Partial<User> & { id: string }), changes?: Partial<User>): User | null => {
+    const id = typeof userIdOrData === 'string' ? userIdOrData : userIdOrData.id;
+    const data = typeof userIdOrData === 'string' ? (changes || {}) : userIdOrData;
+
+    const users = Store.getUsers();
+    const idx = users.findIndex(u => u.id === id);
+    if (idx === -1) return null;
+
+    users[idx] = {
+      ...users[idx],
+      ...data,
+      id
+    };
+    saveToStorage(STORAGE_KEY_USERS, users);
+    const cur = Store.getCurrentUser();
+    if (cur && cur.id === id) {
+      if (users[idx].status === 'blocked' || users[idx].status === 'suspended' || users[idx].isDeleted) {
+        Store.logout();
+      } else {
+        saveToStorage(STORAGE_KEY_CURRENT_USER, users[idx]);
+      }
+    }
+    notifyStoreChanged();
+    return users[idx];
+  },
+
+  banUser: (userId: string): boolean => {
+    const users = Store.getUsers();
+    const idx = users.findIndex(u => u.id === userId);
+    if (idx >= 0) {
+      users[idx].status = 'blocked';
+      saveToStorage(STORAGE_KEY_USERS, users);
+      const cur = Store.getCurrentUser();
+      if (cur && cur.id === userId) {
+        Store.logout();
+      }
+      notifyStoreChanged();
+      return true;
+    }
+    return false;
+  },
+
+  suspendUser: (userId: string): boolean => {
+    const users = Store.getUsers();
+    const idx = users.findIndex(u => u.id === userId);
+    if (idx >= 0) {
+      users[idx].status = 'suspended';
+      saveToStorage(STORAGE_KEY_USERS, users);
+      const cur = Store.getCurrentUser();
+      if (cur && cur.id === userId) {
+        Store.logout();
+      }
+      notifyStoreChanged();
+      return true;
+    }
+    return false;
+  },
+
+  unbanUser: (userId: string): boolean => {
+    const users = Store.getUsers();
+    const idx = users.findIndex(u => u.id === userId);
+    if (idx >= 0) {
+      users[idx].status = 'active';
+      users[idx].isDeleted = false;
+      saveToStorage(STORAGE_KEY_USERS, users);
+      notifyStoreChanged();
+      return true;
+    }
+    return false;
+  },
+
+  deleteUser: (userId: string): boolean => {
+    const users = Store.getUsers();
+    const idx = users.findIndex(u => u.id === userId);
+    if (idx >= 0) {
+      // Soft-delete user
+      users[idx].isDeleted = true;
+      users[idx].status = 'blocked';
+      saveToStorage(STORAGE_KEY_USERS, users);
+      const cur = Store.getCurrentUser();
+      if (cur && cur.id === userId) {
+        Store.logout();
+      }
+      notifyStoreChanged();
+      return true;
+    }
+    return false;
+  },
+
+  restoreUser: (userId: string): boolean => {
+    const users = Store.getUsers();
+    const idx = users.findIndex(u => u.id === userId);
+    if (idx >= 0) {
+      users[idx].isDeleted = false;
+      users[idx].status = 'active';
+      saveToStorage(STORAGE_KEY_USERS, users);
+      notifyStoreChanged();
+      return true;
+    }
+    return false;
+  },
+
+  getUserOrders: (userId: string): Order[] => {
+    const orders = Store.getOrders();
+    return orders.filter(o => o.customerId === userId || o.assignedProviderId === userId);
+  },
+
+  // Dynamic Settings & Live Pricing Controls
+  getSettings: (): SystemSettings => {
+    return loadFromStorage<SystemSettings>(STORAGE_KEY_SETTINGS, DEFAULT_SETTINGS);
+  },
+
+  updateSettings: (newSettings: Partial<SystemSettings>): SystemSettings => {
+    const current = Store.getSettings();
+    const updated: SystemSettings = { ...current, ...newSettings };
+    saveToStorage(STORAGE_KEY_SETTINGS, updated);
+    notifyStoreChanged();
+    return updated;
   },
 
   getOrders: (): Order[] => {

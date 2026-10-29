@@ -12,7 +12,10 @@ export interface User {
   avatar: string;
   address?: string;
   walletBalance: number;
-  status: 'active' | 'pending' | 'blocked';
+  status: 'active' | 'pending' | 'blocked' | 'suspended';
+  isDeleted?: boolean;
+  cnic?: string;
+  notes?: string;
   joinedDate: string;
   // Provider specific fields
   providerCategory?: ProviderCategory;
@@ -22,6 +25,20 @@ export interface User {
   completedJobsCount?: number;
   isOnline?: boolean;
 }
+
+export interface SystemSettings {
+  deliveryBaseFee: number;
+  deliveryPerKmFee: number;
+  deliveryUrgentFee: number;
+  technicianVisitingFee: number;
+  technicianHourlyRate: number;
+  platformCommissionRate: number; // percentage (e.g. 15%)
+  platformFixedFee: number;
+  whatsappSupportPhone: string;
+  whatsappDefaultMessage: string;
+  supportHelpline: string;
+}
+
 
 export type OrderCategory = 'custom_delivery' | 'home_services' | 'transport_cargo';
 

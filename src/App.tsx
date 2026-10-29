@@ -19,6 +19,7 @@ import { OrderHistoryModal } from './components/CustomerPortal/OrderHistoryModal
 import { ProviderDashboard } from './components/ProviderPortal/ProviderDashboard';
 import { AdminDashboard } from './components/AdminPortal/AdminDashboard';
 import { AuthModal } from './components/AuthModal';
+import { FloatingWhatsAppButton } from './components/FloatingWhatsAppButton';
 import { 
   ShoppingBag, 
   Wrench, 
@@ -424,8 +425,8 @@ export default function App() {
                   </button>
                 </li>
                 <li>
-                  <button onClick={() => handleOpenAuthModal('provider_signup')} className="hover:text-emerald-400 transition-colors cursor-pointer font-semibold text-emerald-300">
-                    {isUrdu ? 'ورکر / ڈرائیور رجسٹریشن' : 'Register as Service Partner'}
+                  <button onClick={() => handleOpenAuthModal('provider_signup')} className="hover:text-emerald-400 transition-colors cursor-pointer text-slate-400">
+                    {isUrdu ? 'پارٹنر آن بورڈنگ (ایڈمن تصدیق)' : 'Partner Onboarding (Admin Only)'}
                   </button>
                 </li>
               </ul>
@@ -457,6 +458,9 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Floating WhatsApp Support Button */}
+      <FloatingWhatsAppButton isUrdu={isUrdu} />
     </div>
   );
 }

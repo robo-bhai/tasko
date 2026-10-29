@@ -241,19 +241,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             }`}
           >
             <ShoppingBag className="w-3.5 h-3.5" />
-            <span>{isUrdu ? 'نیا کسٹمر' : 'Customer'}</span>
-          </button>
-
-          <button
-            onClick={() => { setActiveTab('provider_signup'); setErrorMessage(''); }}
-            className={`flex-1 py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === 'provider_signup'
-                ? 'bg-white text-emerald-700 shadow-xs border border-slate-200/80'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <Briefcase className="w-3.5 h-3.5" />
-            <span>{isUrdu ? 'ورکر / ڈرائیور' : 'Provider'}</span>
+            <span>{isUrdu ? 'نیا کسٹمر اکاؤنٹ' : 'Customer Sign Up'}</span>
           </button>
         </div>
 
@@ -319,8 +307,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
                 <p className="leading-relaxed">
                   {isUrdu 
-                    ? 'ایڈمن لاگ ان کے لیے اپنے والے  اور  درج کریں۔'
-                    : 'Log in with your configured to access the master control panel.'}
+                    ? 'ایڈمن لاگ ان کے لیے اپنے GitHub Secrets والے ADMIN_USERNAME اور ADMIN_PASSWORD درج کریں۔'
+                    : 'Log in with your configured ADMIN_USERNAME and ADMIN_PASSWORD secrets to access the master control panel.'}
                 </p>
               </div>
 
@@ -442,188 +430,46 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </form>
           )}
 
-          {/* TAB 3: PROVIDER / DRIVER SIGN UP */}
+          {/* TAB 3: PROVIDER NOTICE (RESTRICTED TO ADMIN ONBOARDING ONLY) */}
           {activeTab === 'provider_signup' && (
-            <form onSubmit={handleProviderSignUp} className="space-y-3.5 text-xs">
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-[11px] text-emerald-800 leading-relaxed">
-                {isUrdu 
-                  ? '⚡ ہمارے مصدقہ پارٹنر بنیں اور روزانہ باعزت روزگار کمائیں۔ رجسٹریشن کے بعد آپ کو قریبی آرڈرز ملنا شروع ہو جائیں گے۔'
-                  : '⚡ Join as a verified partner and start earning daily. You will receive nearby delivery, repair, or cargo jobs.'}
+            <div className="space-y-4 text-center py-4">
+              <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto shadow-xs">
+                <ShieldCheck className="w-8 h-8" />
               </div>
-
               <div>
-                <label className="block text-slate-700 font-bold mb-1">
-                  {t.fullName} *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={provName}
-                  onChange={(e) => setProvName(e.target.value)}
-                  placeholder={isUrdu ? 'مثلاً طارق محمود' : 'e.g. Tariq Mehmood'}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2"
-                />
+                <h4 className="text-base font-bold text-slate-900 mb-1">
+                  {isUrdu ? 'پرووائیڈر اکاؤنٹ رجسٹریشن ایڈمن کے ذریعے محدود ہے' : 'Provider Registration is Admin-Restricted'}
+                </h4>
+                <p className="text-xs text-slate-600 leading-relaxed max-w-sm mx-auto">
+                  {isUrdu
+                    ? 'سیکیورٹی اور کوالٹی کے پیشِ نظر سروس پرووائیڈرز (ٹیکنیشن، پلمبر، رائیڈر) کے اکاؤنٹس صرف خانیوال کنیکٹ ایڈمن پینل سے تصدیق کے بعد بنتے ہیں۔ براہِ کرم تصدیق کے لیے ایڈمن سے رابطہ کریں۔'
+                    : 'For security and service quality, service provider accounts (technicians, plumbers, drivers) are strictly created and onboarded by Khanewal Connect Administration. Please contact Admin via WhatsApp to join.'}
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">
-                    {t.mobilePhone} *
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    value={provPhone}
-                    onChange={(e) => setProvPhone(e.target.value)}
-                    placeholder="+92 300 1234567"
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">
-                    {t.cnicNumber} *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={provCnic}
-                    onChange={(e) => setProvCnic(e.target.value)}
-                    placeholder="37405-1234567-1"
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono"
-                  />
-                </div>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 text-start space-y-1">
+                <div className="font-semibold text-slate-900">{isUrdu ? 'ضروری دستاویزات برائے ایڈمن:' : 'Required for Admin Onboarding:'}</div>
+                <div className="text-[11px] text-slate-600">• {isUrdu ? 'اصل قومی شناختی کارڈ (CNIC)' : 'Valid CNIC Copy'}</div>
+                <div className="text-[11px] text-slate-600">• {isUrdu ? 'موبائل نمبر اور متعلقہ سروس کی مہارت کا ثبوت' : 'Active Mobile Number & Verified Trade Experience'}</div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">
-                    {t.emailAddress} *
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={provEmail}
-                    onChange={(e) => setProvEmail(e.target.value)}
-                    placeholder="provider@example.com"
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">
-                    {t.password} *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    value={provPassword}
-                    onChange={(e) => setProvPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">
-                  {t.serviceCategory} *
-                </label>
-                <select
-                  value={provCategory}
-                  onChange={(e) => setProvCategory(e.target.value as ProviderCategory)}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 bg-white font-medium"
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('login')}
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-colors"
                 >
-                  <option value="home_technician">
-                    {isUrdu ? '🔧 ہوم سروسز ٹیکنیشن (اے سی، الیکٹریشن، پلمبر، صفائی)' : '🔧 Home Technician (AC, Electrician, Plumber, Cleaning)'}
-                  </option>
-                  <option value="cargo_driver">
-                    {isUrdu ? '🚚 کارگو و ٹرانسپورٹ ڈرائیور (لوڈر رکشہ، پک اپ، ٹرک)' : '🚚 Cargo & Transport Driver (Loader, Pickup, Truck)'}
-                  </option>
-                  <option value="delivery_courier">
-                    {isUrdu ? '🛍️ ڈلیوری رائیڈر (شاپنگ اور کسٹم پارسل ترسیل)' : '🛍️ Delivery Courier / Rider (Buy & Deliver, Parcels)'}
-                  </option>
-                </select>
+                  {isUrdu ? 'لاگ ان صفحہ پر جائیں' : 'Back to Login'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('customer_signup')}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
+                >
+                  {isUrdu ? 'کسٹمر اکاؤنٹ بنائیں' : 'Sign Up as Customer'}
+                </button>
               </div>
-
-              {provCategory === 'home_technician' && (
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">
-                    {isUrdu ? 'آپ کی خاص مہارت' : 'Specialization Skill'} *
-                  </label>
-                  <select
-                    value={provSkill}
-                    onChange={(e) => setProvSkill(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 bg-white"
-                  >
-                    <option value="AC Master Service & Chemical Wash">AC Master Service & Chemical Wash (اے سی سروس)</option>
-                    <option value="Certified Electrician & Wiring Specialist">Certified Electrician (الیکٹریشن و وائرنگ)</option>
-                    <option value="Emergency Plumbing & Sanitary">Emergency Plumbing (پلمبنگ و سینیٹری)</option>
-                    <option value="Deep Home & Sofa Cleaning">Deep Home & Sofa Cleaning (گھریلو صفائی)</option>
-                    <option value="Home Appliance Repair">Home Appliance Doctor (فریج، واشنگ مشین مرمت)</option>
-                    <option value="Woodwork & Locksmith">Carpentry & Locksmith (کارپینٹر و تالہ مرمت)</option>
-                  </select>
-                </div>
-              )}
-
-              {provCategory === 'cargo_driver' && (
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">
-                    {t.vehicleType} *
-                  </label>
-                  <select
-                    value={provVehicle}
-                    onChange={(e) => setProvVehicle(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 bg-white"
-                  >
-                    <option value="Loader Rickshaw (400kg)">Loader Rickshaw (400kg - لوڈر رکشہ)</option>
-                    <option value="Suzuki Ravi / Bolan Pickup (800kg)">Suzuki Ravi / Bolan Pickup (800kg - سوزوکی پک اپ)</option>
-                    <option value="Hyundai Shehzore 1-Ton (1200kg)">Hyundai Shehzore 1-Ton (1200kg - شاہ زور)</option>
-                    <option value="Master / Isuzu 3-Ton Truck (3000kg)">Isuzu Forward 3-Ton (3000kg - بڑا ٹرک)</option>
-                  </select>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">
-                    {t.city} *
-                  </label>
-                  <select
-                    value={provCity}
-                    onChange={(e) => setProvCity(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 bg-white"
-                  >
-                    <option value="Islamabad">Islamabad (اسلام آباد)</option>
-                    <option value="Rawalpindi">Rawalpindi (راولپنڈی)</option>
-                    <option value="Lahore">Lahore (لاہور)</option>
-                    <option value="Karachi">Karachi (کراچی)</option>
-                    <option value="Peshawar">Peshawar (پشاور)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 font-bold mb-1">
-                    {isUrdu ? 'ورکشاپ / بیس ایریا' : 'Area / Base'}
-                  </label>
-                  <input
-                    type="text"
-                    value={provAddress}
-                    onChange={(e) => setProvAddress(e.target.value)}
-                    placeholder={isUrdu ? 'مثلاً جی ٹین، اسلام آباد' : 'e.g. G-10 Markaz'}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors shadow-sm mt-2 disabled:opacity-50"
-              >
-                {isSubmitting ? (isUrdu ? 'رجسٹریشن ہو رہی ہے...' : 'Registering...') : t.registerAsProviderBtn}
-              </button>
-            </form>
+            </div>
           )}
         </div>
       </div>
