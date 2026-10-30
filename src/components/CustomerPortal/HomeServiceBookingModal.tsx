@@ -123,205 +123,217 @@ export const HomeServiceBookingModal: React.FC<HomeServiceBookingModalProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-[#0e1017] text-white rounded-2xl sm:rounded-3xl max-w-2xl w-full shadow-2xl border border-amber-500/30 overflow-hidden my-auto max-h-[94vh] sm:max-h-[90vh] flex flex-col">
         {/* Modal Header */}
-        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-emerald-600 flex items-center justify-center">
-              <Wrench className="w-5 h-5 text-white" />
+        <div className="px-3.5 py-3 sm:px-6 sm:py-4 bg-[#08090f] text-white flex items-center justify-between border-b border-amber-500/20 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-400 flex items-center justify-center shrink-0">
+              <Wrench className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Book a Home Service / Technician</h3>
-              <p className="text-xs text-slate-300">Certified local professionals with verified background & warranty</p>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h3 className="text-xs sm:text-base font-bold text-white leading-tight">
+                  بک اے ٹیکنیشن (Book a Technician)
+                </h3>
+                <span className="text-[9px] sm:text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded-full">
+                  خانیوال لوکل
+                </span>
+              </div>
+              <p className="text-[10px] sm:text-xs text-slate-400 line-clamp-1">
+                تصدیق شدہ کاریگر برائے خانیوال شہر و قریبی علاقے
+              </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors"
+            className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors hover:bg-slate-800"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
         {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {/* Service Picker Carousel/Grid */}
-          <div>
-            <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">
-              Select Service Domain *
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              {services.map((srv) => (
-                <button
-                  type="button"
-                  key={srv.id}
-                  onClick={() => {
-                    setSelectedServiceId(srv.id);
-                    if (srv.popularIssues.length > 0) {
-                      setSelectedIssues([srv.popularIssues[0]]);
-                    }
-                  }}
-                  className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                    selectedServiceId === srv.id
-                      ? 'border-emerald-600 bg-emerald-50/70 shadow-xs ring-1 ring-emerald-600'
-                      : 'border-slate-200 hover:border-slate-300 bg-white'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="p-1.5 rounded-md bg-white border border-slate-200 shadow-2xs">
-                      {getServiceIcon(srv.icon)}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          {/* Scrollable Form Body */}
+          <div className="p-3 sm:p-5 overflow-y-auto flex-1 space-y-3 sm:space-y-4 text-xs">
+            {/* Service Picker */}
+            <div>
+              <label className="block text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 sm:mb-2">
+                1. سروس کا انتخاب کریں (Select Domain) *
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5">
+                {services.map((srv) => (
+                  <button
+                    type="button"
+                    key={srv.id}
+                    onClick={() => {
+                      setSelectedServiceId(srv.id);
+                      if (srv.popularIssues.length > 0) {
+                        setSelectedIssues([srv.popularIssues[0]]);
+                      }
+                    }}
+                    className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
+                      selectedServiceId === srv.id
+                        ? 'border-amber-400 bg-amber-950/40 shadow-xs ring-1 ring-amber-400/60'
+                        : 'border-slate-800 hover:border-slate-700 bg-[#12141e]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="p-1 rounded-md bg-slate-900 border border-slate-700">
+                        {getServiceIcon(srv.icon)}
+                      </div>
+                      {selectedServiceId === srv.id && (
+                        <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
+                      )}
                     </div>
-                    {selectedServiceId === srv.id && (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    )}
-                  </div>
-                  <div className="mt-2">
-                    <p className="font-bold text-slate-900 text-xs leading-tight">{srv.name}</p>
-                    <p className="font-mono text-[11px] text-emerald-700 font-semibold mt-1">
-                      PKR {srv.basePrice.toLocaleString()}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Issue Checklist */}
-          {activeService && (
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                  Select Issue / Required Work
-                </span>
-                <span className="text-[11px] text-slate-500">{activeService.estimatedDuration}</span>
+                    <div className="mt-1.5">
+                      <p className="font-bold text-white text-[11px] sm:text-xs leading-tight line-clamp-1">{srv.name}</p>
+                      <p className="font-mono text-[10px] sm:text-[11px] text-amber-400 font-semibold mt-0.5">
+                        PKR {srv.basePrice.toLocaleString()}
+                      </p>
+                    </div>
+                  </button>
+                ))}
               </div>
-              <div className="flex flex-wrap gap-2">
-                {activeService.popularIssues.map((issue, idx) => {
-                  const isChecked = selectedIssues.includes(issue);
-                  return (
-                    <button
-                      type="button"
-                      key={idx}
-                      onClick={() => handleToggleIssue(issue)}
-                      className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${
-                        isChecked
-                          ? 'bg-emerald-600 text-white border-emerald-600'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      {issue}
-                    </button>
-                  );
-                })}
+            </div>
+
+            {/* Issue Checklist */}
+            {activeService && (
+              <div className="p-3 sm:p-4 rounded-xl bg-[#12141e] border border-slate-800 space-y-2 sm:space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    2. مسئلہ منتخب کریں (Common Issues)
+                  </span>
+                  <span className="text-[10px] sm:text-[11px] text-amber-400 font-mono">{activeService.estimatedDuration}</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                  {activeService.popularIssues.map((issue, idx) => {
+                    const isChecked = selectedIssues.includes(issue);
+                    return (
+                      <button
+                        type="button"
+                        key={idx}
+                        onClick={() => handleToggleIssue(issue)}
+                        className={`text-[10px] sm:text-xs px-2.5 py-1 rounded-lg border font-medium transition-colors cursor-pointer ${
+                          isChecked
+                            ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold'
+                            : 'bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800'
+                        }`}
+                      >
+                        {issue}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div>
+                  <input
+                    type="text"
+                    value={customDescription}
+                    onChange={(e) => setCustomDescription(e.target.value)}
+                    placeholder="یا اپنے مسئلے کی مزید تفصیل لکھیں (مثلاً: بریکر بار بار ٹرپ ہو رہا ہے)..."
+                    className="w-full text-[11px] sm:text-xs rounded-lg border border-slate-700 px-3 py-1.5 sm:py-2 bg-slate-900 text-white placeholder-slate-500 focus:outline-hidden focus:border-amber-400"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Date and Time Slot */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+              <div>
+                <label className="block text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                  تاریخ و دن (Preferred Date) *
+                </label>
+                <div className="relative">
+                  <Calendar className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5 sm:top-3" />
+                  <select
+                    value={scheduledDate}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                    className="w-full text-xs sm:text-sm rounded-xl border border-slate-700 pl-8 pr-3 py-2 sm:py-2.5 bg-slate-900 text-white font-medium focus:outline-hidden focus:border-amber-400 cursor-pointer"
+                  >
+                    <option value="Today (Immediate)" className="bg-slate-900 text-white">آج ہی (فوری 30-45 منٹ میں)</option>
+                    <option value="Tomorrow Morning" className="bg-slate-900 text-white">کل صبح (Morning)</option>
+                    <option value="Tomorrow Afternoon" className="bg-slate-900 text-white">کل دوپہر (Afternoon)</option>
+                    <option value="This Weekend (Saturday)" className="bg-slate-900 text-white">ہفتہ / اتوار (Weekend)</option>
+                  </select>
+                </div>
               </div>
 
               <div>
+                <label className="block text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                  پہنچنے کا وقت (Time Slot) *
+                </label>
+                <div className="relative">
+                  <Clock className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5 sm:top-3" />
+                  <select
+                    value={scheduledTimeSlot}
+                    onChange={(e) => setScheduledTimeSlot(e.target.value)}
+                    className="w-full text-xs sm:text-sm rounded-xl border border-slate-700 pl-8 pr-3 py-2 sm:py-2.5 bg-slate-900 text-white font-medium focus:outline-hidden focus:border-amber-400 cursor-pointer"
+                  >
+                    <option value="Immediate Urgent Dispatch" className="bg-slate-900 text-white">فوری ارجنٹ ڈسپیچ (Immediate)</option>
+                    <option value="10:00 AM - 01:00 PM" className="bg-slate-900 text-white">10:00 AM - 01:00 PM (صبح)</option>
+                    <option value="01:00 PM - 04:00 PM" className="bg-slate-900 text-white">01:00 PM - 04:00 PM (دوپہر)</option>
+                    <option value="04:00 PM - 07:00 PM" className="bg-slate-900 text-white">04:00 PM - 07:00 PM (شام)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Service Address in Khanewal */}
+            <div>
+              <label className="block text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                خانیوال میں کام کا پتہ (Service Location Address) *
+              </label>
+              <div className="relative">
+                <MapPin className="w-3.5 h-3.5 text-amber-400 absolute left-3 top-2.5 sm:top-3" />
                 <input
                   type="text"
-                  value={customDescription}
-                  onChange={(e) => setCustomDescription(e.target.value)}
-                  placeholder="Or describe the specific problem in detail (e.g. AC makes rattling sound after 15 mins)..."
-                  className="w-full text-xs rounded-lg border border-slate-300 px-3 py-2 bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                  required
+                  value={serviceAddress}
+                  onChange={(e) => setServiceAddress(e.target.value)}
+                  placeholder="مکان یا دکان نمبر، گلی نمبر، محلہ/کالونی، خانیوال"
+                  className="w-full text-xs sm:text-sm rounded-xl border border-slate-700 pl-8 pr-3 py-2 sm:py-2.5 bg-slate-900 text-white placeholder-slate-500 focus:outline-hidden focus:border-amber-400"
                 />
               </div>
             </div>
-          )}
 
-          {/* Date and Time Slot */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider mb-1">
-                Preferred Date *
-              </label>
-              <div className="relative">
-                <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <select
-                  value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  className="w-full text-xs rounded-xl border border-slate-300 pl-9 pr-3 py-2.5 bg-white font-medium focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
-                >
-                  <option value="Today (Immediate)">Today (Within 60-90 mins)</option>
-                  <option value="Tomorrow Morning">Tomorrow Morning</option>
-                  <option value="Tomorrow Afternoon">Tomorrow Afternoon</option>
-                  <option value="This Weekend (Saturday)">This Weekend (Saturday)</option>
-                </select>
+            {/* Price Breakdown */}
+            <div className="rounded-xl bg-[#12141e] border border-amber-500/20 p-3 sm:p-3.5 space-y-1.5 text-[11px] sm:text-xs">
+              <div className="flex items-center justify-between text-slate-300">
+                <span>{activeService?.name || 'Service'} وزٹ و بنیادی مزدوری</span>
+                <span className="font-mono font-semibold text-white">PKR {basePrice.toLocaleString()}</span>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider mb-1">
-                Arrival Time Window *
-              </label>
-              <div className="relative">
-                <Clock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <select
-                  value={scheduledTimeSlot}
-                  onChange={(e) => setScheduledTimeSlot(e.target.value)}
-                  className="w-full text-xs rounded-xl border border-slate-300 pl-9 pr-3 py-2.5 bg-white font-medium focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
-                >
-                  <option value="10:00 AM - 01:00 PM">10:00 AM - 01:00 PM (Morning)</option>
-                  <option value="01:00 PM - 04:00 PM">01:00 PM - 04:00 PM (Afternoon)</option>
-                  <option value="04:00 PM - 07:00 PM">04:00 PM - 07:00 PM (Evening)</option>
-                  <option value="Immediate Urgent Dispatch">Immediate Urgent Dispatch</option>
-                </select>
+              <div className="flex items-center justify-between text-slate-400">
+                <span>معائنہ کٹ و ٹول چارجز</span>
+                <span className="font-mono font-semibold text-white">PKR {toolAndEquipmentFee}</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-400">
+                <span>7 روزہ خانیوال کنیکٹ گارنٹی</span>
+                <span className="font-mono font-semibold text-white">PKR {platformFee}</span>
+              </div>
+              <div className="pt-2 border-t border-slate-800 flex items-center justify-between font-bold text-white text-xs sm:text-sm">
+                <span>کل تخمینہ رقم (Total)</span>
+                <span className="font-mono text-amber-400 text-sm sm:text-base">PKR {total.toLocaleString()}</span>
               </div>
             </div>
           </div>
 
-          {/* Service Address */}
-          <div>
-            <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider mb-1">
-              Service Address (Technician Destination) *
-            </label>
-            <div className="relative">
-              <MapPin className="w-4 h-4 text-emerald-600 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                required
-                value={serviceAddress}
-                onChange={(e) => setServiceAddress(e.target.value)}
-                placeholder="House / Flat #, Street #, Sector / Area, City"
-                className="w-full text-xs rounded-xl border border-slate-300 pl-9 pr-3 py-2.5 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
-              />
-            </div>
-          </div>
-
-          {/* Price Breakdown */}
-          <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-2 text-xs">
-            <div className="flex items-center justify-between text-slate-600">
-              <span>{activeService?.name || 'Service'} Standard Labor & Visit</span>
-              <span className="font-mono font-semibold">PKR {basePrice.toLocaleString()}</span>
-            </div>
-            <div className="flex items-center justify-between text-slate-600">
-              <span>Diagnostic Kit & Standard Chemical/Parts Allowance</span>
-              <span className="font-mono font-semibold">PKR {toolAndEquipmentFee}</span>
-            </div>
-            <div className="flex items-center justify-between text-slate-600">
-              <span>Service Warranty & Platform Guarantee (7 Days)</span>
-              <span className="font-mono font-semibold">PKR {platformFee}</span>
-            </div>
-            <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-sm font-bold text-slate-900">
-              <span>Total Estimated Service Fee</span>
-              <span className="font-mono text-base text-emerald-600">PKR {total.toLocaleString()}</span>
-            </div>
-          </div>
-
-          {/* Submit Actions */}
-          <div className="flex items-center justify-end gap-3 pt-2">
+          {/* Sticky Modal Action Footer */}
+          <div className="px-3.5 py-2.5 sm:px-6 sm:py-3.5 bg-[#08090f] border-t border-slate-800 flex items-center justify-end gap-2 sm:gap-3 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+              className="px-3 sm:px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
             >
-              Cancel
+              منسوخ (Cancel)
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-md transition-colors flex items-center gap-2"
+              className="px-4 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs sm:text-sm font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              <span>Proceed to Payment</span>
-              <ArrowRight className="w-4 h-4" />
+              <span>چیک آؤٹ پر جائیں</span>
+              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
           </div>
         </form>

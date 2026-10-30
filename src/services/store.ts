@@ -76,46 +76,6 @@ export const INITIAL_USERS: User[] = [
     walletBalance: 150000,
     status: 'active',
     joinedDate: '2024-11-01'
-  },
-  {
-    id: 'usr-prov-electrician',
-    name: 'Muhammad Tariq (Electrician)',
-    email: 'tariq.electrician@khanewalconnect.com',
-    phone: '+92 301 7766554',
-    role: 'provider',
-    password: 'Worker@123',
-    avatar: 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=150&auto=format&fit=crop&q=80',
-    address: 'Block 4, Gulberg, Khanewal',
-    walletBalance: 8500,
-    status: 'active',
-    cnic: '36104-5821943-7',
-    joinedDate: '2025-01-10',
-    providerCategory: 'home_technician',
-    serviceSkill: 'Certified Electrician & Wiring Specialist',
-    rating: 4.9,
-    completedJobsCount: 42,
-    isOnline: true,
-    notes: 'Verified professional electrician in Khanewal City'
-  },
-  {
-    id: 'usr-prov-rickshaw',
-    name: 'Bashir Ahmed (Loader Rickshaw)',
-    email: 'bashir.loader@khanewalconnect.com',
-    phone: '+92 302 8844221',
-    role: 'provider',
-    password: 'Worker@123',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    address: 'Railway Goods Chowk, Khanewal',
-    walletBalance: 6200,
-    status: 'active',
-    cnic: '36104-1948275-3',
-    joinedDate: '2025-01-15',
-    providerCategory: 'cargo_driver',
-    vehicleType: 'Cargo Auto Rickshaw (3-Wheeler)',
-    rating: 4.8,
-    completedJobsCount: 38,
-    isOnline: true,
-    notes: 'Registered loader rickshaw driver for market goods'
   }
 ];
 
@@ -129,7 +89,7 @@ export const INITIAL_SERVICES: HomeServiceItem[] = [
     description: 'Comprehensive chemical wash, filter purification, refrigerant leak detection, and airflow optimization.',
     popularIssues: ['Not cooling properly', 'Water leakage / dripping', 'Gas refill required', 'Strange noise / fan vibration', 'Master chemical wash'],
     icon: 'Fan',
-    isPublished: false // Unpublished until provider assigned
+    isPublished: true
   },
   {
     id: 'srv-electrician',
@@ -140,9 +100,7 @@ export const INITIAL_SERVICES: HomeServiceItem[] = [
     description: 'Short circuit diagnosis, DB breaker replacement, UPS & inverter installation, and smart switch wiring.',
     popularIssues: ['Circuit breaker tripping', 'Socket / switch sparked', 'Ceiling fan installation', 'UPS inverter bypass wiring', 'Full house wiring check'],
     icon: 'Zap',
-    assignedProviderId: 'usr-prov-electrician',
-    assignedProviderName: 'Muhammad Tariq (Electrician)',
-    isPublished: true // Active provider in Khanewal
+    isPublished: true
   },
   {
     id: 'srv-plumbing',
@@ -153,7 +111,7 @@ export const INITIAL_SERVICES: HomeServiceItem[] = [
     description: 'Water pump repair, high-pressure pipe leak fixing, sanitary fittings, geyser installation, and drain unclogging.',
     popularIssues: ['Water pump not pulling', 'Underground pipe leak', 'Blocked kitchen / bathroom drain', 'Geyser thermostat replacement', 'Mixer tap fixing'],
     icon: 'Wrench',
-    isPublished: false
+    isPublished: true
   },
   {
     id: 'srv-cleaning',
@@ -164,7 +122,7 @@ export const INITIAL_SERVICES: HomeServiceItem[] = [
     description: 'Professional steam extraction cleaning for sofas, carpets, kitchen degreasing, and complete floor sanitization.',
     popularIssues: ['5-seater sofa shampooing', 'Deep kitchen degreasing', 'Washroom descaling & polish', 'Full apartment move-in clean', 'Mattress allergen removal'],
     icon: 'Sparkles',
-    isPublished: false
+    isPublished: true
   },
   {
     id: 'srv-appliances',
@@ -175,7 +133,7 @@ export const INITIAL_SERVICES: HomeServiceItem[] = [
     description: 'Repair for refrigerators, automatic washing machines, microwave ovens, and water dispensers.',
     popularIssues: ['Refrigerator not freezing', 'Washing machine spin error', 'Microwave not heating', 'Dispenser cooling stopped'],
     icon: 'Cpu',
-    isPublished: false
+    isPublished: true
   },
   {
     id: 'srv-carpentry',
@@ -186,7 +144,7 @@ export const INITIAL_SERVICES: HomeServiceItem[] = [
     description: 'Door lock replacement, wardrobe sliding hinge repairs, furniture assembly, and wooden polish touchups.',
     popularIssues: ['Door lock jammed', 'Cabinet hinge loose', 'IKEA/Flatpack furniture assembly', 'Bed frame reinforcement'],
     icon: 'Hammer',
-    isPublished: false
+    isPublished: true
   }
 ];
 
@@ -201,9 +159,7 @@ export const INITIAL_VEHICLES: TransportVehicleItem[] = [
     helperRate: 400,
     bestFor: 'Boxes, cartons, small appliances, single mattress, market deliveries',
     icon: 'Truck',
-    assignedProviderId: 'usr-prov-rickshaw',
-    assignedProviderName: 'Bashir Ahmed (Loader Rickshaw)',
-    isPublished: true // Active provider in Khanewal
+    isPublished: true
   },
   {
     id: 'veh-mini-pickup',
@@ -215,7 +171,7 @@ export const INITIAL_VEHICLES: TransportVehicleItem[] = [
     helperRate: 500,
     bestFor: 'Refrigerators, washing machines, sofas, office chairs, 1-room shifting',
     icon: 'Truck',
-    isPublished: false
+    isPublished: true
   },
   {
     id: 'veh-standard-van',
@@ -227,7 +183,7 @@ export const INITIAL_VEHICLES: TransportVehicleItem[] = [
     helperRate: 650,
     bestFor: 'Full 1-2 BHK house shifting, bulky furniture, industrial inventory',
     icon: 'Truck',
-    isPublished: false
+    isPublished: true
   },
   {
     id: 'veh-flatbed-truck',
@@ -239,7 +195,7 @@ export const INITIAL_VEHICLES: TransportVehicleItem[] = [
     helperRate: 800,
     bestFor: 'Commercial cargo, construction materials, factory goods, full villa moves',
     icon: 'Truck',
-    isPublished: false
+    isPublished: true
   }
 ];
 
@@ -896,49 +852,35 @@ export const Store = {
     notifyStoreChanged();
   },
 
-  // Dynamic Provider Availability & Storefront Visibility Controls
+  // Dynamic Admin Visibility & Catalog Controls (Live Hide/Show & Rates)
   isServiceAvailable: (service: HomeServiceItem): boolean => {
-    const users = Store.getUsers();
-    // 1. Direct assigned provider source (must be active and not deleted)
+    // If admin marked it as unpublished/hidden, hide from storefront
+    if (service.isPublished === false) return false;
+
+    // If assigned to a specific provider, ensure provider is not banned/deleted
     if (service.assignedProviderId) {
-      const assigned = users.find(u => u.id === service.assignedProviderId && u.status === 'active' && !u.isDeleted);
-      if (assigned) return true;
+      const users = Store.getUsers();
+      const assigned = users.find(u => u.id === service.assignedProviderId);
+      if (assigned && (assigned.isDeleted || assigned.status === 'blocked')) {
+        return false;
+      }
     }
-    // 2. Active matching provider in system
-    const srvId = service.id.toLowerCase();
-    const srvName = service.name.toLowerCase();
-    return users.some(u => {
-      if (u.role !== 'provider' || u.status !== 'active' || u.isDeleted) return false;
-      const skill = (u.serviceSkill || '').toLowerCase();
-      if (srvId.includes('ac') && (skill.includes('ac') || skill.includes('cooling') || skill.includes('hvac'))) return true;
-      if (srvId.includes('electric') && (skill.includes('electric') || skill.includes('wiring'))) return true;
-      if (srvId.includes('plumb') && (skill.includes('plumb') || skill.includes('sanitary') || skill.includes('pipe'))) return true;
-      if (srvId.includes('clean') && (skill.includes('clean') || skill.includes('wash') || skill.includes('sofa'))) return true;
-      if (srvId.includes('appliance') && (skill.includes('appliance') || skill.includes('refrigerat') || skill.includes('washing'))) return true;
-      if (srvId.includes('carpent') && (skill.includes('carpent') || skill.includes('wood') || skill.includes('lock'))) return true;
-      return skill.includes(srvName) || srvName.includes(skill);
-    });
+    return true;
   },
 
   isVehicleAvailable: (vehicle: TransportVehicleItem): boolean => {
-    const users = Store.getUsers();
-    // 1. Direct assigned driver source
+    // If admin marked it as unpublished/hidden, hide from storefront
+    if (vehicle.isPublished === false) return false;
+
+    // If assigned to a specific driver, ensure driver is not banned/deleted
     if (vehicle.assignedProviderId) {
-      const assigned = users.find(u => u.id === vehicle.assignedProviderId && u.status === 'active' && !u.isDeleted);
-      if (assigned) return true;
+      const users = Store.getUsers();
+      const assigned = users.find(u => u.id === vehicle.assignedProviderId);
+      if (assigned && (assigned.isDeleted || assigned.status === 'blocked')) {
+        return false;
+      }
     }
-    // 2. Active matching cargo driver in system
-    const vehId = vehicle.id.toLowerCase();
-    const vehName = vehicle.name.toLowerCase();
-    return users.some(u => {
-      if (u.role !== 'provider' || u.status !== 'active' || u.isDeleted) return false;
-      const vType = (u.vehicleType || '').toLowerCase();
-      if (vehId.includes('rickshaw') && (vType.includes('rickshaw') || vType.includes('loader') || vType.includes('3-wheeler'))) return true;
-      if (vehId.includes('pickup') && (vType.includes('pickup') || vType.includes('ravi') || vType.includes('bolan') || vType.includes('mini'))) return true;
-      if (vehId.includes('van') && (vType.includes('shehzore') || vType.includes('van') || vType.includes('1-ton'))) return true;
-      if (vehId.includes('truck') && (vType.includes('truck') || vType.includes('isuzu') || vType.includes('master') || vType.includes('flatbed'))) return true;
-      return vType.includes(vehName) || vehName.includes(vType);
-    });
+    return true;
   },
 
   // Returns only services that have active available providers
@@ -1009,6 +951,24 @@ export const Store = {
     const updated = vehicles.filter(v => v.id !== vehicleId);
     Store.updateVehiclesCatalog(updated);
     return true;
+  },
+
+  togglePublishService: (serviceId: string): boolean => {
+    const services = Store.getServicesCatalog();
+    const sIdx = services.findIndex(s => s.id === serviceId);
+    if (sIdx === -1) return false;
+    services[sIdx].isPublished = services[sIdx].isPublished === false ? true : false;
+    Store.updateServicesCatalog(services);
+    return services[sIdx].isPublished;
+  },
+
+  togglePublishVehicle: (vehicleId: string): boolean => {
+    const vehicles = Store.getVehiclesCatalog();
+    const vIdx = vehicles.findIndex(v => v.id === vehicleId);
+    if (vIdx === -1) return false;
+    vehicles[vIdx].isPublished = vehicles[vIdx].isPublished === false ? true : false;
+    Store.updateVehiclesCatalog(vehicles);
+    return vehicles[vIdx].isPublished;
   },
 
   resetToDemoData: () => {

@@ -327,6 +327,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const handleTogglePublishService = (serviceId: string) => {
+    const isNowPublished = Store.togglePublishService(serviceId);
+    setEditingServices([...Store.getServicesCatalog()]);
+    setCatalogSavedMessage(
+      isNowPublished ? 'Service published live to customer store!' : 'Service hidden from customer store.'
+    );
+    setTimeout(() => setCatalogSavedMessage(''), 4000);
+  };
+
+  const handleTogglePublishVehicle = (vehicleId: string) => {
+    const isNowPublished = Store.togglePublishVehicle(vehicleId);
+    setEditingVehicles([...Store.getVehiclesCatalog()]);
+    setCatalogSavedMessage(
+      isNowPublished ? 'Vehicle / Driver published live to customer store!' : 'Vehicle / Driver hidden from customer store.'
+    );
+    setTimeout(() => setCatalogSavedMessage(''), 4000);
+  };
+
   const handleAddNewService = () => {
     const newId = 'srv-custom-' + Date.now();
     const newService: HomeServiceItem = {
@@ -337,11 +355,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       estimatedDuration: '90 mins',
       description: 'Smart switch installation, Wi-Fi smart camera setup, and Alexa/Google Home hub pairing.',
       popularIssues: ['Smart camera mounting', 'Wi-Fi switch configuration', 'Zigbee sensor linking'],
-      icon: 'Zap'
+      icon: 'Zap',
+      isPublished: true
     };
     const updated = [...editingServices, newService];
     setEditingServices(updated);
     Store.updateServicesCatalog(updated);
+    setCatalogSavedMessage('New technician service added to catalog!');
+    setTimeout(() => setCatalogSavedMessage(''), 4000);
+  };
+
+  const handleAddNewVehicle = () => {
+    const newId = 'veh-custom-' + Date.now();
+    const newVehicle: TransportVehicleItem = {
+      id: newId,
+      name: 'Khanewal Cargo Loader Rickshaw',
+      capacityKg: 400,
+      dimensions: '5.5ft x 3.8ft bed',
+      baseFare: 700,
+      perKmRate: 50,
+      helperRate: 350,
+      bestFor: 'Agricultural sacks, bazaar freight, carton transport',
+      icon: 'Truck',
+      isPublished: true
+    };
+    const updated = [...editingVehicles, newVehicle];
+    setEditingVehicles(updated);
+    Store.updateVehiclesCatalog(updated);
+    setCatalogSavedMessage('New vehicle / rickshaw added to fleet catalog!');
+    setTimeout(() => setCatalogSavedMessage(''), 4000);
   };
 
   const handleCreateUser = (e: React.FormEvent) => {
@@ -1203,13 +1245,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
             <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={handleAddNewService}
                 className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Plus className="w-4 h-4 text-slate-600" />
-                <span>Add Custom Service</span>
+                <span>Add Service</span>
               </button>
               <button
+                type="button"
+                onClick={handleAddNewVehicle}
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4 text-slate-600" />
+                <span>Add Vehicle / Riksha</span>
+              </button>
+              <button
+                type="button"
                 onClick={handleSaveCatalog}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
               >
@@ -1301,16 +1353,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <span className="font-bold text-slate-900 block text-sm">{srv.name}</span>
                           <span className="text-[11px] text-slate-400">{srv.category} · {srv.estimatedDuration}</span>
                         </div>
-                        {isLive ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                            Live on Store
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
-                            Hidden from Store
-                          </span>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePublishService(srv.id)}
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold border shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer ${
+                            isLive 
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100' 
+                              : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+                          }`}
+                          title={isLive ? 'Click to Hide from Store' : 'Click to Publish Live on Store'}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                          {isLive ? 'Live on Store (Click to Hide)' : 'Hidden (Click to Live)'}
+                        </button>
                       </div>
 
                       <p className="text-slate-500 text-[11px] line-clamp-2">{srv.description}</p>
@@ -1418,16 +1473,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <span className="font-bold text-slate-900 block text-xs">{veh.name}</span>
                           <span className="text-[10px] text-slate-400 font-mono">Capacity: {veh.capacityKg}kg</span>
                         </div>
-                        {isLive ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                            Live
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
-                            Hidden
-                          </span>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePublishVehicle(veh.id)}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 flex items-center gap-1 transition-colors cursor-pointer ${
+                            isLive
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                              : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+                          }`}
+                          title={isLive ? 'Click to Hide from Store' : 'Click to Publish Live on Store'}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                          {isLive ? 'Live (Click to Hide)' : 'Hidden (Click to Live)'}
+                        </button>
                       </div>
 
                       {/* Driver Source Selector */}

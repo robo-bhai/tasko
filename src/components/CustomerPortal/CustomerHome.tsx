@@ -101,7 +101,8 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
     return veh.name;
   };
 
-  // Instant Delivery Ride Catalog Data
+  // Instant Delivery Ride Catalog Data dynamically populated from Admin Settings
+  const settings = Store.getSettings();
   const deliveryRideItems = [
     {
       id: 'ride-instant-bike',
@@ -109,8 +110,8 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
       nameEn: 'Instant Bike Courier (Docs, Medicine & Parcels)',
       vehicleUr: '125cc موٹر بائیک',
       vehicleEn: '125cc Motorbike',
-      baseFee: 200,
-      perKm: 35,
+      baseFee: settings.deliveryBaseFee,
+      perKm: settings.deliveryPerKmFee,
       eta: '15 - 25 mins',
       descUr: 'شہر کے اندر فوری دستاویزات، پارسل، گھر کا پکا کھانا یا بازار سے چھوٹی اشیاء منگوائیں۔',
       descEn: 'Superfast parcel, food, or documents pickup across Khanewal neighborhoods.'
@@ -121,8 +122,8 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
       nameEn: 'Market Grocery & Store Errands Run',
       vehicleUr: 'کارگو بائیک باکس',
       vehicleEn: 'Cargo Bike Box',
-      baseFee: 250,
-      perKm: 35,
+      baseFee: settings.deliveryBaseFee + 50,
+      perKm: settings.deliveryPerKmFee,
       eta: '25 - 40 mins',
       descUr: 'خانیوال کی کسی بھی دکان یا غلہ منڈی سے مطلوبہ سودا سلف خرید کر گھر پہنچائیں۔',
       descEn: 'Our verified rider visits the local market, buys requested items, and delivers to your doorstep.'
@@ -133,8 +134,8 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
       nameEn: 'Emergency Pharmacy & Medical Delivery',
       vehicleUr: 'ایمرجنسی بائیک',
       vehicleEn: 'Priority Bike',
-      baseFee: 220,
-      perKm: 35,
+      baseFee: settings.deliveryBaseFee + (settings.deliveryUrgentFee || 100),
+      perKm: settings.deliveryPerKmFee,
       eta: '10 - 20 mins',
       descUr: 'ڈاکٹر کے نسخے کے مطابق قریبی میڈیکل اسٹور سے فوری ادویات کی فراہمی۔',
       descEn: 'Priority 24/7 delivery of emergency medicines and healthcare essentials.'
@@ -145,8 +146,8 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
       nameEn: 'Bakery, Sweets & Food Pickup',
       vehicleUr: 'تھرمل بائیک بیگ',
       vehicleEn: 'Thermal Bike Bag',
-      baseFee: 200,
-      perKm: 35,
+      baseFee: settings.deliveryBaseFee,
+      perKm: settings.deliveryPerKmFee,
       eta: '20 - 30 mins',
       descUr: 'شہر کی مشہور مٹھائیوں اور ریسٹورنٹ سے گرما گرم کھانا فوری وصول کریں۔',
       descEn: 'Get fresh, hot food and bakery delicacies collected and safely delivered.'
@@ -916,67 +917,6 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
               <span>{isUrdu ? 'ایڈمن واٹس ایپ پر رجسٹریشن' : 'WhatsApp Admin Onboarding'}</span>
             </a>
           </div>
-        </div>
-      </section>
-
-      {/* 6. LOCAL KHANEWAL CUSTOMER TESTIMONIALS */}
-      <section className="bg-[#0b0d14] rounded-3xl border border-amber-500/20 p-6 md:p-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h3 className="text-xl font-black text-white">
-              {isUrdu ? 'خانیوال کے شہریوں کا بھروسہ' : 'What Khanewal Residents Say'}
-            </h3>
-            <p className="text-xs text-slate-400">
-              {isUrdu ? 'شہر اور نواحی کالونیوں سے تصدیق شدہ کسٹمر ریویوز' : 'Real reviews from verified residents in Peoples Colony, Civil Lines, and Cantt'}
-            </p>
-          </div>
-          <div className="flex items-center gap-1 text-amber-400 font-bold text-sm bg-amber-950/60 border border-amber-500/30 px-3 py-1.5 rounded-full w-fit">
-            <Star className="w-4 h-4 fill-amber-400" />
-            <span>4.9 / 5.0 (خانیوال لوکل ریٹنگ)</span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            {
-              name: 'ملک ارسلان اعوان',
-              area: 'پیپلز کالونی، خانیوال',
-              trade: 'الیکٹریشن سروس',
-              comment: 'رات 9 بجے ڈی بی بریکر ٹرپ ہو گیا تھا۔ ایپ سے بک کیا، 20 منٹ میں طارق صاحب ٹیکنیشن پہنچ گئے اور مناسب ریٹ پر مکمل فالٹ درست کر دیا۔'
-            },
-            {
-              name: 'چوہدری عثمان ظفر',
-              area: 'سیول لائنز، خانیوال',
-              trade: 'لوڈر رکشہ کارگو',
-              comment: 'غلہ منڈی سے 8 بوریاں دکان پر لانی تھیں۔ بشیر ڈرائیور نے بروقت اور بحفاظت سامان پہنچایا۔ فون نمبر اور لائیو اسٹیٹس ڈیش بورڈ پر نظر آ رہا تھا۔'
-            },
-            {
-              name: 'ڈاکٹر فرہاد خان',
-              area: 'ماڈل ٹاؤن، خانیوال',
-              trade: 'فوری کوریئر رائیڈر',
-              comment: 'کلینک کے لیے فوری میڈیسن چاہیے تھیں۔ رائیڈر نے 15 منٹ میں مین بازار سے خرید کر پہنچا دیں۔ انتہائی شائستہ اور پروفیشنل سروس۔'
-            }
-          ].map((rev, idx) => (
-            <div key={idx} className="bg-[#12141e] border border-slate-800 p-4 rounded-2xl space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-bold text-white text-xs">{rev.name}</h4>
-                  <span className="text-[10px] text-amber-400 block">{rev.area}</span>
-                </div>
-                <span className="text-[10px] font-bold text-slate-400 bg-slate-900 border border-slate-700 px-2 py-0.5 rounded-md">
-                  {rev.trade}
-                </span>
-              </div>
-              <p className="text-xs text-slate-300 leading-relaxed italic">
-                "{rev.comment}"
-              </p>
-              <div className="flex items-center gap-1 text-amber-400">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
-                ))}
-              </div>
-            </div>
-          ))}
         </div>
       </section>
 

@@ -87,20 +87,7 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
       ...prev,
       { sender: 'user', text: chatMessage, time }
     ]);
-    const userText = chatMessage;
     setChatMessage('');
-
-    // Provider reply
-    setTimeout(() => {
-      setChatHistory(prev => [
-        ...prev,
-        { 
-          sender: 'provider', 
-          text: `آپ کا پیغام ("${userText}") مل گیا ہے۔ میں راستے میں ہوں، جلد پہنچ رہا ہوں۔`, 
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-        }
-      ]);
-    }, 1200);
   };
 
   // Steps calculation
