@@ -280,6 +280,28 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
             </div>
           </div>
 
+          {/* Event Planning Banner if applicable */}
+          {activeOrder.category === 'event_planning' && activeOrder.eventDetails && (
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-slate-900 to-amber-950/20 border border-amber-500/40 text-xs text-amber-200 space-y-1.5 shadow-md">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-amber-300 text-sm flex items-center gap-1.5">
+                  <span>🎪</span>
+                  <span>{activeOrder.eventDetails.eventTitle}</span>
+                </span>
+                <span className="font-bold bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full text-[11px]">
+                  {activeOrder.eventDetails.guestCount} معزز مہمان
+                </span>
+              </div>
+              <p className="text-slate-300 text-[11px]">
+                📍 وینیو: <strong className="text-white">{activeOrder.eventDetails.venueNameOrAddress}</strong> ({activeOrder.eventDetails.khanewalArea})
+              </p>
+              <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-amber-400 pt-1 border-t border-amber-500/20">
+                <span>📅 تاریخ تقریب: {activeOrder.eventDetails.eventDate} ({activeOrder.eventDetails.eventTimeSlot})</span>
+                <span>بجٹ تخمینہ: PKR {activeOrder.pricing.total.toLocaleString()}</span>
+              </div>
+            </div>
+          )}
+
           {/* Assigned Provider Profile Card */}
           {activeOrder.assignedProviderName ? (
             <div className="p-4 rounded-2xl border border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
@@ -302,7 +324,11 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {activeOrder.category === 'home_services' ? 'ماہر و مصدقہ ٹیکنیشن (خانیوال)' : 'تصدیق شدہ کوریئر رائیڈر (خانیوال)'}
+                    {activeOrder.category === 'home_services' 
+                      ? 'ماہر و مصدقہ ٹیکنیشن (خانیوال)' 
+                      : activeOrder.category === 'event_planning'
+                      ? 'ایونٹ کوآرڈینیٹر و مینیجر (خانیوال تقریب)'
+                      : 'تصدیق شدہ کوریئر رائیڈر (خانیوال)'}
                   </p>
                   <div className="flex items-center gap-1 text-xs text-amber-500 font-bold mt-0.5">
                     <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />

@@ -48,6 +48,7 @@ import { PWAInstallButton } from '../PWAInstallButton';
 interface CustomerHomeProps {
   currentUser?: User | null;
   onOpenOrderModal: (category: 'custom_delivery' | 'home_services' | 'transport_cargo', preselectedId?: string) => void;
+  onOpenEventPlanner?: () => void;
   onOpenLiveTracker: (order?: Order) => void;
   onOpenAuth: (tab?: 'login' | 'customer_signup' | 'provider_signup', notice?: string) => void;
   activeOrders: Order[];
@@ -59,6 +60,7 @@ interface CustomerHomeProps {
 export const CustomerHome: React.FC<CustomerHomeProps> = ({
   currentUser,
   onOpenOrderModal,
+  onOpenEventPlanner,
   onOpenLiveTracker,
   onOpenAuth,
   activeOrders,
@@ -69,8 +71,8 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
   const t = translations[lang];
   const isUrdu = lang === 'ur';
 
-  // Active table view: 'technician' | 'ride' | 'cargo'
-  const [activeTableTab, setActiveTableTab] = useState<'technician' | 'ride' | 'cargo'>('technician');
+  // Active table view: 'technician' | 'ride' | 'cargo' | 'event_planner'
+  const [activeTableTab, setActiveTableTab] = useState<'technician' | 'ride' | 'cargo' | 'event_planner'>('technician');
   const [serviceSearchQuery, setServiceSearchQuery] = useState('');
   const [flyerSearchQuery, setFlyerSearchQuery] = useState('');
 
@@ -211,6 +213,21 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
       bgColor: 'bg-indigo-700 shadow-indigo-700/30',
       icon: <Paintbrush className="w-6 h-6 text-white" />,
       action: () => onOpenOrderModal('home_services', 'srv-cleaning')
+    },
+    {
+      id: 'event_planner',
+      nameUr: 'شادی و تقریب پلانر',
+      nameEn: 'Event & Wedding Planner',
+      bgColor: 'bg-gradient-to-tr from-amber-500 to-yellow-400 shadow-amber-500/30',
+      icon: <Sparkles className="w-6 h-6 text-slate-950" />,
+      action: () => {
+        if (onOpenEventPlanner) {
+          onOpenEventPlanner();
+        } else {
+          setActiveTableTab('event_planner');
+          document.getElementById('booking-tables-section')?.scrollIntoView({ behavior: 'smooth' });
+        }
+      }
     },
     {
       id: 'more_services',
@@ -443,6 +460,41 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
           </div>
         </div>
 
+        {/* VIP Event Planner Showcase Banner */}
+        <div className="rounded-3xl bg-gradient-to-r from-amber-600/20 via-[#0e111a] to-amber-950/40 border-2 border-amber-500/50 p-4 sm:p-6 shadow-xl relative overflow-hidden">
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="space-y-2 text-center md:text-start">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/20 border border-amber-400/50 text-amber-300 text-xs font-black">
+                <span>🎪</span>
+                <span>{isUrdu ? 'نئی خصوصی سروس: شادی و تقریب پلانر' : 'New VIP Service: Event & Wedding Planner'}</span>
+              </div>
+              <h3 className="text-base sm:text-2xl font-black text-white">
+                {isUrdu ? 'خانیوال میں شادی، بارات، ولیمہ اور پارٹیاں مکمل انتظام کے ساتھ!' : 'Complete Wedding, Walima & Event Planning across Khanewal'}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 max-w-xl">
+                {isUrdu 
+                  ? 'روایتی دیگیں، پر ہیڈ بوفے، وی آئی پی شامیانہ، برائیڈل اسٹیج و پھولوں کی سجاوٹ، ساؤنڈ سسٹم، فوٹوگرافی، اور ٹرینڈ ویٹرز — سب کچھ ایک کلک پر۔'
+                  : 'Catering, traditional degain, VIP tentage, bridal stage decor, DJ sound system, drone shoot, and hospitality staff.'}
+              </p>
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-1.5 sm:gap-2 pt-1 text-[11px] font-bold text-amber-200">
+                <span className="bg-slate-950/80 px-2.5 py-1 rounded-lg border border-amber-500/30">🍲 دیگیں و کیٹرنگ</span>
+                <span className="bg-slate-950/80 px-2.5 py-1 rounded-lg border border-amber-500/30">🎪 وی آئی پی شامیانہ</span>
+                <span className="bg-slate-950/80 px-2.5 py-1 rounded-lg border border-amber-500/30">💐 اسٹیج و ڈیکوریشن</span>
+                <span className="bg-slate-950/80 px-2.5 py-1 rounded-lg border border-amber-500/30">📸 فوٹو و ویڈیو</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onOpenEventPlanner ? onOpenEventPlanner() : onOpenOrderModal('home_services')}
+              className="px-6 py-3.5 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black text-xs sm:text-sm rounded-2xl shadow-xl shadow-amber-500/25 transition-all transform hover:scale-105 shrink-0 flex items-center gap-2 cursor-pointer"
+            >
+              <span>{isUrdu ? '🎪 ایونٹ ابھی پلان / بک کریں' : 'Plan Your Event Now'}</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
         {/* 5. Contact & Trust Bar matching flyer */}
         <div className="rounded-2xl bg-gradient-to-r from-[#14120c] via-[#1a160e] to-[#0d0f18] border border-amber-500/30 p-4 sm:p-5 space-y-3">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-start">
@@ -623,6 +675,21 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
             <Truck className="w-3.5 h-3.5 text-amber-400" />
             <span>{isUrdu ? '3. بک اے کارگو' : '3. Book a Cargo'}</span>
           </button>
+
+          <button
+            onClick={() => {
+              if (onOpenEventPlanner) {
+                onOpenEventPlanner();
+              } else {
+                setActiveTableTab('event_planner');
+                document.getElementById('booking-tables-section')?.scrollIntoView({ behavior: 'smooth' });
+              }
+            }}
+            className="px-3.5 sm:px-4 py-2.5 bg-gradient-to-r from-amber-500/20 to-yellow-500/30 hover:bg-amber-500/30 text-amber-300 text-xs font-black rounded-xl transition-all border border-amber-500/50 flex items-center gap-2 cursor-pointer shadow-xs"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>{isUrdu ? '4. شادی و تقریب پلانر' : '4. Event Planner'}</span>
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -723,6 +790,21 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
               <Truck className="w-4 h-4" />
               <span>{isUrdu ? '3. بک اے کارگو' : '3. Book a Cargo'}</span>
               <span className="text-[10px] opacity-80 font-mono">({vehicles.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTableTab('event_planner')}
+              className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+                activeTableTab === 'event_planner'
+                  ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md shadow-amber-400/20'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <span>{isUrdu ? '4. شادی و تقریب پلانر' : '4. Event Planner'}</span>
+              <span className="text-[10px] bg-amber-950 text-amber-300 border border-amber-600/40 px-1.5 py-0.2 rounded font-sans font-bold">
+                VIP
+              </span>
             </button>
           </div>
         </div>
@@ -1030,6 +1112,146 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            TABLE 4: BOOK EVENT & CELEBRATION PLANNER (خانۂ تقریب)
+            ========================================================================= */}
+        {activeTableTab === 'event_planner' && (
+          <div className="bg-[#0f1118] rounded-3xl border-2 border-amber-500/40 overflow-hidden shadow-2xl space-y-4">
+            <div className="p-5 sm:p-6 bg-gradient-to-r from-amber-600/20 via-[#141622] to-amber-950/30 border-b border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-amber-400 text-xl shadow-md">
+                  🎪
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                    <span>{isUrdu ? 'ٹیبل 4: شادی و تقریب پلانر — خانۂ تقریب' : 'Table 4: Khanewal Event & Wedding Planner'}</span>
+                    <span className="text-[10px] bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-black">
+                      VIP
+                    </span>
+                  </h3>
+                  <p className="text-xs text-amber-200/80">
+                    {isUrdu ? 'شادی، بارات، ولیمہ، سالگرہ اور گھریلو دعوتوں کا مصدقہ مکمل انتظام' : 'Turnkey events, catering, tentage, and stage decor in Khanewal'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => onOpenEventPlanner ? onOpenEventPlanner() : onOpenOrderModal('home_services')}
+                className="px-5 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer w-fit"
+              >
+                <span>{isUrdu ? 'نئی تقریب پلان کریں' : 'Plan Custom Event'}</span>
+                <Sparkles className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Event Packages Grid */}
+            <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[
+                {
+                  id: 'pkg-barat',
+                  icon: '👑',
+                  nameUr: 'شاہی بارات و رخصتی پیکج',
+                  nameEn: 'Royal Barat & Wedding Setup',
+                  guests: '200 - 800 افراد',
+                  descUr: 'برائیڈل اسٹیج صوفہ، وی آئی پی شامیانہ، کٹلری، یونیفارمڈ ویٹرز، ہائی کوالٹی ساؤنڈ و انٹری لائٹس۔',
+                  pricing: 'PKR 75,000 سے شروع',
+                  badge: 'مقبول ترین'
+                },
+                {
+                  id: 'pkg-walima',
+                  icon: '✨',
+                  nameUr: 'ولیمہ گرینڈ استقبالیہ و بوفے',
+                  nameEn: 'Grand Walima Reception',
+                  guests: '250 - 1000+ افراد',
+                  descUr: 'لذیذ بوفے کیٹرنگ، راشن سلاد و سویٹس، وی آئی پی ہال ڈیکوریشن، اسٹیج و فوٹوگرافی۔',
+                  pricing: 'PKR 95,000 سے شروع',
+                  badge: 'پریمیم'
+                },
+                {
+                  id: 'pkg-mehndi',
+                  icon: '🌸',
+                  nameUr: 'مہندی و مایوں رنگین سیٹ اپ',
+                  nameEn: 'Mehndi & Mayun Festive Setup',
+                  guests: '100 - 400 افراد',
+                  descUr: 'گیندا پھول اسٹیج، جھولا سیٹ اپ، کلر فل پردے، ڈھولک ساؤنڈ سسٹم، فوٹو بووتھ۔',
+                  pricing: 'PKR 45,000 سے شروع',
+                  badge: 'رنگین تھیم'
+                },
+                {
+                  id: 'pkg-dawat',
+                  icon: '🍲',
+                  nameUr: 'گھریلو دعوت و روایتی دیگیں',
+                  nameEn: 'Traditional Dawat & Degain',
+                  guests: '50 - 300 افراد',
+                  descUr: 'ماہر باورچی کی تیار کردہ لذیذ دیگیں (بریانی، قورمہ، کڑاہی، زردہ)، کراکری و چٹائیاں۔',
+                  pricing: 'PKR 9,500 فی دیگ',
+                  badge: 'خالص ذائقہ'
+                },
+                {
+                  id: 'pkg-birthday',
+                  icon: '🎂',
+                  nameUr: 'سالگرہ و پرائیویٹ فیملی پارٹی',
+                  nameEn: 'Birthday & Family Lawn Party',
+                  guests: '30 - 150 افراد',
+                  descUr: 'بیلون ڈیکوریشن، کسٹم کیک ٹیبل، پارٹی لائٹنگ، بچوں کے لیے ساؤنڈ و اسنیکس۔',
+                  pricing: 'PKR 25,000 سے شروع',
+                  badge: 'فیملی فن'
+                },
+                {
+                  id: 'pkg-qawwali',
+                  icon: '🪕',
+                  nameUr: 'محفل قوالی، میلاد و صوفی نائٹ',
+                  nameEn: 'Sufi Qawwali & Milad Gathering',
+                  guests: '100 - 500 افراد',
+                  descUr: 'قالین و گدے، سٹیج، پریمیم ایکو ساؤنڈ سسٹم، پروجیکٹر اور لنگر و نیاز کا باوقار انتظام۔',
+                  pricing: 'PKR 35,000 سے شروع',
+                  badge: 'روحانی انتظام'
+                }
+              ].map(pkg => (
+                <div
+                  key={pkg.id}
+                  className="rounded-2xl bg-[#121422] border border-amber-500/20 hover:border-amber-400/60 p-4 space-y-3 transition-all hover:shadow-lg hover:shadow-amber-500/10 flex flex-col justify-between"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-2xl">{pkg.icon}</span>
+                      <span className="text-[10px] bg-amber-400/15 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded-full font-bold">
+                        {pkg.badge}
+                      </span>
+                    </div>
+
+                    <h4 className="font-black text-white text-sm">
+                      {isUrdu ? pkg.nameUr : pkg.nameEn}
+                    </h4>
+
+                    <span className="text-[11px] font-mono text-amber-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-md inline-block">
+                      👥 گنجائش: {pkg.guests}
+                    </span>
+
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      {pkg.descUr}
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                    <span className="font-mono font-bold text-xs text-amber-300">
+                      {pkg.pricing}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onOpenEventPlanner ? onOpenEventPlanner() : onOpenOrderModal('home_services')}
+                      className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[11px] rounded-lg transition-colors cursor-pointer"
+                    >
+                      {isUrdu ? 'بک کریں' : 'Book'}
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

@@ -642,6 +642,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <option value="custom_delivery">Custom Delivery</option>
                   <option value="home_services">Home Services</option>
                   <option value="transport_cargo">Transport & Cargo</option>
+                  <option value="event_planning">🎪 Event Planning (تقریبات)</option>
                 </select>
               </div>
 
@@ -691,12 +692,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       ? (order.serviceDetails?.serviceName || 'Home Service')
                       : order.category === 'transport_cargo'
                       ? (order.transportDetails?.vehicleName || 'Cargo Transport')
+                      : order.category === 'event_planning'
+                      ? (order.eventDetails ? `🎪 ${order.eventDetails.eventTitle}` : 'Event Planning')
                       : (order.deliveryDetails?.itemName || 'Store Delivery');
 
                     const serviceSubtitle = order.category === 'home_services'
                       ? order.serviceDetails?.issueDescription
                       : order.category === 'transport_cargo'
                       ? `${order.transportDetails?.cargoDescription || 'Cargo'} (${order.transportDetails?.estimatedDistanceKm || 0} km)`
+                      : order.category === 'event_planning'
+                      ? `📅 ${order.eventDetails?.eventDate || ''} | 👥 ${order.eventDetails?.guestCount || 0} Guests | 📍 ${order.eventDetails?.venueNameOrAddress || order.deliveryAddress}`
                       : `Store: ${order.deliveryDetails?.storeName || 'Khanewal Market'}`;
 
                     return (
@@ -784,8 +789,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                             {/* Inline Worker Name and Phone Input Box when choosing Assign */}
                             {isInline ? (
-                              <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-300 space-y-2 text-xs shadow-xs animate-in fade-in duration-200">
-                                <span className="font-bold text-amber-950 block">ورکر کی تفصیلات درج کریں:</span>
+                              <div className="p-3.5 rounded-xl bg-slate-950 border-2 border-amber-500/80 space-y-2.5 text-xs shadow-xl animate-in fade-in duration-200 text-white">
+                                <span className="font-bold text-amber-300 block flex items-center gap-1.5">
+                                  <span>👤</span>
+                                  <span>ورکر / مینیجر تفویض کریں (Assign Worker Details):</span>
+                                </span>
 
                                 {/* Quick select from existing registered providers */}
                                 {providersList.length > 0 && (
@@ -797,9 +805,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         setInlineWorkerPhone(prov.phone);
                                       }
                                     }}
-                                    className="w-full text-[11px] rounded-lg border border-amber-300 bg-white px-2 py-1 text-slate-800 font-medium"
+                                    className="w-full text-xs rounded-lg border border-amber-500/40 bg-slate-900 px-2.5 py-1.5 text-amber-200 font-medium focus:border-amber-400 focus:outline-hidden"
                                   >
-                                    <option value="">-- رجسٹرڈ ورکر چنیں (یا نیچے خود ٹائپ کریں) --</option>
+                                    <option value="">-- رجسٹرڈ ورکر منتخب کریں (یا نیچے نام لکھیں) --</option>
                                     {providersList.map(prov => (
                                       <option key={prov.id} value={prov.id}>
                                         {prov.name} ({prov.phone}) - {prov.serviceSkill || prov.providerCategory || 'Verified'}
@@ -810,53 +818,53 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                                 <div className="grid grid-cols-2 gap-2">
                                   <div>
-                                    <label className="text-[10px] text-slate-600 font-medium block">Worker Name:</label>
+                                    <label className="text-[10px] text-amber-400 font-bold block mb-1">ورکر کا نام (Worker Name):</label>
                                     <input
                                       type="text"
                                       value={inlineWorkerName}
                                       onChange={(e) => setInlineWorkerName(e.target.value)}
                                       placeholder="مثلاً: Muhammad Aslam"
-                                      className="w-full text-xs rounded-lg border border-slate-300 px-2 py-1 bg-white font-medium focus:ring-1 focus:ring-amber-500"
+                                      className="w-full text-xs rounded-lg border border-slate-700 px-2.5 py-1.5 bg-slate-900 text-white font-medium placeholder:text-slate-500 focus:border-amber-400 focus:outline-hidden"
                                     />
                                   </div>
 
                                   <div>
-                                    <label className="text-[10px] text-slate-600 font-medium block">Worker Phone:</label>
+                                    <label className="text-[10px] text-amber-400 font-bold block mb-1">ورکر فون (Worker Phone):</label>
                                     <input
                                       type="tel"
                                       value={inlineWorkerPhone}
                                       onChange={(e) => setInlineWorkerPhone(e.target.value)}
                                       placeholder="0300-1234567"
-                                      className="w-full text-xs rounded-lg border border-slate-300 px-2 py-1 bg-white font-mono focus:ring-1 focus:ring-amber-500"
+                                      className="w-full text-xs rounded-lg border border-slate-700 px-2.5 py-1.5 bg-slate-900 text-white font-mono placeholder:text-slate-500 focus:border-amber-400 focus:outline-hidden"
                                     />
                                   </div>
                                 </div>
 
-                                <div className="flex items-center justify-between gap-2 pt-1">
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-[10px] text-slate-600 font-medium">ETA:</span>
+                                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-amber-300 font-bold">پہنچنے کا وقت (ETA):</span>
                                     <input
                                       type="number"
                                       value={inlineWorkerEta}
                                       onChange={(e) => setInlineWorkerEta(Number(e.target.value))}
                                       placeholder="20"
-                                      className="w-14 text-xs rounded-lg border border-slate-300 px-1.5 py-0.5 bg-white font-mono text-center"
+                                      className="w-14 text-xs rounded-lg border border-slate-700 px-1.5 py-1 bg-slate-900 font-mono text-center text-amber-300 font-bold focus:border-amber-400 focus:outline-hidden"
                                     />
-                                    <span className="text-[10px] text-slate-500">منٹ</span>
+                                    <span className="text-[10px] text-slate-400">منٹ</span>
                                   </div>
 
-                                  <div className="flex items-center gap-1.5">
+                                  <div className="flex items-center gap-2">
                                     <button
                                       type="button"
                                       onClick={() => handleSaveInlineAssign(order.id)}
-                                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs cursor-pointer"
+                                      className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-lg shadow-sm cursor-pointer"
                                     >
-                                      محفوظ کریں (Save)
+                                      محفوظ و لائیو نشر کریں
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setInlineOrderId(null)}
-                                      className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-lg cursor-pointer"
+                                      className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-lg cursor-pointer"
                                     >
                                       منسوخ
                                     </button>
@@ -1806,6 +1814,73 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <span className="font-semibold text-slate-900">{selectedOrderDetails.deliveryAddress}</span>
               </div>
 
+              {selectedOrderDetails.eventDetails && (
+                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 space-y-2 text-xs">
+                  <div className="flex items-center justify-between border-b border-amber-200 pb-1.5">
+                    <span className="font-bold text-amber-950 flex items-center gap-1">
+                      <span>🎪</span>
+                      <span>ایونٹ پلاننگ مکمل تفصیلات:</span>
+                    </span>
+                    <span className="font-bold bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded text-[11px]">
+                      {selectedOrderDetails.eventDetails.guestCount} معزز مہمان
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                      <span className="text-slate-500 block">عنوان تقریب:</span>
+                      <span className="font-bold text-slate-900">{selectedOrderDetails.eventDetails.eventTitle}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">تاریخ و وقت:</span>
+                      <span className="font-bold text-slate-900">
+                        {selectedOrderDetails.eventDetails.eventDate} ({selectedOrderDetails.eventDetails.eventTimeSlot})
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">مقام / ہال:</span>
+                      <span className="font-bold text-slate-900">{selectedOrderDetails.eventDetails.venueNameOrAddress}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">علاقہ خانیوال:</span>
+                      <span className="font-bold text-slate-900">{selectedOrderDetails.eventDetails.khanewalArea}</span>
+                    </div>
+                  </div>
+
+                  {selectedOrderDetails.eventDetails.selectedServices && (
+                    <div>
+                      <span className="text-slate-500 block text-[10px] mb-1">مطلوبہ سروسز:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedOrderDetails.eventDetails.selectedServices.map((srv, idx) => (
+                          <span key={idx} className="bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded text-[10px] font-semibold">
+                            {srv.replace('_', ' ')}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedOrderDetails.eventDetails.menuDetailsText && (
+                    <div className="bg-white/80 p-2 rounded-lg border border-amber-200 text-[11px]">
+                      <span className="font-bold text-amber-950 block">کھانے کا مینو و دیگیں:</span>
+                      <span className="text-slate-700">{selectedOrderDetails.eventDetails.menuDetailsText}</span>
+                      {selectedOrderDetails.eventDetails.numberOfDegs && (
+                        <span className="block text-amber-800 font-bold mt-0.5">
+                          تعداد دیگیں: {selectedOrderDetails.eventDetails.numberOfDegs}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between text-[11px] pt-1 border-t border-amber-200">
+                    <span className="text-slate-600">میزبان رابطہ: {selectedOrderDetails.eventDetails.contactPersonName}</span>
+                    <span className="font-mono font-bold text-emerald-800">
+                      WhatsApp: {selectedOrderDetails.eventDetails.whatsappNumber}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <span className="text-slate-400 block text-[11px]">Pricing Breakdown:</span>
                 <div className="font-mono text-slate-600 space-y-0.5 mt-1">
@@ -2332,67 +2407,67 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* DISPATCH & LIVE STATUS UPDATE MODAL */}
       {dispatchOrder && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-6">
-            <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-[#0b0f19] rounded-3xl max-w-lg w-full shadow-[0_0_50px_rgba(245,158,11,0.25)] border-2 border-amber-500/60 overflow-hidden my-6 text-slate-100">
+            <div className="px-5 sm:px-6 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950/40 text-white flex items-center justify-between border-b border-amber-500/30">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-xs">
+                <div className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-sm shadow-md">
                   ⚡
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <span>Dispatch & Live Status Broadcast</span>
-                    <span className="font-mono text-xs text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800">
+                    <span>ورکر تفویض و لائیو سٹیٹس براڈکاسٹ</span>
+                    <span className="font-mono text-xs text-amber-400 bg-amber-950 px-2 py-0.5 rounded border border-amber-700">
                       {dispatchOrder.id}
                     </span>
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    Customer: {dispatchOrder.customerName} ({dispatchOrder.customerPhone})
+                    کسٹمر: {dispatchOrder.customerName} ({dispatchOrder.customerPhone})
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setDispatchOrder(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
+                className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveDispatchModal} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleSaveDispatchModal} className="p-4 sm:p-6 space-y-4 text-xs">
               {/* Order Context */}
-              <div className="bg-slate-50 border border-slate-200 p-3 rounded-2xl space-y-1">
-                <div className="flex items-center justify-between text-slate-700">
-                  <span className="font-semibold capitalize">{dispatchOrder.category.replace('_', ' ')}</span>
-                  <span className="font-mono font-bold text-slate-900">PKR {dispatchOrder.pricing.total.toLocaleString()}</span>
+              <div className="bg-slate-950 border border-amber-500/30 p-3 rounded-2xl space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-amber-300 capitalize">{dispatchOrder.category.replace('_', ' ')}</span>
+                  <span className="font-mono font-bold text-white">PKR {dispatchOrder.pricing.total.toLocaleString()}</span>
                 </div>
-                <p className="text-slate-500 text-[11px] truncate">
-                  Address: {dispatchOrder.deliveryAddress}
+                <p className="text-slate-400 text-[11px] truncate">
+                  پتہ: {dispatchOrder.deliveryAddress}
                 </p>
               </div>
 
               {/* Status Selector */}
               <div>
-                <label className="block text-slate-700 font-bold mb-1">
-                  1. Live Order Status (Customer will see this real-time) *
+                <label className="block text-amber-400 font-bold mb-1.5">
+                  1. آرڈر کا لائیو سٹیٹس منتخب کریں (Customer will see this real-time) *
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {[
-                    { val: 'pending', label: 'Pending', color: 'border-slate-300' },
-                    { val: 'assigned', label: 'Assigned', color: 'border-blue-400 text-blue-800' },
-                    { val: 'on_the_way', label: 'On The Way (روانہ)', color: 'border-amber-400 text-amber-800' },
-                    { val: 'work_started', label: 'Work Started', color: 'border-purple-400 text-purple-800' },
-                    { val: 'completed', label: 'Completed (مکمل)', color: 'border-emerald-400 text-emerald-800' },
-                    { val: 'cancelled', label: 'Cancelled', color: 'border-red-400 text-red-800' }
+                    { val: 'pending', label: '⏳ Pending (انتظار)' },
+                    { val: 'assigned', label: '👤 Assigned (تفویض)' },
+                    { val: 'on_the_way', label: '🛵 On The Way (روانہ)' },
+                    { val: 'work_started', label: '🔧 In Progress (جاری)' },
+                    { val: 'completed', label: '✅ Completed (مکمل)' },
+                    { val: 'cancelled', label: '❌ Cancelled (منسوخ)' }
                   ].map(st => (
                     <button
                       type="button"
                       key={st.val}
                       onClick={() => setDispatchStatus(st.val as OrderStatus)}
-                      className={`py-2 px-2 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer ${
+                      className={`py-2 px-2.5 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer ${
                         dispatchStatus === st.val
-                          ? 'bg-slate-900 text-white shadow-xs border-slate-900 ring-2 ring-blue-500/30'
-                          : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                          ? 'bg-amber-500 text-slate-950 shadow-md border-amber-400 ring-2 ring-amber-400/40'
+                          : 'bg-slate-950 hover:bg-slate-900 text-slate-300 border-slate-800'
                       }`}
                     >
                       {st.label}
@@ -2402,16 +2477,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               {/* Quick Select Provider or Type Custom */}
-              <div className="pt-2 border-t border-slate-100">
-                <label className="block text-slate-700 font-bold mb-1">
-                  2. Select Verified Worker / Driver (or Type Custom Name)
+              <div className="pt-2 border-t border-slate-800">
+                <label className="block text-amber-400 font-bold mb-1.5">
+                  2. تصدیق شدہ ورکر یا مینیجر چنیں (یا نیچے نیا نام و نمبر لکھیں)
                 </label>
                 <select
                   value={dispatchProviderId}
                   onChange={(e) => handleSelectProviderForDispatch(e.target.value)}
-                  className="w-full text-xs rounded-xl border border-slate-300 px-3 py-2 bg-white mb-2 cursor-pointer"
+                  className="w-full text-xs rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-amber-200 mb-2 font-medium focus:border-amber-400 focus:outline-hidden cursor-pointer"
                 >
-                  <option value="">-- Choose from Registered Fleet (Optional) --</option>
+                  <option value="">-- سسٹم کے رجسٹرڈ ورکرز میں سے منتخب کریں (اختیاری) --</option>
                   {providersList.map(p => (
                     <option key={p.id} value={p.id}>
                       {p.name} ({p.phone}) - {p.serviceSkill || p.vehicleType || p.providerCategory}
@@ -2422,38 +2497,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">
-                    Worker / Rider / Driver Name *
+                  <label className="block text-amber-400 font-bold mb-1">
+                    ورکر / رائیڈر / ایونٹ مینیجر کا نام *
                   </label>
                   <input
                     type="text"
                     required
                     value={dispatchProviderName}
                     onChange={(e) => setDispatchProviderName(e.target.value)}
-                    placeholder="e.g. Muhammad Tariq (Electrician)"
-                    className="w-full text-xs rounded-xl border border-slate-300 px-3 py-2 font-medium focus:border-blue-600 focus:outline-hidden"
+                    placeholder="e.g. Tariq Mehmood (Technician)"
+                    className="w-full text-xs rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-white font-medium placeholder:text-slate-600 focus:border-amber-400 focus:outline-hidden"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">
-                    Worker Direct Contact Phone *
+                  <label className="block text-amber-400 font-bold mb-1">
+                    ورکر کا براہِ راست موبائل نمبر *
                   </label>
                   <input
                     type="tel"
                     required
                     value={dispatchProviderPhone}
                     onChange={(e) => setDispatchProviderPhone(e.target.value)}
-                    placeholder="+92 301 7766554"
-                    className="w-full text-xs rounded-xl border border-slate-300 px-3 py-2 font-mono focus:border-blue-600 focus:outline-hidden"
+                    placeholder="0300-1234567"
+                    className="w-full text-xs rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-white font-mono placeholder:text-slate-600 focus:border-amber-400 focus:outline-hidden"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">
-                    Estimated Time to Reach (ETA in minutes)
+                  <label className="block text-amber-400 font-bold mb-1">
+                    پہنچنے کا متوقع وقت (ETA in minutes)
                   </label>
                   <input
                     type="number"
@@ -2462,47 +2537,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     value={dispatchEtaMinutes}
                     onChange={(e) => setDispatchEtaMinutes(Number(e.target.value) || 0)}
                     placeholder="20"
-                    className="w-full text-xs rounded-xl border border-slate-300 px-3 py-2 font-mono font-bold focus:border-blue-600 focus:outline-hidden"
+                    className="w-full text-xs rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 font-mono font-bold text-amber-300 focus:border-amber-400 focus:outline-hidden"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">
-                    ETA Live Customer Preview
+                  <label className="block text-amber-400 font-bold mb-1">
+                    کسٹمر کی سکرین پر لائیو پریویو
                   </label>
-                  <div className="h-9 rounded-xl bg-amber-50 border border-amber-200 px-3 flex items-center text-[11px] font-bold text-amber-900">
-                    ~ {dispatchEtaMinutes || 0} منٹ میں پہنچ جائے گا (ETA)
+                  <div className="h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 px-3.5 flex items-center text-[11px] font-bold text-amber-300">
+                    ⏱ تقریباً {dispatchEtaMinutes || 0} منٹ میں پہنچ جائے گا (ETA)
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">
-                  Custom Status Note / Message for Customer (Urdu / English)
+                <label className="block text-amber-400 font-bold mb-1">
+                  کسٹمر کے لیے خصوصی پیغام / ریمارکس (Urdu / English)
                 </label>
                 <textarea
                   rows={2}
                   value={dispatchNote}
                   onChange={(e) => setDispatchNote(e.target.value)}
-                  placeholder="مثلاً: ٹیکنیشن اوزار اور تار لے کر روانہ ہو چکا ہے، 20 منٹ میں آپ کے پتے پر ہو گا۔"
-                  className="w-full text-xs rounded-xl border border-slate-300 px-3 py-2 focus:border-blue-600 focus:outline-hidden"
+                  placeholder="مثلاً: ٹیکنیشن اوزار اور سامان لے کر روانہ ہو چکا ہے، 20 منٹ میں آپ کے پتے پر پہنچ جائے گا۔"
+                  className="w-full text-xs rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-white placeholder:text-slate-600 focus:border-amber-400 focus:outline-hidden"
                 />
               </div>
 
-              <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
+              <div className="pt-3 flex justify-end gap-2.5 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setDispatchOrder(null)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium cursor-pointer"
+                  className="px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl font-medium cursor-pointer"
                 >
-                  Cancel
+                  منسوخ کریں
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-bold shadow-md cursor-pointer flex items-center gap-1.5"
+                  className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-xl font-black shadow-lg shadow-amber-500/20 cursor-pointer flex items-center gap-1.5"
                 >
-                  <span>Broadcast Live to Customer</span>
-                  <span>→</span>
+                  <span>محفوظ اور کسٹمر کو لائیو نشر کریں</span>
+                  <span>✓</span>
                 </button>
               </div>
             </form>

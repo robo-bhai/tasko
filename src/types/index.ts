@@ -40,7 +40,7 @@ export interface SystemSettings {
 }
 
 
-export type OrderCategory = 'custom_delivery' | 'home_services' | 'transport_cargo';
+export type OrderCategory = 'custom_delivery' | 'home_services' | 'transport_cargo' | 'event_planning';
 
 export type OrderStatus = 'pending' | 'assigned' | 'on_the_way' | 'work_started' | 'completed' | 'cancelled';
 
@@ -87,6 +87,28 @@ export interface TransportDetails {
   helperCount: number;
 }
 
+export interface EventPlanningDetails {
+  eventType: string; // 'barat' | 'walima' | 'mehndi_mayun' | 'birthday' | 'corporate_seminar' | 'dawat_catering' | 'qawwali_mehfil' | 'milad_majlis' | 'other'
+  eventTitle: string; // e.g. "محمد حمزہ کی بارات و دعوت"
+  eventDate: string; // YYYY-MM-DD
+  eventTimeSlot: 'day_lunch' | 'evening_dinner' | 'night_party' | 'full_day';
+  guestCount: number; // e.g. 350
+  venueType: 'hall_marquee' | 'home_lawn' | 'farmhouse_ground' | 'need_admin_suggestion';
+  venueNameOrAddress: string; // e.g. "Royal Palace Marquee, Multan Road Khanewal"
+  khanewalArea: string; // Local area in Khanewal
+  budgetRangePkr: number; // Estimated budget
+  selectedServices: string[]; // ['catering', 'tentage_shamiana', 'stage_floral', 'sound_dj', 'photography_drone', 'waiters_crockery', 'generator', 'valet_security']
+  cateringType: 'per_head_buffet' | 'traditional_degain' | 'refreshment_tea' | 'only_setup_no_food';
+  menuDetailsText?: string; // Custom menu
+  numberOfDegs?: number; // If degain selected
+  tentageThemeColor?: string; // Theme e.g. "Royal Gold & White"
+  soundAndStageReq?: string;
+  specialInstructions?: string;
+  contactPersonName: string;
+  contactPersonPhone: string;
+  whatsappNumber: string;
+}
+
 export interface OrderPricing {
   baseFee: number;
   serviceOrDeliveryFee: number;
@@ -118,6 +140,7 @@ export interface Order {
   deliveryDetails?: CustomDeliveryDetails;
   serviceDetails?: HomeServiceDetails;
   transportDetails?: TransportDetails;
+  eventDetails?: EventPlanningDetails;
   
   // Pricing and payment
   pricing: OrderPricing;

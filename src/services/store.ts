@@ -728,6 +728,8 @@ export const Store = {
         stepIndex = 2;
         label = currentOrder.category === 'home_services' 
           ? `Technician En Route (${params.etaMinutes ? `~${params.etaMinutes} mins` : 'Dispatched'})`
+          : currentOrder.category === 'event_planning'
+          ? `Event Team & Coordinator Dispatched (${params.etaMinutes ? `~${params.etaMinutes} mins` : 'On The Way'})`
           : `Rider / Driver In Transit (${params.etaMinutes ? `~${params.etaMinutes} mins` : 'On The Way'})`;
         break;
       case 'work_started':

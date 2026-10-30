@@ -16,6 +16,7 @@ import { TransportBookingModal } from './components/CustomerPortal/TransportBook
 import { CheckoutModal, PendingCheckoutOrder } from './components/CustomerPortal/CheckoutModal';
 import { LiveOrderTracker } from './components/CustomerPortal/LiveOrderTracker';
 import { OrderHistoryModal } from './components/CustomerPortal/OrderHistoryModal';
+import { EventPlannerModal } from './components/CustomerPortal/EventPlannerModal';
 import { ProviderDashboard } from './components/ProviderPortal/ProviderDashboard';
 import { AdminDashboard } from './components/AdminPortal/AdminDashboard';
 import { AuthModal } from './components/AuthModal';
@@ -70,6 +71,7 @@ export default function App() {
   const [selectedOrderId, setSelectedOrderId] = useState<string | undefined>();
 
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isEventPlannerModalOpen, setIsEventPlannerModalOpen] = useState(false);
   
   // Auth Modal State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -125,6 +127,25 @@ export default function App() {
       setPreselectedVehicleId(preselectedId);
       setIsTransportModalOpen(true);
     }
+  };
+
+  const handleOpenEventPlanner = () => {
+    if (!currentUser) {
+      setAuthNoticeReason(
+        lang === 'ur'
+          ? 'ایونٹ پلاننگ کی درخواست جمع کروانے کے لیے پہلے لاگ ان کریں یا نیا اکاؤنٹ بنائیں۔'
+          : 'Please sign in or create an account to plan an event.'
+      );
+      setPendingOrderAction({ category: 'home_services' });
+      setIsAuthModalOpen(true);
+      return;
+    }
+    setIsEventPlannerModalOpen(true);
+  };
+
+  const handleEventOrderSuccess = (newOrder: Order) => {
+    setSelectedOrderId(newOrder.id);
+    setIsLiveTrackerOpen(true);
   };
 
   const handleOpenAuthModal = (tab?: 'login' | 'customer_signup' | 'provider_signup', notice?: string) => {
@@ -232,6 +253,7 @@ export default function App() {
           <CustomerHome
             currentUser={currentUser}
             onOpenOrderModal={handleOpenOrderModal}
+            onOpenEventPlanner={handleOpenEventPlanner}
             onOpenLiveTracker={handleOpenLiveTracker}
             onOpenAuth={handleOpenAuthModal}
             activeOrders={customerOrders}
@@ -371,6 +393,14 @@ export default function App() {
         onClose={() => setIsHistoryModalOpen(false)}
         orders={currentUser?.role === 'admin' ? orders : customerOrders}
         onOpenLiveTracker={handleOpenLiveTracker}
+      />
+
+      <EventPlannerModal
+        isOpen={isEventPlannerModalOpen}
+        onClose={() => setIsEventPlannerModalOpen(false)}
+        currentUser={currentUser}
+        onOrderSuccess={handleEventOrderSuccess}
+        isUrdu={isUrdu}
       />
 
       <AuthModal

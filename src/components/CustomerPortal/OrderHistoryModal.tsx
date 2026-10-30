@@ -12,7 +12,8 @@ import {
   MapPin, 
   Receipt, 
   ChevronRight,
-  Filter
+  Filter,
+  Sparkles
 } from 'lucide-react';
 
 interface OrderHistoryModalProps {
@@ -71,10 +72,11 @@ export const OrderHistoryModal: React.FC<OrderHistoryModalProps> = ({
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
-      case 'custom_delivery': return <ShoppingBag className="w-4 h-4 text-blue-600" />;
-      case 'home_services': return <Wrench className="w-4 h-4 text-emerald-600" />;
-      case 'transport_cargo': return <Truck className="w-4 h-4 text-indigo-600" />;
-      default: return <Clock className="w-4 h-4 text-slate-600" />;
+      case 'custom_delivery': return <ShoppingBag className="w-4 h-4 text-blue-400" />;
+      case 'home_services': return <Wrench className="w-4 h-4 text-emerald-400" />;
+      case 'transport_cargo': return <Truck className="w-4 h-4 text-indigo-400" />;
+      case 'event_planning': return <Sparkles className="w-4 h-4 text-amber-400" />;
+      default: return <Clock className="w-4 h-4 text-slate-400" />;
     }
   };
 
@@ -200,6 +202,16 @@ export const OrderHistoryModal: React.FC<OrderHistoryModalProps> = ({
                       <p className="font-semibold text-white">
                         گاڑی: {order.transportDetails.vehicleName} · {order.transportDetails.cargoDescription}
                       </p>
+                    )}
+                    {order.category === 'event_planning' && order.eventDetails && (
+                      <div className="space-y-0.5">
+                        <p className="font-semibold text-amber-300">
+                          🎪 {order.eventDetails.eventTitle} ({order.eventDetails.guestCount} معزز مہمان)
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          وینیو: {order.eventDetails.venueNameOrAddress} · تاریخ: {order.eventDetails.eventDate}
+                        </p>
+                      </div>
                     )}
 
                     <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
