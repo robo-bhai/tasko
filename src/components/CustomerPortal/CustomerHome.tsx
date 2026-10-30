@@ -32,7 +32,16 @@ import {
   MessageCircle,
   HelpCircle,
   Award,
-  Navigation
+  Navigation,
+  Bell,
+  Menu,
+  ShoppingCart,
+  Lock,
+  Wind,
+  Car,
+  Paintbrush,
+  Boxes,
+  HardHat
 } from 'lucide-react';
 import { PWAInstallButton } from '../PWAInstallButton';
 
@@ -63,6 +72,7 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
   // Active table view: 'technician' | 'ride' | 'cargo'
   const [activeTableTab, setActiveTableTab] = useState<'technician' | 'ride' | 'cargo'>('technician');
   const [serviceSearchQuery, setServiceSearchQuery] = useState('');
+  const [flyerSearchQuery, setFlyerSearchQuery] = useState('');
 
   // Strictly only show tracking for the current logged-in customer
   const customerActiveOrders = currentUser ? activeOrders : [];
@@ -101,7 +111,125 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
     return veh.name;
   };
 
-  // Instant Delivery Ride Catalog Data
+  // 13 Circular Services matching flyer
+  const flyerServices = [
+    {
+      id: 'labor',
+      nameUr: 'مزدور',
+      nameEn: 'Laborer',
+      bgColor: 'bg-purple-600 shadow-purple-600/30',
+      icon: <HardHat className="w-6 h-6 text-white" />,
+      action: () => onOpenOrderModal('home_services', 'srv-cleaning')
+    },
+    {
+      id: 'house_shifting',
+      nameUr: 'گھر شفٹنگ',
+      nameEn: 'House Shifting',
+      bgColor: 'bg-blue-600 shadow-blue-600/30',
+      icon: <Truck className="w-6 h-6 text-white" />,
+      action: () => onOpenOrderModal('transport_cargo', 'veh-standard-van')
+    },
+    {
+      id: 'delivery_cargo',
+      nameUr: 'ڈیلیوری / کارگو',
+      nameEn: 'Delivery / Cargo',
+      bgColor: 'bg-amber-600 shadow-amber-600/30',
+      icon: <ShoppingBag className="w-6 h-6 text-white" />,
+      action: () => onOpenOrderModal('transport_cargo', 'veh-loader-rickshaw')
+    },
+    {
+      id: 'market_shopping',
+      nameUr: 'مارکیٹ سے خریداری',
+      nameEn: 'Market Shopping',
+      bgColor: 'bg-emerald-600 shadow-emerald-600/30',
+      icon: <ShoppingCart className="w-6 h-6 text-white" />,
+      action: () => onOpenOrderModal('custom_delivery')
+    },
+    {
+      id: 'locks_keys',
+      nameUr: 'تالے اور چابی',
+      nameEn: 'Locks & Keys',
+      bgColor: 'bg-pink-600 shadow-pink-600/30',
+      icon: <Lock className="w-6 h-6 text-white" />,
+      action: () => onOpenOrderModal('home_services', 'srv-carpentry')
+    },
+    {
+      id: 'ac_repair',
+      nameUr: 'AC ریپیرنگ',
+      nameEn: 'AC Repair',
+      bgColor: 'bg-cyan-600 shadow-cyan-600/30',
+      icon: <Wind className="w-6 h-6 text-white" />,
+      action: () => onOpenOrderModal('home_services', 'srv-ac-repair')
+    },
+    {
+      id: 'carpenter',
+      nameUr: 'کارپینٹر',
+      nameEn: 'Carpenter',
+      bgColor: 'bg-teal-600 shadow-teal-600/30',
+      icon: <Hammer className="w-6 h-6 text-white" />,
+      action: () => onOpenOrderModal('home_services', 'srv-carpentry')
+    },
+    {
+      id: 'plumber_electrician',
+      nameUr: 'پلمبر / الیکٹریشن',
+      nameEn: 'Plumber & Electrician',
+      bgColor: 'bg-red-600 shadow-red-600/30',
+      icon: <Wrench className="w-6 h-6 text-white" />,
+      action: () => onOpenOrderModal('home_services', 'srv-electrician')
+    },
+    {
+      id: 'pick_and_drop',
+      nameUr: 'پک اینڈ ڈراپ',
+      nameEn: 'Pick & Drop',
+      bgColor: 'bg-rose-600 shadow-rose-600/30',
+      icon: <Car className="w-6 h-6 text-white" />,
+      action: () => onOpenOrderModal('custom_delivery')
+    },
+    {
+      id: 'wood_work',
+      nameUr: 'وڈ ورک',
+      nameEn: 'Wood Work',
+      bgColor: 'bg-cyan-900 shadow-cyan-900/30',
+      icon: <Boxes className="w-6 h-6 text-white" />,
+      action: () => onOpenOrderModal('home_services', 'srv-carpentry')
+    },
+    {
+      id: 'masonry',
+      nameUr: 'سنگ کاری',
+      nameEn: 'Masonry',
+      bgColor: 'bg-amber-900 shadow-amber-900/30',
+      icon: <Hammer className="w-6 h-6 text-white" />,
+      action: () => onOpenOrderModal('home_services', 'srv-appliances')
+    },
+    {
+      id: 'painting',
+      nameUr: 'پینٹنگ',
+      nameEn: 'Painting',
+      bgColor: 'bg-indigo-700 shadow-indigo-700/30',
+      icon: <Paintbrush className="w-6 h-6 text-white" />,
+      action: () => onOpenOrderModal('home_services', 'srv-cleaning')
+    },
+    {
+      id: 'more_services',
+      nameUr: 'اور بھی بہت کچھ...',
+      nameEn: 'More Services',
+      bgColor: 'bg-amber-500 shadow-amber-500/30',
+      icon: <Sparkles className="w-6 h-6 text-slate-950" />,
+      action: () => {
+        document.getElementById('booking-tables-section')?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  ];
+
+  // Filter flyer services by search query
+  const filteredFlyerServices = flyerServices.filter(s => 
+    !flyerSearchQuery.trim() || 
+    s.nameUr.includes(flyerSearchQuery.trim()) || 
+    s.nameEn.toLowerCase().includes(flyerSearchQuery.toLowerCase().trim())
+  );
+
+  // Instant Delivery Ride Catalog Data dynamically populated from Admin Settings
+  const settings = Store.getSettings();
   const deliveryRideItems = [
     {
       id: 'ride-instant-bike',
@@ -109,8 +237,8 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
       nameEn: 'Instant Bike Courier (Docs, Medicine & Parcels)',
       vehicleUr: '125cc موٹر بائیک',
       vehicleEn: '125cc Motorbike',
-      baseFee: 200,
-      perKm: 35,
+      baseFee: settings.deliveryBaseFee,
+      perKm: settings.deliveryPerKmFee,
       eta: '15 - 25 mins',
       descUr: 'شہر کے اندر فوری دستاویزات، پارسل، گھر کا پکا کھانا یا بازار سے چھوٹی اشیاء منگوائیں۔',
       descEn: 'Superfast parcel, food, or documents pickup across Khanewal neighborhoods.'
@@ -121,8 +249,8 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
       nameEn: 'Market Grocery & Store Errands Run',
       vehicleUr: 'کارگو بائیک باکس',
       vehicleEn: 'Cargo Bike Box',
-      baseFee: 250,
-      perKm: 35,
+      baseFee: settings.deliveryBaseFee + 50,
+      perKm: settings.deliveryPerKmFee,
       eta: '25 - 40 mins',
       descUr: 'خانیوال کی کسی بھی دکان یا غلہ منڈی سے مطلوبہ سودا سلف خرید کر گھر پہنچائیں۔',
       descEn: 'Our verified rider visits the local market, buys requested items, and delivers to your doorstep.'
@@ -133,8 +261,8 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
       nameEn: 'Emergency Pharmacy & Medical Delivery',
       vehicleUr: 'ایمرجنسی بائیک',
       vehicleEn: 'Priority Bike',
-      baseFee: 220,
-      perKm: 35,
+      baseFee: settings.deliveryBaseFee + (settings.deliveryUrgentFee || 100),
+      perKm: settings.deliveryPerKmFee,
       eta: '10 - 20 mins',
       descUr: 'ڈاکٹر کے نسخے کے مطابق قریبی میڈیکل اسٹور سے فوری ادویات کی فراہمی۔',
       descEn: 'Priority 24/7 delivery of emergency medicines and healthcare essentials.'
@@ -145,8 +273,8 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
       nameEn: 'Bakery, Sweets & Food Pickup',
       vehicleUr: 'تھرمل بائیک بیگ',
       vehicleEn: 'Thermal Bike Bag',
-      baseFee: 200,
-      perKm: 35,
+      baseFee: settings.deliveryBaseFee,
+      perKm: settings.deliveryPerKmFee,
       eta: '20 - 30 mins',
       descUr: 'شہر کی مشہور مٹھائیوں اور ریسٹورنٹ سے گرما گرم کھانا فوری وصول کریں۔',
       descEn: 'Get fresh, hot food and bakery delicacies collected and safely delivered.'
@@ -167,16 +295,224 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
   )}`;
 
   return (
-    <div className={`space-y-12 pb-20 ${isUrdu ? 'rtl' : 'ltr'}`}>
+    <div className={`space-y-8 sm:space-y-12 pb-24 ${isUrdu ? 'rtl' : 'ltr'}`}>
+      
+      {/* =========================================================================
+          FLYER UI SECTION: TOP HEADER, SEARCH BAR, BANNER CARD & HAMARI KHIDMAT
+          ========================================================================= */}
+      <section className="bg-gradient-to-b from-[#0a0b12] to-[#07080d] rounded-3xl border border-amber-500/40 p-4 sm:p-6 shadow-2xl space-y-5">
+        
+        {/* 1. Header with branding and notification bell */}
+        <div className="flex items-center justify-between gap-3 border-b border-amber-500/20 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-400 via-amber-500 to-yellow-400 text-slate-950 flex items-center justify-center font-black text-lg shadow-lg shadow-amber-500/30 shrink-0">
+              KC
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg sm:text-xl font-black tracking-tight text-white">
+                  KHANEWAL CONNECT
+                </h1>
+                <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-full">
+                  {isUrdu ? 'خانیوال' : 'Khanewal'}
+                </span>
+              </div>
+              <p className="text-[11px] text-amber-400/90 font-bold">
+                {isUrdu ? 'ہر مسئلے کا فوری حل — اب سب کچھ آپ کے موبائل پر!' : 'Instant Solutions — Everything on Your Mobile!'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                if (currentUser) {
+                  onOpenLiveTracker();
+                } else {
+                  onOpenAuth('login', isUrdu ? 'اطلاعات کے لیے لاگ ان کریں' : 'Please sign in to view notifications');
+                }
+              }}
+              className="relative p-2.5 rounded-xl bg-[#141624] border border-amber-500/30 text-amber-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              title={isUrdu ? 'اطلاعات' : 'Notifications'}
+            >
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-[#0a0b12]" />
+            </button>
+          </div>
+        </div>
+
+        {/* 2. Search View / EditText: "کون سی سروس چاہیئے؟" */}
+        <div className="relative">
+          <Search className={`w-4 h-4 text-amber-400 absolute ${isUrdu ? 'right-4' : 'left-4'} top-3.5`} />
+          <input
+            type="text"
+            value={flyerSearchQuery}
+            onChange={(e) => setFlyerSearchQuery(e.target.value)}
+            placeholder={isUrdu ? 'کون سی سروس چاہیئے؟ (مثلاً: الیکٹریشن، پلمبر، کارگو، AC)' : 'Which service do you need? (e.g. Electrician, Plumber, Cargo)'}
+            className={`w-full py-3 text-xs sm:text-sm rounded-2xl bg-[#11131e] border-2 border-amber-500/40 text-white placeholder-slate-400 focus:outline-hidden focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30 shadow-inner transition-all ${
+              isUrdu ? 'pr-11 pl-4' : 'pl-11 pr-4'
+            }`}
+          />
+          {flyerSearchQuery && (
+            <button
+              onClick={() => setFlyerSearchQuery('')}
+              className={`absolute ${isUrdu ? 'left-3' : 'right-3'} top-3 text-slate-400 hover:text-white text-xs font-bold px-1.5 py-0.5 rounded-md bg-slate-800`}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* 3. Banner/Card Section: "خانیوال کی ہر ضرورت اب ایک ایپ پر!" */}
+        <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-[#1c180e] via-[#241f12] to-[#10121b] border-2 border-amber-500/40 p-5 sm:p-7 shadow-xl">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-2 text-center md:text-start">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-500/50 text-[11px] font-black text-amber-400">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>{isUrdu ? 'خانیوال اب مزید قریب' : 'Khanewal Now Closer Than Ever'}</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-white leading-tight">
+                {isUrdu ? 'خانیوال کی ہر ضرورت اب ایک ایپ پر!' : 'Every Khanewal Need Now on One App!'}
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 max-w-xl">
+                {isUrdu 
+                  ? 'مزدور، پلمبر، الیکٹریشن، کارپینٹر، اے سی ریپیرنگ، کارگو اور مارکیٹ سودا سلف — مصدقہ کاریگر اور فوری ترسیل۔' 
+                  : 'Certified plumbers, electricians, AC repairs, loader trucks, and rapid doorstep errands across Khanewal.'}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-2.5 shrink-0">
+              <button
+                onClick={() => {
+                  document.getElementById('services-grid-section')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="px-5 py-3 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-400 hover:from-amber-500 hover:to-amber-600 text-slate-950 text-xs sm:text-sm font-black rounded-xl transition-all shadow-lg hover:shadow-amber-500/20 flex items-center gap-2 cursor-pointer"
+              >
+                <span>{isUrdu ? 'ہماری تمام خدمات دیکھیں' : 'View All Services'}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Services Grid / List Layout: "ہماری خدمات" */}
+        <div id="services-grid-section" className="space-y-4 pt-2">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                <Wrench className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-lg sm:text-xl font-black text-white">
+                  {isUrdu ? 'ہماری خدمات' : 'Our Services'}
+                </h3>
+                <p className="text-[11px] text-amber-400/80">
+                  {isUrdu ? 'براہِ راست سروس پر کلک کریں اور فوری آرڈر بک کریں' : 'Tap any service below to book directly'}
+                </p>
+              </div>
+            </div>
+
+            <span className="text-[11px] font-bold text-amber-300 bg-amber-950/80 border border-amber-500/40 px-3 py-1 rounded-full">
+              {filteredFlyerServices.length} {isUrdu ? 'سہولیات' : 'Available'}
+            </span>
+          </div>
+
+          {/* Circular Icon Grid: 3 cols mobile, 4 on sm, 6-7 on lg */}
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2.5 sm:gap-4">
+            {filteredFlyerServices.map((srv) => (
+              <button
+                key={srv.id}
+                onClick={srv.action}
+                className="group flex flex-col items-center justify-center p-2.5 sm:p-3.5 rounded-2xl bg-[#0e1019] hover:bg-[#161826] border border-amber-500/20 hover:border-amber-400/60 transition-all shadow-md hover:shadow-amber-500/10 transform hover:-translate-y-1 cursor-pointer text-center"
+              >
+                <div className={`w-13 h-13 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shadow-lg transition-transform group-hover:scale-110 ${srv.bgColor}`}>
+                  {srv.icon}
+                </div>
+                <span className="mt-2 text-xs sm:text-sm font-black text-white group-hover:text-amber-300 transition-colors leading-tight">
+                  {isUrdu ? srv.nameUr : srv.nameEn}
+                </span>
+                <span className="text-[9px] text-amber-400/70 mt-0.5 group-hover:text-amber-300">
+                  {isUrdu ? 'بک کریں' : 'Book'}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 5. Contact & Trust Bar matching flyer */}
+        <div className="rounded-2xl bg-gradient-to-r from-[#14120c] via-[#1a160e] to-[#0d0f18] border border-amber-500/30 p-4 sm:p-5 space-y-3">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-start">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-400 text-slate-950 font-black text-xs shadow-md">
+              <Award className="w-4 h-4" />
+              <span>{isUrdu ? 'آپ کا اعتماد ہی ہماری پہچان' : 'Your Trust is Our Identity'}</span>
+            </div>
+
+            <span className="text-xs font-bold text-amber-300 font-mono">
+              {isUrdu ? 'خانیوال کی اپنی ایپ — KHANEWAL CONNECT' : 'Khanewal Own App — KHANEWAL CONNECT'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            {/* M Baqir Bhatti */}
+            <a
+              href="tel:03040975351"
+              className="flex items-center justify-between p-3 rounded-xl bg-[#090a10] border border-amber-500/30 hover:border-amber-400 text-white transition-all group cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-400/20 text-amber-400 flex items-center justify-center group-hover:bg-amber-400 group-hover:text-slate-950 transition-colors">
+                  <PhoneCall className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs text-slate-400 block font-medium">M Baqir Bhatti</span>
+                  <span className="font-mono font-black text-sm text-amber-400">0304-0975351</span>
+                </div>
+              </div>
+              <span className="text-[10px] bg-amber-950/80 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-md font-bold">
+                {isUrdu ? 'کال کریں' : 'Call'}
+              </span>
+            </a>
+
+            {/* Mujtaba Faiz */}
+            <a
+              href="tel:03047705212"
+              className="flex items-center justify-between p-3 rounded-xl bg-[#090a10] border border-amber-500/30 hover:border-amber-400 text-white transition-all group cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-400/20 text-amber-400 flex items-center justify-center group-hover:bg-amber-400 group-hover:text-slate-950 transition-colors">
+                  <PhoneCall className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs text-slate-400 block font-medium">Mujtaba Faiz</span>
+                  <span className="font-mono font-black text-sm text-amber-400">0304-7705212</span>
+                </div>
+              </div>
+              <span className="text-[10px] bg-amber-950/80 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-md font-bold">
+                {isUrdu ? 'کال کریں' : 'Call'}
+              </span>
+            </a>
+          </div>
+
+          {/* Verified Badges & PWA */}
+          <div className="pt-2 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400 border-t border-slate-800/80">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span>{isUrdu ? 'پلے اسٹور و ویب ایپ سے مصدقہ تصدیق شدہ' : 'Verified by Play Store & Web PWA'}</span>
+            </div>
+            <PWAInstallButton isUrdu={isUrdu} variant="banner" />
+          </div>
+        </div>
+
+      </section>
       
       {/* 1. LOGGED-IN CUSTOMER ACTIVE ORDER TRACKING (Strictly visible only to logged-in customer) */}
       {currentUser && latestActiveOrder && (
-        <section className="bg-gradient-to-r from-[#14151f] via-[#1c1b14] to-[#0e0f14] text-white rounded-3xl p-5 md:p-6 shadow-2xl border-2 border-amber-500/40 relative overflow-hidden">
+        <section className="bg-gradient-to-r from-[#14151f] via-[#1c1b14] to-[#0e0f14] text-white rounded-3xl p-4 sm:p-6 shadow-2xl border-2 border-amber-500/40 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
           
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-2">
-              <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="flex h-3 w-3 relative">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500" />
@@ -185,10 +521,10 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
                   {isUrdu ? 'آپ کا فعال آرڈر جاری ہے (لائیو ٹریکنگ)' : 'Your Live Active Booking'}
                 </span>
                 <span className="text-slate-500">·</span>
-                <span className="font-mono text-xs text-amber-300 font-bold bg-amber-950/80 border border-amber-600/50 px-2.5 py-0.5 rounded-lg">
+                <span className="font-mono text-xs text-amber-300 font-bold bg-amber-950/80 border border-amber-600/50 px-2 py-0.5 rounded-lg">
                   {latestActiveOrder.id}
                 </span>
-                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
                   latestActiveOrder.status === 'on_the_way'
                     ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                     : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
@@ -200,13 +536,13 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
                 </span>
               </div>
 
-              <h3 className="text-lg md:text-xl font-black tracking-tight text-white">
+              <h3 className="text-base sm:text-xl font-black tracking-tight text-white">
                 {latestActiveOrder.category === 'custom_delivery' && (isUrdu ? 'فوری ڈوراسٹیپ ڈیلیوری' : 'Doorstep Store Delivery')}
                 {latestActiveOrder.category === 'home_services' && `${latestActiveOrder.serviceDetails?.serviceName || 'Home Service'}`}
                 {latestActiveOrder.category === 'transport_cargo' && `${latestActiveOrder.transportDetails?.vehicleName || 'Cargo Transport'}`}
               </h3>
 
-              <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-slate-300">
+              <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-xs text-slate-300">
                 {latestActiveOrder.assignedProviderName ? (
                   <span className="text-amber-300 font-semibold flex items-center gap-1">
                     <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
@@ -238,7 +574,7 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
             <div className="flex items-center gap-3 shrink-0">
               <button
                 onClick={() => onOpenLiveTracker(latestActiveOrder)}
-                className="px-5 py-3 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 text-xs font-black rounded-2xl transition-all shadow-lg hover:shadow-amber-500/20 flex items-center gap-2 cursor-pointer transform hover:scale-[1.02]"
+                className="px-4 py-2.5 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 text-xs font-black rounded-xl transition-all shadow-lg hover:shadow-amber-500/20 flex items-center gap-2 cursor-pointer transform hover:scale-[1.02]"
               >
                 <Radio className="w-4 h-4 text-slate-950 animate-pulse" />
                 <span>{isUrdu ? 'لائیو ٹریکنگ دیکھیں' : 'Open Live Tracker'}</span>
@@ -249,108 +585,47 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
         </section>
       )}
 
-      {/* 2. HERO SHOWCASE - BLACK & GOLD LUXURY AESTHETIC */}
-      <section className="relative overflow-hidden rounded-3xl bg-[#0b0c12] text-white border border-amber-500/30 shadow-2xl">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-500/15 via-transparent to-transparent pointer-events-none" />
-        
-        <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[420px] lg:items-stretch relative z-10">
-          <div className="lg:col-span-7 p-8 md:p-12 flex flex-col justify-center space-y-6">
-            <div className="inline-flex items-center gap-2 text-xs font-bold text-amber-400 bg-amber-950/70 border border-amber-500/40 px-3.5 py-1.5 rounded-full w-fit shadow-xs">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <span>{isUrdu ? 'خانیوال سٹی اور نواحی علاقوں کا اپنا سپر نیٹ ورک' : 'Khanewal City & Nearby Areas #1 On-Demand Super App'}</span>
-            </div>
+      {/* Quick 3 Category Jump Buttons */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-[#0d0f17] border border-amber-500/20">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <button
+            onClick={() => {
+              setActiveTableTab('technician');
+              document.getElementById('booking-tables-section')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="px-3.5 sm:px-4 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 text-xs font-black rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer"
+          >
+            <Wrench className="w-3.5 h-3.5 text-slate-950" />
+            <span>{isUrdu ? '1. بک اے ٹیکنیشن' : '1. Book a Technician'}</span>
+          </button>
 
-            <div className="space-y-2">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white leading-tight">
-                {isUrdu ? (
-                  <>
-                    گھر کی مرمت، فوری رائیڈ اور کارگو ٹرانسپورٹ <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-500">ایک کلک پر</span>
-                  </>
-                ) : (
-                  <>
-                    Certified Home Repairs, Rides & Heavy Cargo <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-400">At Your Doorstep</span>
-                  </>
-                )}
-              </h1>
-              <p className="text-sm md:text-base text-slate-300 max-w-xl leading-relaxed">
-                {isUrdu 
-                  ? 'خانیوال سٹی میں تصدیق شدہ الیکٹریشنز، پلمبرز، بائیک رائیڈرز اور لوڈر گاڑیاں۔ شفاف فلیٹ ریٹس، براہِ راست رابطہ اور منٹوں میں لائیو ڈسپیچ۔'
-                  : 'Book verified Khanewal electricians, plumbers, instant courier riders, and loader cargo vehicles with transparent upfront pricing and live GPS tracking.'}
-              </p>
-            </div>
+          <button
+            onClick={() => {
+              setActiveTableTab('ride');
+              document.getElementById('booking-tables-section')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="px-3.5 sm:px-4 py-2.5 bg-[#171923] hover:bg-[#202230] text-amber-400 text-xs font-bold rounded-xl transition-all border border-amber-500/40 flex items-center gap-2 cursor-pointer"
+          >
+            <ShoppingBag className="w-3.5 h-3.5 text-amber-400" />
+            <span>{isUrdu ? '2. بک اے رائیڈ' : '2. Book a Ride'}</span>
+          </button>
 
-            {/* Quick 3 Table Switcher CTA Buttons */}
-            <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 pt-2">
-              <button
-                onClick={() => {
-                  setActiveTableTab('technician');
-                  document.getElementById('booking-tables-section')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className="px-4 sm:px-5 py-3 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 text-xs sm:text-sm font-black rounded-xl transition-all shadow-lg hover:shadow-amber-500/20 flex items-center gap-2 cursor-pointer"
-              >
-                <Wrench className="w-4 h-4 text-slate-950" />
-                <span>{isUrdu ? '1. بک اے ٹیکنیشن' : '1. Book a Technician'}</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setActiveTableTab('ride');
-                  document.getElementById('booking-tables-section')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className="px-4 sm:px-5 py-3 bg-[#171923] hover:bg-[#202230] text-amber-400 text-xs sm:text-sm font-bold rounded-xl transition-all border border-amber-500/40 flex items-center gap-2 cursor-pointer"
-              >
-                <ShoppingBag className="w-4 h-4 text-amber-400" />
-                <span>{isUrdu ? '2. بک اے رائیڈ' : '2. Book a Ride'}</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setActiveTableTab('cargo');
-                  document.getElementById('booking-tables-section')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className="px-4 sm:px-5 py-3 bg-[#171923] hover:bg-[#202230] text-amber-400 text-xs sm:text-sm font-bold rounded-xl transition-all border border-amber-500/40 flex items-center gap-2 cursor-pointer"
-              >
-                <Truck className="w-4 h-4 text-amber-400" />
-                <span>{isUrdu ? '3. بک اے کارگو' : '3. Book a Cargo'}</span>
-              </button>
-
-              {/* Install PWA Button */}
-              <div className="pt-1 sm:pt-0">
-                <PWAInstallButton isUrdu={isUrdu} variant="hero" />
-              </div>
-            </div>
-
-            {/* Trust Badges */}
-            <div className="pt-3 flex flex-wrap items-center gap-4 sm:gap-6 text-xs text-slate-300 border-t border-slate-800">
-              <div className="flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>{isUrdu ? '100% تصدیق شدہ خانیوال ورکرز (CNIC Checked)' : '100% Verified Local Pros'}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>{isUrdu ? '20 تا 35 منٹ تیز رفتار رسائی' : 'Under 35-Min Dispatch'}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Coins className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>{isUrdu ? 'کیش آن ڈیلیوری / جاز کیش' : 'Cash on Delivery & JazzCash'}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-5 relative min-h-[280px] lg:min-h-full">
-            <img
-              src="/src/assets/images/hero_delivery_service_1793035359071.jpg"
-              alt="Khanewal Connect Services"
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800&auto=format&fit=crop&q=80';
-              }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0b0c12] via-transparent lg:bg-gradient-to-r lg:from-[#0b0c12] lg:to-transparent" />
-          </div>
+          <button
+            onClick={() => {
+              setActiveTableTab('cargo');
+              document.getElementById('booking-tables-section')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="px-3.5 sm:px-4 py-2.5 bg-[#171923] hover:bg-[#202230] text-amber-400 text-xs font-bold rounded-xl transition-all border border-amber-500/40 flex items-center gap-2 cursor-pointer"
+          >
+            <Truck className="w-3.5 h-3.5 text-amber-400" />
+            <span>{isUrdu ? '3. بک اے کارگو' : '3. Book a Cargo'}</span>
+          </button>
         </div>
-      </section>
+
+        <div className="flex items-center gap-2">
+          <PWAInstallButton isUrdu={isUrdu} variant="hero" />
+        </div>
+      </div>
 
       {/* 3. KHANEWAL LOCAL OPERATIONAL COVERAGE STRIP */}
       <section className="bg-[#0f1118] text-white rounded-2xl border border-amber-500/20 p-5 shadow-md">
@@ -916,67 +1191,6 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
               <span>{isUrdu ? 'ایڈمن واٹس ایپ پر رجسٹریشن' : 'WhatsApp Admin Onboarding'}</span>
             </a>
           </div>
-        </div>
-      </section>
-
-      {/* 6. LOCAL KHANEWAL CUSTOMER TESTIMONIALS */}
-      <section className="bg-[#0b0d14] rounded-3xl border border-amber-500/20 p-6 md:p-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h3 className="text-xl font-black text-white">
-              {isUrdu ? 'خانیوال کے شہریوں کا بھروسہ' : 'What Khanewal Residents Say'}
-            </h3>
-            <p className="text-xs text-slate-400">
-              {isUrdu ? 'شہر اور نواحی کالونیوں سے تصدیق شدہ کسٹمر ریویوز' : 'Real reviews from verified residents in Peoples Colony, Civil Lines, and Cantt'}
-            </p>
-          </div>
-          <div className="flex items-center gap-1 text-amber-400 font-bold text-sm bg-amber-950/60 border border-amber-500/30 px-3 py-1.5 rounded-full w-fit">
-            <Star className="w-4 h-4 fill-amber-400" />
-            <span>4.9 / 5.0 (خانیوال لوکل ریٹنگ)</span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            {
-              name: 'ملک ارسلان اعوان',
-              area: 'پیپلز کالونی، خانیوال',
-              trade: 'الیکٹریشن سروس',
-              comment: 'رات 9 بجے ڈی بی بریکر ٹرپ ہو گیا تھا۔ ایپ سے بک کیا، 20 منٹ میں طارق صاحب ٹیکنیشن پہنچ گئے اور مناسب ریٹ پر مکمل فالٹ درست کر دیا۔'
-            },
-            {
-              name: 'چوہدری عثمان ظفر',
-              area: 'سیول لائنز، خانیوال',
-              trade: 'لوڈر رکشہ کارگو',
-              comment: 'غلہ منڈی سے 8 بوریاں دکان پر لانی تھیں۔ بشیر ڈرائیور نے بروقت اور بحفاظت سامان پہنچایا۔ فون نمبر اور لائیو اسٹیٹس ڈیش بورڈ پر نظر آ رہا تھا۔'
-            },
-            {
-              name: 'ڈاکٹر فرہاد خان',
-              area: 'ماڈل ٹاؤن، خانیوال',
-              trade: 'فوری کوریئر رائیڈر',
-              comment: 'کلینک کے لیے فوری میڈیسن چاہیے تھیں۔ رائیڈر نے 15 منٹ میں مین بازار سے خرید کر پہنچا دیں۔ انتہائی شائستہ اور پروفیشنل سروس۔'
-            }
-          ].map((rev, idx) => (
-            <div key={idx} className="bg-[#12141e] border border-slate-800 p-4 rounded-2xl space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-bold text-white text-xs">{rev.name}</h4>
-                  <span className="text-[10px] text-amber-400 block">{rev.area}</span>
-                </div>
-                <span className="text-[10px] font-bold text-slate-400 bg-slate-900 border border-slate-700 px-2 py-0.5 rounded-md">
-                  {rev.trade}
-                </span>
-              </div>
-              <p className="text-xs text-slate-300 leading-relaxed italic">
-                "{rev.comment}"
-              </p>
-              <div className="flex items-center gap-1 text-amber-400">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
-                ))}
-              </div>
-            </div>
-          ))}
         </div>
       </section>
 

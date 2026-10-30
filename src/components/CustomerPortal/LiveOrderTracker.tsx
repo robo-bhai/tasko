@@ -87,20 +87,7 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
       ...prev,
       { sender: 'user', text: chatMessage, time }
     ]);
-    const userText = chatMessage;
     setChatMessage('');
-
-    // Provider reply
-    setTimeout(() => {
-      setChatHistory(prev => [
-        ...prev,
-        { 
-          sender: 'provider', 
-          text: `آپ کا پیغام ("${userText}") مل گیا ہے۔ میں راستے میں ہوں، جلد پہنچ رہا ہوں۔`, 
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-        }
-      ]);
-    }, 1200);
   };
 
   // Steps calculation
@@ -117,24 +104,24 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
   else if (activeOrder.status === 'completed') currentStep = 3;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden my-auto flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-[#0e1017] rounded-3xl max-w-2xl w-full shadow-2xl border border-amber-500/30 overflow-hidden my-auto flex flex-col max-h-[94vh] text-white">
         {/* Header */}
-        <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-xs text-white shadow-xs">
-              <Radio className="w-5 h-5 animate-pulse" />
+        <div className="px-4 sm:px-5 py-3.5 sm:py-4 bg-[#141622] border-b border-amber-500/20 text-white flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-400/20 border border-amber-400/40 text-amber-400 flex items-center justify-center font-bold text-xs shadow-xs">
+              <Radio className="w-4 h-4 animate-pulse" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm sm:text-base font-extrabold text-white">
+                <h3 className="text-xs sm:text-base font-black text-white">
                   لائیو آرڈر و ڈسپیچ ٹریکر
                 </h3>
-                <span className="font-mono text-xs text-blue-300 font-bold bg-blue-950 border border-blue-800 px-2 py-0.5 rounded-md">
+                <span className="font-mono text-xs text-amber-300 font-bold bg-amber-950/80 border border-amber-600/40 px-2 py-0.5 rounded-md">
                   {activeOrder.id}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-300">خانیوال سٹی اور قریبی علاقوں میں ریئل ٹائم اپ ڈیٹس</p>
+              <p className="text-[10px] text-amber-400/80">خانیوال سٹی اور قریبی علاقوں میں ریئل ٹائم اپ ڈیٹس</p>
             </div>
           </div>
 
@@ -144,7 +131,7 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
               <select
                 value={activeOrder.id}
                 onChange={(e) => onSelectOrder(e.target.value)}
-                className="bg-slate-800 text-white text-xs rounded-xl px-2.5 py-1.5 border border-slate-700"
+                className="bg-slate-900 text-amber-400 text-xs rounded-xl px-2 py-1 border border-amber-500/30"
               >
                 {orders.map((o) => (
                   <option key={o.id} value={o.id}>
@@ -157,14 +144,14 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
             <button
               onClick={handleManualRefresh}
               title="Refresh Status"
-              className="p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
             >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-amber-400' : ''}`} />
             </button>
 
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+              className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -172,9 +159,9 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
         </div>
 
         {/* Scrollable Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-5">
+        <div className="p-3 sm:p-5 overflow-y-auto space-y-4">
           {/* Progress Stepper */}
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5">
+          <div className="bg-[#121420] border border-slate-800 rounded-2xl p-3 sm:p-4">
             <div className="grid grid-cols-4 gap-1.5 sm:gap-2 relative">
               {steps.map((st, i) => {
                 const isPassed = i <= currentStep && activeOrder.status !== 'cancelled';
@@ -184,26 +171,26 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                     <div
                       className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                         isPassed
-                          ? 'bg-blue-600 text-white shadow-xs'
-                          : 'bg-slate-200 text-slate-500'
-                      } ${isCurrent ? 'ring-4 ring-blue-100 scale-105' : ''}`}
+                          ? 'bg-amber-400 text-slate-950 shadow-xs'
+                          : 'bg-slate-800 text-slate-500'
+                      } ${isCurrent ? 'ring-4 ring-amber-400/30 scale-105' : ''}`}
                     >
-                      {isPassed ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
+                      {isPassed ? <CheckCircle2 className="w-4 h-4 text-slate-950" /> : i + 1}
                     </div>
-                    <span className="text-[11px] sm:text-xs font-bold text-slate-900 mt-2 line-clamp-1">{st.label}</span>
-                    <span className="text-[9px] sm:text-[10px] text-slate-500 hidden sm:block">{st.desc}</span>
+                    <span className="text-[10px] sm:text-xs font-bold text-white mt-2 line-clamp-1">{st.label}</span>
+                    <span className="text-[9px] sm:text-[10px] text-slate-400 hidden sm:block">{st.desc}</span>
                   </div>
                 );
               })}
             </div>
 
             {/* Status note banner */}
-            <div className="mt-4 pt-3 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-2">
+            <div className="mt-3 pt-3 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-2">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                <span className="font-semibold text-slate-800">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="font-semibold text-slate-300">
                   موجودہ کیفیت:{' '}
-                  <span className="font-bold text-blue-700">
+                  <span className="font-bold text-amber-400">
                     {activeOrder.status === 'pending' && 'ورکر کی تصدیق کا انتظار'}
                     {activeOrder.status === 'assigned' && 'ورکر تفویض ہو چکا ہے'}
                     {activeOrder.status === 'on_the_way' && 'ورکر آپ کے پتے کی طرف روانہ ہے'}
@@ -214,9 +201,9 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                 </span>
               </div>
               {activeOrder.etaMinutes && activeOrder.status !== 'completed' && (
-                <div className="flex items-center gap-1.5 text-slate-600 font-mono">
-                  <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  <span>متوقع پہنچنے کا وقت: <strong className="text-slate-900">~{activeOrder.etaMinutes} منٹ</strong></span>
+                <div className="flex items-center gap-1.5 text-slate-300 font-mono text-xs">
+                  <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>متوقع پہنچنے کا وقت: <strong className="text-amber-400">~{activeOrder.etaMinutes} منٹ</strong></span>
                 </div>
               )}
             </div>

@@ -79,65 +79,65 @@ export const OrderHistoryModal: React.FC<OrderHistoryModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6 flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-[#0e1017] rounded-3xl max-w-3xl w-full shadow-2xl border border-amber-500/30 overflow-hidden my-auto flex flex-col max-h-[94vh]">
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-[#141622] border-b border-amber-500/20 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-              <Clock className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-xl bg-amber-400/20 border border-amber-400/40 text-amber-400 flex items-center justify-center">
+              <Clock className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Order History & Receipts</h3>
-              <p className="text-xs text-slate-300">Track current jobs, inspect receipts, and rate verified providers</p>
+              <h3 className="text-sm sm:text-base font-black text-white">آرڈرز کی تاریخ اور رسیدیں (Order History)</h3>
+              <p className="text-[10px] sm:text-xs text-amber-400/80">لائیو ٹریکنگ، تصدیق شدہ رسید اور کاریگر ریٹنگ</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors"
+            className="text-slate-400 hover:text-white p-1 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Filter Bar */}
-        <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-4 shrink-0">
-          <div className="flex items-center gap-1.5 p-1 bg-slate-200/70 rounded-lg text-xs font-semibold">
+        <div className="px-3 sm:px-6 py-2.5 bg-[#10121b] border-b border-slate-800 flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-1 p-1 bg-slate-900 rounded-xl text-[11px] font-bold">
             <button
               onClick={() => setFilter('all')}
-              className={`px-3 py-1 rounded-md transition-colors ${
-                filter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                filter === 'all' ? 'bg-amber-400 text-slate-950 font-black shadow-xs' : 'text-slate-400 hover:text-white'
               }`}
             >
-              All Orders ({orders.length})
+              تمام ({orders.length})
             </button>
             <button
               onClick={() => setFilter('active')}
-              className={`px-3 py-1 rounded-md transition-colors ${
-                filter === 'active' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                filter === 'active' ? 'bg-amber-400 text-slate-950 font-black shadow-xs' : 'text-slate-400 hover:text-white'
               }`}
             >
-              Active ({orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length})
+              جاری ({orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length})
             </button>
             <button
               onClick={() => setFilter('completed')}
-              className={`px-3 py-1 rounded-md transition-colors ${
-                filter === 'completed' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                filter === 'completed' ? 'bg-emerald-500 text-slate-950 font-black shadow-xs' : 'text-slate-400 hover:text-white'
               }`}
             >
-              Completed ({orders.filter(o => o.status === 'completed').length})
+              مکمل ({orders.filter(o => o.status === 'completed').length})
             </button>
           </div>
 
-          <span className="text-xs text-slate-400 font-mono">
+          <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
             {filteredOrders.length} records
           </span>
         </div>
 
         {/* Order List */}
-        <div className="p-6 overflow-y-auto space-y-4">
+        <div className="p-3 sm:p-5 overflow-y-auto space-y-3">
           {filteredOrders.length === 0 ? (
-            <div className="text-center py-12 text-slate-500 space-y-2">
+            <div className="text-center py-12 text-slate-400 space-y-2">
               <p className="text-sm font-semibold">No orders in this view</p>
               <p className="text-xs">Your placed orders will show up here.</p>
             </div>
@@ -147,90 +147,90 @@ export const OrderHistoryModal: React.FC<OrderHistoryModalProps> = ({
               return (
                 <div
                   key={order.id}
-                  className="rounded-xl border border-slate-200 bg-white p-4 space-y-3 hover:border-slate-300 transition-colors"
+                  className="rounded-2xl border border-slate-800 bg-[#121420] p-3.5 sm:p-4 space-y-2.5 hover:border-amber-500/40 transition-colors text-white"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
                     <div className="flex items-center gap-2">
-                      <div className="p-1.5 rounded-lg bg-slate-50 border border-slate-200">
+                      <div className="p-1.5 rounded-lg bg-slate-900 border border-slate-700">
                         {getCategoryIcon(order.category)}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-slate-900">{order.id}</span>
-                          <span className="text-slate-300">·</span>
-                          <span className="text-xs text-slate-500 font-medium capitalize">
+                          <span className="font-mono text-xs font-bold text-amber-400">{order.id}</span>
+                          <span className="text-slate-600">·</span>
+                          <span className="text-xs text-slate-300 font-medium capitalize">
                             {order.category.replace('_', ' ')}
                           </span>
                         </div>
-                        <span className="text-[11px] text-slate-400">
+                        <span className="text-[10px] text-slate-400">
                           {new Date(order.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
                         </span>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold capitalize ${
+                      <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold capitalize ${
                         order.status === 'completed' 
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40'
                           : order.status === 'cancelled'
-                          ? 'bg-red-50 text-red-700 border border-red-200'
-                          : 'bg-blue-50 text-blue-700 border border-blue-200'
+                          ? 'bg-red-950/80 text-red-300 border border-red-500/40'
+                          : 'bg-amber-950/80 text-amber-300 border border-amber-500/40'
                       }`}>
                         {order.status.replace('_', ' ')}
                       </span>
-                      <span className="font-mono font-bold text-sm text-slate-900">
+                      <span className="font-mono font-black text-sm text-amber-400">
                         PKR {order.pricing.total.toLocaleString()}
                       </span>
                     </div>
                   </div>
 
                   {/* Body description */}
-                  <div className="text-xs text-slate-600 space-y-1">
+                  <div className="text-xs text-slate-300 space-y-1">
                     {order.category === 'custom_delivery' && order.deliveryDetails && (
-                      <p className="font-semibold text-slate-800 line-clamp-1">
-                        Items: {order.deliveryDetails.itemName}
+                      <p className="font-semibold text-white line-clamp-1">
+                        سامان: {order.deliveryDetails.itemName}
                       </p>
                     )}
                     {order.category === 'home_services' && order.serviceDetails && (
-                      <p className="font-semibold text-slate-800">
-                        Service: {order.serviceDetails.serviceName} ({order.serviceDetails.issueDescription})
+                      <p className="font-semibold text-white">
+                        سروس: {order.serviceDetails.serviceName} ({order.serviceDetails.issueDescription})
                       </p>
                     )}
                     {order.category === 'transport_cargo' && order.transportDetails && (
-                      <p className="font-semibold text-slate-800">
-                        Cargo: {order.transportDetails.vehicleName} · {order.transportDetails.cargoDescription}
+                      <p className="font-semibold text-white">
+                        گاڑی: {order.transportDetails.vehicleName} · {order.transportDetails.cargoDescription}
                       </p>
                     )}
 
-                    <div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
+                      <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                       <span className="truncate">{order.deliveryAddress}</span>
                     </div>
                   </div>
 
                   {/* Review Banner if already rated */}
                   {order.review && (
-                    <div className="p-2.5 rounded-lg bg-amber-50/60 border border-amber-200/80 text-xs text-amber-950 flex items-center justify-between">
+                    <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/30 text-xs text-amber-200 flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className="flex text-amber-500">
+                        <div className="flex text-amber-400">
                           {Array.from({ length: order.review.rating }).map((_, i) => (
                             <Star key={i} className="w-3 h-3 fill-amber-400" />
                           ))}
                         </div>
                         <span className="italic line-clamp-1">"{order.review.comment}"</span>
                       </div>
-                      <span className="text-[10px] text-amber-700 font-mono">Reviewed</span>
+                      <span className="text-[10px] text-amber-400 font-mono">Reviewed</span>
                     </div>
                   )}
 
                   {/* Action buttons */}
-                  <div className="pt-2 flex items-center justify-between text-xs">
+                  <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-800/80">
                     <button
                       onClick={() => setReceiptOrder(order)}
-                      className="text-slate-500 hover:text-slate-800 flex items-center gap-1 font-medium"
+                      className="text-amber-400 hover:text-amber-300 flex items-center gap-1 font-semibold cursor-pointer"
                     >
                       <Receipt className="w-3.5 h-3.5" />
-                      <span>View Receipt</span>
+                      <span>رسید دیکھیں (Receipt)</span>
                     </button>
 
                     <div className="flex items-center gap-2">
@@ -240,9 +240,9 @@ export const OrderHistoryModal: React.FC<OrderHistoryModalProps> = ({
                             onClose();
                             onOpenLiveTracker(order);
                           }}
-                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg flex items-center gap-1"
+                          className="px-3 py-1.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black text-xs rounded-xl flex items-center gap-1 cursor-pointer"
                         >
-                          <span>Track Live GPS</span>
+                          <span>لائیو ٹریک کریں</span>
                           <ChevronRight className="w-3.5 h-3.5" />
                         </button>
                       )}
@@ -255,10 +255,10 @@ export const OrderHistoryModal: React.FC<OrderHistoryModalProps> = ({
                             setComment(order.review?.comment || '');
                             setSelectedTags(order.review?.tags || ['Punctual', 'Professional']);
                           }}
-                          className="px-3 py-1.5 border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold rounded-lg flex items-center gap-1"
+                          className="px-3 py-1.5 border border-amber-500/40 hover:bg-slate-800 text-amber-300 font-bold text-xs rounded-xl flex items-center gap-1 cursor-pointer"
                         >
-                          <Star className="w-3.5 h-3.5 text-amber-500" />
-                          <span>{order.review ? 'Edit Review' : 'Rate Provider'}</span>
+                          <Star className="w-3.5 h-3.5 text-amber-400" />
+                          <span>{order.review ? 'ریویو تبدیل کریں' : 'کاریگر کو ریٹ کریں'}</span>
                         </button>
                       )}
                     </div>

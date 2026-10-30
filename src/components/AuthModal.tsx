@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User } from '../types';
-import { Store, DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD, KHANEWAL_LOCAL_AREAS } from '../services/store';
+import { Store, KHANEWAL_LOCAL_AREAS } from '../services/store';
 import { Language, translations } from '../i18n/translations';
 import { 
   X, 
@@ -142,73 +142,73 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   )}`;
 
   return (
-    <div className={`fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 ${isUrdu ? 'rtl' : 'ltr'}`}>
-      <div className="bg-[#0f1118] text-white rounded-3xl max-w-lg w-full shadow-2xl border border-amber-500/30 overflow-hidden my-6">
+    <div className={`fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 ${isUrdu ? 'rtl' : 'ltr'}`}>
+      <div className="bg-[#0f1118] text-white rounded-2xl sm:rounded-3xl max-w-lg w-full shadow-2xl border border-amber-500/30 overflow-hidden my-auto max-h-[94vh] flex flex-col">
         {/* Header */}
-        <div className="px-6 py-5 bg-[#090a0f] text-white flex items-center justify-between border-b border-amber-500/20">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 text-slate-950 flex items-center justify-center font-black text-sm shadow-md">
+        <div className="px-3.5 py-3 sm:px-6 sm:py-4 bg-[#090a0f] text-white flex items-center justify-between border-b border-amber-500/20 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 text-slate-950 flex items-center justify-center font-black text-xs sm:text-sm shadow-md shrink-0">
               KC
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-extrabold text-white tracking-tight">
-                  {isUrdu ? 'خانیوال کنیکٹ اکاؤنٹ پورٹل' : 'Khanewal Connect Portal'}
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h3 className="text-xs sm:text-base font-extrabold text-white tracking-tight">
+                  {isUrdu ? 'خانیوال کنیکٹ اکاؤنٹ' : 'Khanewal Connect'}
                 </h3>
-                <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded-full">
+                <span className="text-[9px] sm:text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 sm:px-2 py-0.5 rounded-full">
                   خانیوال لوکل
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
-                {isUrdu ? 'صرف خانیوال شہر اور قریبی علاقوں کے لیے محفوظ لاگ ان' : 'Secure Access for Khanewal City & Surrounding Areas'}
+              <p className="text-[10px] sm:text-xs text-slate-400 line-clamp-1">
+                {isUrdu ? 'صرف خانیوال شہر و قریبی علاقوں کے لیے' : 'Khanewal City & Surrounding Areas'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-amber-400 p-1.5 rounded-xl transition-colors hover:bg-slate-800"
+            className="text-slate-400 hover:text-amber-400 p-1 rounded-lg transition-colors hover:bg-slate-800"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
         {/* Notice reason banner if redirected */}
         {noticeReason && (
-          <div className="bg-amber-950/40 border-b border-amber-500/30 px-6 py-3 flex items-center gap-2.5 text-xs text-amber-300 font-medium">
-            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>{noticeReason}</span>
+          <div className="bg-amber-950/40 border-b border-amber-500/30 px-3.5 py-2 sm:px-6 sm:py-3 flex items-center gap-2 text-[11px] sm:text-xs text-amber-300 font-medium shrink-0">
+            <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
+            <span className="line-clamp-2">{noticeReason}</span>
           </div>
         )}
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-800 bg-[#0a0c12] p-1.5 gap-1.5 text-xs font-semibold">
+        <div className="flex border-b border-slate-800 bg-[#0a0c12] p-1 gap-1 text-[11px] sm:text-xs font-semibold shrink-0">
           <button
             onClick={() => { setActiveTab('login'); setErrorMessage(''); }}
-            className={`flex-1 py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-3 rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
               activeTab === 'login'
                 ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold shadow-md'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
             }`}
           >
-            <UserCheck className="w-3.5 h-3.5" />
-            <span>{isUrdu ? 'لاگ ان کریں (Sign In)' : 'Sign In'}</span>
+            <UserCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+            <span className="truncate">{isUrdu ? 'لاگ ان' : 'Sign In'}</span>
           </button>
           
           <button
             onClick={() => { setActiveTab('customer_signup'); setErrorMessage(''); }}
-            className={`flex-1 py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-3 rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
               activeTab === 'customer_signup'
                 ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold shadow-md'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
             }`}
           >
-            <ShoppingBag className="w-3.5 h-3.5" />
-            <span>{isUrdu ? 'نیا کسٹمر اکاؤنٹ بنائیں' : 'Create Customer Account'}</span>
+            <ShoppingBag className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+            <span className="truncate">{isUrdu ? 'نیا اکاؤنٹ بنائیں' : 'Create Account'}</span>
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-6">
+        <div className="p-3.5 sm:p-6 overflow-y-auto flex-1">
           {/* Alerts */}
           {errorMessage && (
             <div className="mb-4 p-3 bg-red-950/60 border border-red-500/40 rounded-xl text-red-200 text-xs flex items-center gap-2">
@@ -263,31 +263,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     }`}
                   />
                 </div>
-              </div>
-
-              {/* Helper Quick Fill for Admin & Verified Worker */}
-              <div className="bg-slate-900/90 border border-amber-500/20 rounded-xl p-3 text-[11px] text-slate-300 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 font-bold text-amber-400">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>{isUrdu ? 'ایڈمن لاگ ان کواڈینشلز:' : 'Admin & Staff Access:'}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLoginIdentifier(DEFAULT_ADMIN_USERNAME);
-                      setLoginPassword(DEFAULT_ADMIN_PASSWORD);
-                    }}
-                    className="text-[10px] text-amber-400 hover:text-amber-300 underline font-semibold cursor-pointer"
-                  >
-                    {isUrdu ? 'خودکار درج کریں' : 'Auto Fill Admin'}
-                  </button>
-                </div>
-                <p className="text-slate-400 leading-relaxed">
-                  {isUrdu 
-                    ? `ایڈمن صارف نام: ${DEFAULT_ADMIN_USERNAME} | پاس ورڈ GitHub Secrets سے سنک ہے۔`
-                    : `Admin: ${DEFAULT_ADMIN_USERNAME} (Loaded from GitHub Secrets).`}
-                </p>
               </div>
 
               <button
@@ -347,9 +322,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">
+                  <label className="block text-slate-300 font-bold mb-1 text-[10px] sm:text-xs">
                     {isUrdu ? 'پاس ورڈ (Password)' : 'Password'} *
                   </label>
                   <input
@@ -358,20 +333,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={custPassword}
                     onChange={(e) => setCustPassword(e.target.value)}
                     placeholder={isUrdu ? 'کم از کم 6 ہندسے' : 'Min 6 characters'}
-                    className="w-full rounded-xl bg-slate-900 border border-slate-700 text-white px-3 py-2 focus:border-amber-400 focus:outline-hidden"
+                    className="w-full text-xs sm:text-sm rounded-xl bg-slate-900 border border-slate-700 text-white px-3 py-2 sm:py-2.5 focus:border-amber-400 focus:outline-hidden"
                   />
                 </div>
 
                 {/* KHANEWAL LOCAL OPERATIONAL AREAS (Replaced Lahore/Karachi) */}
                 <div>
-                  <label className="block text-amber-400 font-bold mb-1 flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                  <label className="block text-amber-400 font-bold mb-1 text-[10px] sm:text-xs flex items-center gap-1">
+                    <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400" />
                     <span>{isUrdu ? 'خانیوال کا علاقہ / سیکٹر *' : 'Khanewal Local Area *'}</span>
                   </label>
                   <select
                     value={custAreaId}
                     onChange={(e) => setCustAreaId(e.target.value)}
-                    className="w-full rounded-xl bg-slate-900 border border-amber-500/50 text-white px-3 py-2 font-medium focus:border-amber-400 focus:outline-hidden cursor-pointer"
+                    className="w-full text-xs sm:text-sm rounded-xl bg-slate-900 border border-amber-500/50 text-white px-3 py-2 sm:py-2.5 font-medium focus:border-amber-400 focus:outline-hidden cursor-pointer"
                   >
                     {KHANEWAL_LOCAL_AREAS.map(area => (
                       <option key={area.id} value={area.id} className="bg-slate-900 text-white">
@@ -383,7 +358,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-bold mb-1">
+                <label className="block text-slate-300 font-bold mb-1 text-[10px] sm:text-xs">
                   {isUrdu ? 'گھر / دکان کا مکمل پتہ (گلی، مکان نمبر)' : 'Street & House Address in Khanewal'}
                 </label>
                 <div className="relative">
@@ -393,7 +368,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={custAddress}
                     onChange={(e) => setCustAddress(e.target.value)}
                     placeholder={isUrdu ? 'مثلاً مکان 12، گلی 4، بالمقابل جامع مسجد' : 'e.g. House #12, Street #4'}
-                    className={`w-full rounded-xl bg-slate-900 border border-slate-700 text-white py-2 focus:border-amber-400 focus:outline-hidden ${
+                    className={`w-full text-xs sm:text-sm rounded-xl bg-slate-900 border border-slate-700 text-white py-2 sm:py-2.5 focus:border-amber-400 focus:outline-hidden ${
                       isUrdu ? 'pr-8 pl-3' : 'pl-8 pr-3'
                     }`}
                   />
@@ -403,7 +378,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black rounded-xl transition-all shadow-lg hover:shadow-amber-500/20 mt-2 disabled:opacity-50 cursor-pointer"
+                className="w-full py-2.5 sm:py-3 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black text-xs sm:text-sm rounded-xl transition-all shadow-lg hover:shadow-amber-500/20 mt-2 disabled:opacity-50 cursor-pointer"
               >
                 {isSubmitting ? (isUrdu ? 'اکاؤنٹ بن رہا ہے...' : 'Creating...') : (isUrdu ? 'کسٹمر اکاؤنٹ مکمل کریں' : 'Complete Registration')}
               </button>
@@ -411,12 +386,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           )}
 
           {/* Provider / Driver Onboarding Banner (Strictly directs to Admin WhatsApp) */}
-          <div className="mt-5 pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
+          <div className="mt-4 pt-3 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs bg-slate-900/60 p-2.5 sm:p-3 rounded-2xl border border-slate-800">
             <div className="text-center sm:text-start">
-              <span className="font-bold text-amber-400 block">
+              <span className="font-bold text-amber-400 block text-[11px] sm:text-xs">
                 {isUrdu ? 'کاریگر، رائیڈر یا لوڈر ڈرائیور ہیں؟' : 'Are you a technician, rider, or cargo driver?'}
               </span>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[10px] sm:text-[11px] text-slate-400">
                 {isUrdu ? 'تصدیق اور آن بورڈنگ کے لیے ایڈمن واٹس ایپ پر رابطہ کریں۔' : 'Contact Khanewal Connect admin on WhatsApp to get registered.'}
               </span>
             </div>
@@ -424,10 +399,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               href={partnerOnboardUrl}
               target="_blank"
               rel="noreferrer"
-              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-[11px] flex items-center gap-1.5 transition-colors shrink-0 shadow-xs"
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-[10px] sm:text-xs flex items-center gap-1.5 transition-colors shrink-0 shadow-xs"
             >
               <MessageCircle className="w-3.5 h-3.5" />
-              <span>{isUrdu ? 'ایڈمن واٹس ایپ آن بورڈنگ' : 'WhatsApp Admin'}</span>
+              <span>{isUrdu ? 'ایڈمن واٹس ایپ' : 'WhatsApp Admin'}</span>
             </a>
           </div>
         </div>

@@ -20,6 +20,7 @@ import { ProviderDashboard } from './components/ProviderPortal/ProviderDashboard
 import { AdminDashboard } from './components/AdminPortal/AdminDashboard';
 import { AuthModal } from './components/AuthModal';
 import { FloatingWhatsAppButton } from './components/FloatingWhatsAppButton';
+import { BottomNavigation } from './components/BottomNavigation';
 import { 
   ShoppingBag, 
   Wrench, 
@@ -202,6 +203,12 @@ export default function App() {
       ? 'السلام علیکم! میں Khanewal Connect پر بطور سروس پارٹنر / کاریگر / ڈرائیور آن بورڈ ہونا چاہتا ہوں۔ برائے مہربانی مجھے رجسٹر کریں۔'
       : 'Hello Admin, I want to onboard as a verified service partner on Khanewal Connect. Please register me.'
   )}`;
+
+  const handleLogout = () => {
+    Store.logout();
+    setCurrentUser(null);
+    setActivePortal('customer');
+  };
 
   return (
     <div className={`min-h-screen bg-[#07080c] flex flex-col font-sans text-slate-100 selection:bg-amber-400 selection:text-slate-950 ${isUrdu ? 'rtl' : 'ltr'}`}>
@@ -491,6 +498,26 @@ export default function App() {
 
       {/* Floating WhatsApp Support Button */}
       <FloatingWhatsAppButton isUrdu={isUrdu} />
+
+      {/* Fixed Bottom Navigation View */}
+      <BottomNavigation
+        currentUser={currentUser}
+        activeOrders={navbarActiveOrders}
+        onNavigateHome={() => {
+          setActivePortal('customer');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onOpenOrders={() => setIsHistoryModalOpen(true)}
+        onOpenBookNow={() => {
+          setActivePortal('customer');
+          setTimeout(() => {
+            document.getElementById('services-grid-section')?.scrollIntoView({ behavior: 'smooth' });
+          }, 60);
+        }}
+        onOpenAuth={handleOpenAuthModal}
+        onLogout={handleLogout}
+        isUrdu={isUrdu}
+      />
     </div>
   );
 }
