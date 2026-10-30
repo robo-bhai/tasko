@@ -834,6 +834,10 @@ export const Store = {
     return orders[idx];
   },
 
+  getPublicReviews: (): Order[] => {
+    return Store.getOrders().filter(o => o.review && o.status === 'completed');
+  },
+
   getServicesCatalog: (): HomeServiceItem[] => {
     return loadFromStorage<HomeServiceItem[]>(STORAGE_KEY_SERVICES, INITIAL_SERVICES);
   },

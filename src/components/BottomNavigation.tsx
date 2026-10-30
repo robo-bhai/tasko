@@ -51,7 +51,11 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       onNavigateHome();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (tab === 'orders') {
-      onOpenOrders();
+      if (!currentUser) {
+        onOpenAuth('login', isUrdu ? 'اپنے آرڈرز اور ہسٹری دیکھنے کے لیے لاگ ان کریں' : 'Please sign in to view your orders');
+      } else {
+        onOpenOrders();
+      }
     } else if (tab === 'wallet') {
       setIsWalletModalOpen(true);
     } else if (tab === 'profile') {

@@ -74,6 +74,9 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
   const [serviceSearchQuery, setServiceSearchQuery] = useState('');
   const [flyerSearchQuery, setFlyerSearchQuery] = useState('');
 
+  // Real Customer Reviews from Store (visible to all users)
+  const publicCustomerReviews = Store.getPublicReviews();
+
   // Strictly only show tracking for the current logged-in customer
   const customerActiveOrders = currentUser ? activeOrders : [];
   const latestActiveOrder = customerActiveOrders.find(
@@ -1192,6 +1195,96 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
             </a>
           </div>
         </div>
+      </section>
+
+      {/* 6. VERIFIED CUSTOMER REVIEWS & TESTIMONIALS (خانیوال کے شہریوں کے تاثرات) */}
+      <section className="bg-gradient-to-b from-[#0f1118] to-[#0a0b12] rounded-3xl border border-amber-500/30 p-5 md:p-8 space-y-6 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+          <div>
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 mb-1">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              <span>{isUrdu ? 'صارفین کی رائے اور تاثرات' : 'Verified Customer Testimonials'}</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-white">
+              {isUrdu ? 'خانیوال کے مطمئن شہریوں کے لائیو ریویوز' : 'Real Customer Reviews Across Khanewal'}
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {isUrdu 
+                ? 'جب بھی کوئی صارف کام مکمل ہونے پر ریویو دیتا ہے، وہ یہاں شفافیت کے ساتھ تمام صارفین کو نظر آتا ہے۔' 
+                : 'Authentic reviews submitted by verified Khanewal residents after successful job completion.'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-amber-400 bg-amber-950/80 border border-amber-500/40 px-3 py-1 rounded-full">
+              ★ {isUrdu ? '100% حقیقی ریویوز' : '100% Real Feedback'}
+            </span>
+          </div>
+        </div>
+
+        {/* Reviews Grid */}
+        {publicCustomerReviews.length === 0 ? (
+          <div className="p-8 rounded-2xl bg-[#121420] border border-slate-800 text-center space-y-2">
+            <div className="w-12 h-12 rounded-2xl bg-amber-400/10 text-amber-400 flex items-center justify-center mx-auto mb-2">
+              <Star className="w-6 h-6 fill-amber-400 text-amber-400" />
+            </div>
+            <p className="text-sm font-bold text-white">
+              {isUrdu ? 'ابھی کوئی نیا ریویو درج نہیں ہوا' : 'No customer reviews submitted yet'}
+            </p>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              {isUrdu 
+                ? 'جب آپ کا آرڈر مکمل ہوگا اور آپ ریویو دیں گے، تو آپ کا تجربہ یہاں تمام شہریوں کے لیے لائیو دکھایا جائے گا۔' 
+                : 'Book a service today and share your verified experience to help the Khanewal community!'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {publicCustomerReviews.map((revOrder) => (
+              <div 
+                key={revOrder.id}
+                className="p-4 rounded-2xl bg-[#121422] border border-amber-500/20 hover:border-amber-400/50 transition-all space-y-3 shadow-md"
+              >
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                  <div>
+                    <span className="font-bold text-white text-xs block">{revOrder.customerName}</span>
+                    <span className="text-[10px] text-amber-400 font-medium">
+                      {revOrder.category === 'home_services' 
+                        ? (revOrder.serviceDetails?.serviceName || 'Home Service') 
+                        : revOrder.category === 'transport_cargo' 
+                        ? (revOrder.transportDetails?.vehicleName || 'Cargo') 
+                        : 'Store Delivery'}
+                    </span>
+                  </div>
+
+                  <div className="flex text-amber-400">
+                    {Array.from({ length: revOrder.review?.rating || 5 }).map((_, i) => (
+                      <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                    ))}
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-200 italic leading-relaxed">
+                  "{revOrder.review?.comment}"
+                </p>
+
+                {revOrder.review?.tags && revOrder.review.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {revOrder.review.tags.map((tag, tIdx) => (
+                      <span key={tIdx} className="text-[10px] bg-slate-900 border border-slate-700 text-slate-300 px-2 py-0.5 rounded-md">
+                        ✓ {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] text-slate-400">
+                  <span>ورکر: {revOrder.assignedProviderName || 'مصدقہ کاریگر'}</span>
+                  <span>{new Date(revOrder.review?.reviewedAt || revOrder.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
     </div>

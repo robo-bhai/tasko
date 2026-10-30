@@ -412,6 +412,27 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
             </div>
           </div>
 
+          {/* Customer Cancel Order Option if still pending or assigned */}
+          {(activeOrder.status === 'pending' || activeOrder.status === 'assigned') && (
+            <div className="p-3.5 rounded-2xl bg-red-950/40 border border-red-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div>
+                <span className="font-bold text-red-300 block">کیا آپ یہ آرڈر منسوخ کرنا چاہتے ہیں؟</span>
+                <span className="text-slate-400 text-[11px]">ورکر کے روانہ ہونے سے پہلے آپ بلا معاوضہ آرڈر منسوخ کر سکتے ہیں۔</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('کیا آپ واقعی یہ آرڈر منسوخ کرنا چاہتے ہیں؟ (Are you sure you want to cancel this booking?)')) {
+                    Store.updateOrderStatus(activeOrder.id, 'cancelled', 'صارف کی طرف سے منسوخ کیا گیا (Cancelled by customer)');
+                  }
+                }}
+                className="px-3.5 py-1.5 bg-red-600/80 hover:bg-red-600 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer shrink-0"
+              >
+                آرڈر منسوخ کریں (Cancel)
+              </button>
+            </div>
+          )}
+
           {/* Rate & Review if completed */}
           {activeOrder.status === 'completed' && (
             <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">

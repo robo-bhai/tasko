@@ -353,7 +353,7 @@ export default function App() {
       <LiveOrderTracker
         isOpen={isLiveTrackerOpen}
         onClose={() => setIsLiveTrackerOpen(false)}
-        orders={orders}
+        orders={currentUser?.role === 'admin' ? orders : customerOrders}
         selectedOrderId={selectedOrderId}
         onSelectOrder={(id) => setSelectedOrderId(id)}
         onOpenReviewModal={(order) => {
@@ -369,7 +369,7 @@ export default function App() {
       <OrderHistoryModal
         isOpen={isHistoryModalOpen}
         onClose={() => setIsHistoryModalOpen(false)}
-        orders={orders}
+        orders={currentUser?.role === 'admin' ? orders : customerOrders}
         onOpenLiveTracker={handleOpenLiveTracker}
       />
 

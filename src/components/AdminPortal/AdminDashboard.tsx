@@ -108,8 +108,51 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [dispatchProviderName, setDispatchProviderName] = useState('');
   const [dispatchProviderPhone, setDispatchProviderPhone] = useState('');
   const [dispatchEtaMinutes, setDispatchEtaMinutes] = useState<number>(20);
-  const [dispatchNote, setDispatchNote] = useState('');
   const [dispatchProviderId, setDispatchProviderId] = useState<string>('');
+  const [dispatchNote, setDispatchNote] = useState('');
+
+  // Inline row-wise status & worker assignment state
+  const [inlineOrderId, setInlineOrderId] = useState<string | null>(null);
+  const [inlineWorkerName, setInlineWorkerName] = useState('');
+  const [inlineWorkerPhone, setInlineWorkerPhone] = useState('');
+  const [inlineWorkerEta, setInlineWorkerEta] = useState<number>(20);
+  const [inlineStatus, setInlineStatus] = useState<OrderStatus>('assigned');
+
+  const handleStartInlineAssign = (order: Order, targetStatus: OrderStatus = 'assigned') => {
+    setInlineOrderId(order.id);
+    setInlineStatus(targetStatus);
+    setInlineWorkerName(order.assignedProviderName || '');
+    setInlineWorkerPhone(order.assignedProviderPhone || '');
+    setInlineWorkerEta(order.etaMinutes || 20);
+  };
+
+  const handleSaveInlineAssign = (orderId: string) => {
+    Store.adminUpdateOrderDispatch(orderId, {
+      status: inlineStatus,
+      providerName: inlineWorkerName.trim() || undefined,
+      providerPhone: inlineWorkerPhone.trim() || undefined,
+      etaMinutes: Number(inlineWorkerEta) || undefined
+    });
+    setUserActionNotice(`Order ${orderId} updated! Worker: ${inlineWorkerName || 'Assigned'}, Status: ${inlineStatus}. Customer live tracker updated!`);
+    setTimeout(() => setUserActionNotice(''), 5000);
+    setInlineOrderId(null);
+  };
+
+  const handleDirectStatusChange = (order: Order, newStatus: OrderStatus) => {
+    if (newStatus === 'assigned') {
+      handleStartInlineAssign(order, 'assigned');
+      return;
+    }
+
+    Store.adminUpdateOrderDispatch(order.id, {
+      status: newStatus,
+      providerName: order.assignedProviderName,
+      providerPhone: order.assignedProviderPhone,
+      etaMinutes: order.etaMinutes
+    });
+    setUserActionNotice(`Order ${order.id} status changed to ${newStatus}. Updated live on customer tab!`);
+    setTimeout(() => setUserActionNotice(''), 4500);
+  };
 
   // Stats
   const activeOrdersCount = orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length;
@@ -626,107 +669,256 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-[11px]">
-                  <th className="py-3 px-4">Order ID & Date</th>
-                  <th className="py-3 px-4">Category</th>
+                  <th className="py-3 px-4">Order ID & Time</th>
                   <th className="py-3 px-4">Customer Details</th>
-                  <th className="py-3 px-4">Assigned Worker</th>
-                  <th className="py-3 px-4">Status & Dispatch Override</th>
-                  <th className="py-3 px-4 text-right">Amount</th>
-                  <th className="py-3 px-4 text-center">Inspect</th>
+                  <th className="py-3 px-4">Service / Cargo Name</th>
+                  <th className="py-3 px-4">Pay & Status</th>
+                  <th className="py-3 px-4 min-w-[300px]">Change Status & Worker Assignment</th>
+                  <th className="py-3 px-3 text-center">Inspect</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-slate-400">
+                    <td colSpan={6} className="text-center py-8 text-slate-400">
                       No matching orders found.
                     </td>
                   </tr>
                 ) : (
-                  filteredOrders.map((order) => (
-                    <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3.5 px-4">
-                        <span className="font-mono font-bold text-slate-900 block">{order.id}</span>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </td>
+                  filteredOrders.map((order) => {
+                    const isInline = inlineOrderId === order.id;
+                    const serviceTitle = order.category === 'home_services' 
+                      ? (order.serviceDetails?.serviceName || 'Home Service')
+                      : order.category === 'transport_cargo'
+                      ? (order.transportDetails?.vehicleName || 'Cargo Transport')
+                      : (order.deliveryDetails?.itemName || 'Store Delivery');
 
-                      <td className="py-3.5 px-4 capitalize">
-                        <span className="font-medium text-slate-700 block">
-                          {order.category.replace('_', ' ')}
-                        </span>
-                        <span className="text-[11px] text-slate-400">
-                          {order.paymentMethod.toUpperCase()}
-                        </span>
-                      </td>
+                    const serviceSubtitle = order.category === 'home_services'
+                      ? order.serviceDetails?.issueDescription
+                      : order.category === 'transport_cargo'
+                      ? `${order.transportDetails?.cargoDescription || 'Cargo'} (${order.transportDetails?.estimatedDistanceKm || 0} km)`
+                      : `Store: ${order.deliveryDetails?.storeName || 'Khanewal Market'}`;
 
-                      <td className="py-3.5 px-4">
-                        <span className="font-semibold text-slate-900 block">{order.customerName}</span>
-                        <span className="text-slate-500 font-mono text-[11px]">{order.customerPhone}</span>
-                      </td>
+                    return (
+                      <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
+                        {/* 1. Order ID */}
+                        <td className="py-3.5 px-4 align-top">
+                          <span className="font-mono font-bold text-slate-900 block text-sm">{order.id}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <span className="text-[10px] text-slate-500 block">
+                            {new Date(order.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                          </span>
+                        </td>
 
-                      <td className="py-3.5 px-4">
-                        {order.assignedProviderName ? (
-                          <div className="space-y-0.5">
-                            <span className="font-bold text-emerald-800 flex items-center gap-1">
-                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              {order.assignedProviderName}
+                        {/* 2. Customer Name & Details */}
+                        <td className="py-3.5 px-4 align-top">
+                          <span className="font-bold text-slate-900 block text-xs">{order.customerName}</span>
+                          <span className="text-slate-600 font-mono text-[11px] block">{order.customerPhone}</span>
+                          <span className="text-[11px] text-slate-400 line-clamp-2 max-w-[200px] mt-0.5" title={order.deliveryAddress}>
+                            📍 {order.deliveryAddress}
+                          </span>
+                        </td>
+
+                        {/* 3. Service Name */}
+                        <td className="py-3.5 px-4 align-top">
+                          <span className="font-bold text-slate-900 block text-xs">
+                            {serviceTitle}
+                          </span>
+                          <span className="text-[11px] text-slate-500 block line-clamp-1">
+                            {serviceSubtitle}
+                          </span>
+                          <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded font-medium inline-block mt-1 capitalize">
+                            {order.category.replace('_', ' ')}
+                          </span>
+                        </td>
+
+                        {/* 4. Pay & Status */}
+                        <td className="py-3.5 px-4 align-top">
+                          <span className="font-mono font-bold text-sm text-slate-900 block">
+                            PKR {order.pricing.total.toLocaleString()}
+                          </span>
+                          <div className="flex flex-wrap items-center gap-1 mt-1">
+                            <span className="text-[10px] bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.2 rounded font-semibold uppercase">
+                              {order.paymentMethod}
                             </span>
-                            <span className="text-[11px] text-slate-500 font-mono block">
-                              {order.assignedProviderPhone || 'No phone recorded'}
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold uppercase ${
+                              order.paymentStatus === 'paid' 
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}>
+                              {order.paymentStatus}
                             </span>
-                            {order.etaMinutes ? (
-                              <span className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded font-semibold inline-block">
-                                ETA: ~{order.etaMinutes} mins
-                              </span>
-                            ) : null}
                           </div>
-                        ) : (
+                        </td>
+
+                        {/* 5. Change Status & Worker Assignment (Live Inline Controls) */}
+                        <td className="py-3.5 px-4 align-top">
+                          <div className="space-y-1.5">
+                            {/* Direct Status Change Dropdown */}
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={isInline ? inlineStatus : order.status}
+                                onChange={(e) => handleDirectStatusChange(order, e.target.value as OrderStatus)}
+                                className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border shadow-2xs transition-colors cursor-pointer ${
+                                  order.status === 'completed'
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                    : order.status === 'cancelled'
+                                    ? 'bg-red-50 text-red-800 border-red-300'
+                                    : order.status === 'on_the_way'
+                                    ? 'bg-amber-50 text-amber-900 border-amber-300'
+                                    : order.status === 'assigned'
+                                    ? 'bg-blue-50 text-blue-900 border-blue-300'
+                                    : 'bg-slate-50 text-slate-800 border-slate-300'
+                                }`}
+                              >
+                                <option value="pending">⏳ Pending (انتظار برائے تصدیق)</option>
+                                <option value="assigned">👤 Assigned (ورکر تفویض کریں)</option>
+                                <option value="on_the_way">🛵 On The Way (راستے میں ہے)</option>
+                                <option value="work_started">🔧 Work Started (کام جاری ہے)</option>
+                                <option value="completed">✅ Completed (مکمل ہو گیا)</option>
+                                <option value="cancelled">❌ Cancelled (منسوخ کریں)</option>
+                              </select>
+                            </div>
+
+                            {/* Inline Worker Name and Phone Input Box when choosing Assign */}
+                            {isInline ? (
+                              <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-300 space-y-2 text-xs shadow-xs animate-in fade-in duration-200">
+                                <span className="font-bold text-amber-950 block">ورکر کی تفصیلات درج کریں:</span>
+
+                                {/* Quick select from existing registered providers */}
+                                {providersList.length > 0 && (
+                                  <select
+                                    onChange={(e) => {
+                                      const prov = providersList.find(p => p.id === e.target.value);
+                                      if (prov) {
+                                        setInlineWorkerName(prov.name);
+                                        setInlineWorkerPhone(prov.phone);
+                                      }
+                                    }}
+                                    className="w-full text-[11px] rounded-lg border border-amber-300 bg-white px-2 py-1 text-slate-800 font-medium"
+                                  >
+                                    <option value="">-- رجسٹرڈ ورکر چنیں (یا نیچے خود ٹائپ کریں) --</option>
+                                    {providersList.map(prov => (
+                                      <option key={prov.id} value={prov.id}>
+                                        {prov.name} ({prov.phone}) - {prov.serviceSkill || prov.providerCategory || 'Verified'}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="text-[10px] text-slate-600 font-medium block">Worker Name:</label>
+                                    <input
+                                      type="text"
+                                      value={inlineWorkerName}
+                                      onChange={(e) => setInlineWorkerName(e.target.value)}
+                                      placeholder="مثلاً: Muhammad Aslam"
+                                      className="w-full text-xs rounded-lg border border-slate-300 px-2 py-1 bg-white font-medium focus:ring-1 focus:ring-amber-500"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="text-[10px] text-slate-600 font-medium block">Worker Phone:</label>
+                                    <input
+                                      type="tel"
+                                      value={inlineWorkerPhone}
+                                      onChange={(e) => setInlineWorkerPhone(e.target.value)}
+                                      placeholder="0300-1234567"
+                                      className="w-full text-xs rounded-lg border border-slate-300 px-2 py-1 bg-white font-mono focus:ring-1 focus:ring-amber-500"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-2 pt-1">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[10px] text-slate-600 font-medium">ETA:</span>
+                                    <input
+                                      type="number"
+                                      value={inlineWorkerEta}
+                                      onChange={(e) => setInlineWorkerEta(Number(e.target.value))}
+                                      placeholder="20"
+                                      className="w-14 text-xs rounded-lg border border-slate-300 px-1.5 py-0.5 bg-white font-mono text-center"
+                                    />
+                                    <span className="text-[10px] text-slate-500">منٹ</span>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSaveInlineAssign(order.id)}
+                                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs cursor-pointer"
+                                    >
+                                      محفوظ کریں (Save)
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setInlineOrderId(null)}
+                                      className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-lg cursor-pointer"
+                                    >
+                                      منسوخ
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              /* Display assigned worker information if available */
+                              <div>
+                                {order.assignedProviderName ? (
+                                  <div className="flex items-start justify-between gap-2 p-1.5 rounded-lg bg-emerald-50/60 border border-emerald-200 text-[11px]">
+                                    <div>
+                                      <span className="font-bold text-emerald-800 flex items-center gap-1">
+                                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                        {order.assignedProviderName}
+                                      </span>
+                                      <span className="font-mono text-slate-600 block text-[10px]">
+                                        📞 {order.assignedProviderPhone || 'No phone'}
+                                      </span>
+                                      {order.etaMinutes && (
+                                        <span className="text-[10px] text-amber-800 font-semibold block">
+                                          ⏱ پہنچنے کا وقت: ~{order.etaMinutes} منٹ
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStartInlineAssign(order, order.status)}
+                                      className="text-[10px] text-blue-700 hover:text-blue-900 font-bold px-1.5 py-0.5 rounded-md hover:bg-blue-100 border border-blue-200 transition-colors cursor-pointer shrink-0"
+                                      title="Edit Worker or Phone"
+                                    >
+                                      تبدیل ورکر (Edit)
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartInlineAssign(order, 'assigned')}
+                                    className="text-[11px] text-amber-800 hover:text-amber-900 font-bold bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer w-fit"
+                                  >
+                                    <span>+ ورکر کا نام اور فون درج کریں</span>
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* 6. Inspect Full Details */}
+                        <td className="py-3.5 px-3 text-center align-top">
                           <button
-                            onClick={() => handleOpenDispatchModal(order)}
-                            className="text-[11px] text-amber-700 hover:text-amber-900 font-bold bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                            onClick={() => setSelectedOrderDetails(order)}
+                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors cursor-pointer"
+                            title="Inspect Order Details & Timeline"
                           >
-                            <span>+ Assign Worker</span>
+                            <Eye className="w-4 h-4" />
                           </button>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        <button
-                          onClick={() => handleOpenDispatchModal(order)}
-                          className={`text-xs font-bold px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer ${
-                            order.status === 'completed'
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
-                              : order.status === 'cancelled'
-                              ? 'bg-red-50 text-red-800 border-red-300 hover:bg-red-100'
-                              : order.status === 'on_the_way'
-                              ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
-                              : 'bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100'
-                          }`}
-                          title="Click to Assign Provider, Phone, ETA & Status Live"
-                        >
-                          <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
-                          <span className="capitalize">{order.status.replace('_', ' ')}</span>
-                          <span className="text-[10px] opacity-70">✎</span>
-                        </button>
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">
-                        PKR {order.pricing.total.toLocaleString()}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center">
-                        <button
-                          onClick={() => setSelectedOrderDetails(order)}
-                          className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors cursor-pointer"
-                          title="Inspect Order Audit"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

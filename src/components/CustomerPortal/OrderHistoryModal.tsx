@@ -235,16 +235,32 @@ export const OrderHistoryModal: React.FC<OrderHistoryModalProps> = ({
 
                     <div className="flex items-center gap-2">
                       {isActive && (
-                        <button
-                          onClick={() => {
-                            onClose();
-                            onOpenLiveTracker(order);
-                          }}
-                          className="px-3 py-1.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black text-xs rounded-xl flex items-center gap-1 cursor-pointer"
-                        >
-                          <span>لائیو ٹریک کریں</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
+                        <>
+                          {(order.status === 'pending' || order.status === 'assigned') && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm('کیا آپ واقعی یہ آرڈر منسوخ کرنا چاہتے ہیں؟ (Are you sure you want to cancel this booking?)')) {
+                                  Store.updateOrderStatus(order.id, 'cancelled', 'صارف کی طرف سے منسوخ کیا گیا (Cancelled by customer)');
+                                }
+                              }}
+                              className="px-2.5 py-1 text-red-400 hover:text-red-300 hover:bg-red-950/40 border border-red-500/30 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                            >
+                              منسوخ کریں (Cancel)
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => {
+                              onClose();
+                              onOpenLiveTracker(order);
+                            }}
+                            className="px-3 py-1.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black text-xs rounded-xl flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>لائیو ٹریک کریں</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </>
                       )}
 
                       {order.status === 'completed' && (
