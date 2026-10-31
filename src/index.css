@@ -39,4 +39,38 @@
   direction: ltr;
 }
 
+/* Printable PDF & Physical Invoice Styling */
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+  
+  /* Hide non-printable UI */
+  header, nav, footer, button, .no-print, [aria-label="Bottom Navigation"] {
+    display: none !important;
+  }
+
+  .print-only-container {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .print-clean-card {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: 1px solid #d1d5db !important;
+    page-break-inside: avoid;
+  }
+}
+
+
 
