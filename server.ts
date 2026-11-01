@@ -4,7 +4,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
-import * as Brevo from '@getbrevo/brevo';
+import pkg from '@getbrevo/brevo';
+const { TransactionalEmailsApi, SendSmtpEmail, TransactionalEmailsApiApiKeys } = pkg;
 import { initDbPool, isDbConnected, query } from './src/server/db.js';
 
 dotenv.config();
@@ -12,13 +13,18 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize Brevo API Instance
-const apiInstance = new Brevo.TransactionalEmailsApi();
-if (process.env.BREVO_API_KEY) {
-  apiInstance.setApiKey(
-    Brevo.TransactionalEmailsApiApiKeys.apiKey,
-    process.env.BREVO_API_KEY
-  );
+// Initialize Brevo API Instance Safely
+let apiInstance: any = null;
+try {
+  apiInstance = new TransactionalEmailsApi();
+  if (process.env.BREVO_API_KEY) {
+    apiInstance.setApiKey(
+      TransactionalEmailsApiApiKeys.apiKey,
+      process.env.BREVO_API_KEY
+    );
+  }
+} catch (e) {
+  console.warn('Brevo API initialization warning:', e);
 }
 
 async function syncSuperAdminFromEnv() {
@@ -113,7 +119,7 @@ async function startServer() {
       const resetToken = crypto.randomBytes(32).toString('hex');
       const tokenExpiry = new Date(Date.now() + 3600000); // 1 Hour expiry
 
-      // Store reset token in database (Aapko users table mein reset_token aur reset_token_expiry columns add karne honge)
+      // Store reset token in database
       try {
         await query('UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?', [
           resetToken,
@@ -128,27 +134,31 @@ async function startServer() {
       const resetUrl = `${clientUrl}/reset-password?token=${resetToken}`;
 
       // Prepare Brevo Transactional Email
-      const sendSmtpEmail = new Brevo.SendSmtpEmail();
-      sendSmtpEmail.subject = "Password Reset Request - Omnitask Super App";
-      sendSmtpEmail.htmlContent = `
-        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-          <h2>Password Reset Request</h2>
-          <p>Hello ${user.name || 'User'},</p>
-          <p>Aapne apna password reset karne ki request ki hai. Niche diye gaye button par click karke apna password badlein:</p>
-          <p>
-            <a href="${resetUrl}" style="background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Reset Password</a>
-          </p>
-          <p>Yeh link 1 ghante ke baad expire ho jayega.</p>
-          <p>Agar aapne yeh request nahi ki, toh is email ko ignore karein.</p>
-        </div>
-      `;
-      sendSmtpEmail.sender = {
-        name: process.env.SENDER_NAME || "Omnitask Support",
-        email: process.env.SENDER_EMAIL || "no-reply@omnitask.app"
-      };
-      sendSmtpEmail.to = [{ email: user.email, name: user.name || 'User' }];
+      if (apiInstance && process.env.BREVO_API_KEY) {
+        const sendSmtpEmail = new SendSmtpEmail();
+        sendSmtpEmail.subject = "Password Reset Request - Omnitask Super App";
+        sendSmtpEmail.htmlContent = `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+            <h2>Password Reset Request</h2>
+            <p>Hello ${user.name || 'User'},</p>
+            <p>Aapne apna password reset karne ki request ki hai. Niche diye gaye button par click karke apna password badlein:</p>
+            <p>
+              <a href="${resetUrl}" style="background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Reset Password</a>
+            </p>
+            <p>Yeh link 1 ghante ke baad expire ho jayega.</p>
+            <p>Agar aapne yeh request nahi ki, toh is email ko ignore karein.</p>
+          </div>
+        `;
+        sendSmtpEmail.sender = {
+          name: process.env.SENDER_NAME || "Omnitask Support",
+          email: process.env.SENDER_EMAIL || "no-reply@omnitask.app"
+        };
+        sendSmtpEmail.to = [{ email: user.email, name: user.name || 'User' }];
 
-      await apiInstance.sendTransacEmail(sendSmtpEmail);
+        await apiInstance.sendTransacEmail(sendSmtpEmail);
+      } else {
+        console.warn('Brevo API key not configured. Skipping actual email send.');
+      }
 
       return res.status(200).json({ success: true, message: 'Password reset link aapke email par bhej diya gaya hai.' });
     } catch (error: any) {
