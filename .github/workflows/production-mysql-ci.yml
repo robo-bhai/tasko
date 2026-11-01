@@ -76,16 +76,6 @@ jobs:
             echo "WARNING: Secret 'RCLONE_CONF' is missing! Skipping Google Drive restore."
           fi
 
-      # 3. Restore MySQL Snapshot from GitHub Actions Cache (Fallback)
-      - name: Restore Persistent MySQL Database Cache
-        id: restore-mysql-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: mysql-backup
-          key: khanewal-prod-v4-${{ runner.os }}-${{ github.run_id }}
-          restore-keys: |
-            khanewal-prod-v4-${{ runner.os }}-
-            khanewal-prod-v4-
 
       # 4. Bulletproof Database Initialization & Schema/Columns Setup
       - name: Initialize or Restore MySQL Database
