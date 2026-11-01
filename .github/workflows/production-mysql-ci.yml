@@ -150,9 +150,10 @@ jobs:
             SELECT 'orders', COUNT(*) FROM orders;
           "
 
-      # 4. Install Dependencies Reliably (including Brevo package)
+      # 4. Install Dependencies Reliably (Explicitly installing @getbrevo/brevo)
       - name: Install Application Dependencies
         run: |
+          npm install @getbrevo/brevo --legacy-peer-deps --no-audit --no-fund
           npm install --legacy-peer-deps --no-audit --no-fund
 
       # 5. Build Production Frontend Assets
