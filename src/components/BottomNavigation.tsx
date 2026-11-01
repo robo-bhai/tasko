@@ -72,7 +72,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       {/* Sticky Bottom Navigation Bar */}
       <nav 
         aria-label="Bottom Navigation"
-        className="fixed bottom-0 left-0 right-0 z-40 bg-[#07080d]/95 backdrop-blur-md border-t border-amber-500/30 px-3 py-1.5 shadow-[0_-8px_30px_rgba(0,0,0,0.8)] pb-safe"
+        className="w-full bg-[#07080d]/98 backdrop-blur-md border-t border-amber-500/30 px-3 py-1.5 shadow-[0_-8px_30px_rgba(0,0,0,0.8)] pb-[max(0.375rem,env(safe-area-inset-bottom))]"
       >
         <div className="max-w-md mx-auto flex items-center justify-around relative">
           

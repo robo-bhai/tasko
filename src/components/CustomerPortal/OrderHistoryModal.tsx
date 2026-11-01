@@ -139,7 +139,7 @@ export const OrderHistoryModal: React.FC<OrderHistoryModalProps> = ({
         </div>
 
         {/* Order List */}
-        <div className="p-3 sm:p-5 overflow-y-auto space-y-3">
+        <div className="p-3 sm:p-5 overflow-y-auto flex-1 min-h-0 space-y-3">
           {filteredOrders.length === 0 ? (
             <div className="text-center py-12 text-slate-400 space-y-2">
               <p className="text-sm font-semibold">Koi order mojood nahi hai</p>

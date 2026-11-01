@@ -14,7 +14,9 @@ import {
   MapPin,
   ShoppingBag,
   MessageCircle,
-  Sparkles
+  Sparkles,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -40,12 +42,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // Login fields
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   // Customer Signup fields
   const [custName, setCustName] = useState('');
   const [custEmail, setCustEmail] = useState('');
   const [custPhone, setCustPhone] = useState('');
   const [custPassword, setCustPassword] = useState('');
+  const [showCustPassword, setShowCustPassword] = useState(false);
   const [custAddress, setCustAddress] = useState('');
   const [custAreaId, setCustAreaId] = useState(KHANEWAL_LOCAL_AREAS[0].id);
 
@@ -245,19 +249,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-bold mb-1.5">
+                <label className="block text-slate-300 font-bold mb-1.5 text-left">
                   {isUrdu ? 'Password' : 'Password'} *
                 </label>
                 <div className="relative">
-                  <Lock className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
+                  <Lock className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3 pointer-events-none" />
                   <input
-                    type="password"
+                    type={showLoginPassword ? "text" : "password"}
                     required
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 py-2.5 pl-9 pr-3 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-hidden"
+                    className="w-full rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 py-2.5 pl-9 pr-10 text-left focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-hidden"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword(!showLoginPassword)}
+                    className="absolute right-3 top-2.5 p-1 text-slate-400 hover:text-amber-400 transition-colors cursor-pointer"
+                    title={showLoginPassword ? (isUrdu ? 'Password chupayein' : 'Hide password') : (isUrdu ? 'Password dekhein' : 'Show password')}
+                  >
+                    {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -320,17 +332,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1 text-[10px] sm:text-xs">
+                  <label className="block text-slate-300 font-bold mb-1 text-[10px] sm:text-xs text-left">
                     {isUrdu ? 'Password' : 'Password'} *
                   </label>
-                  <input
-                    type="password"
-                    required
-                    value={custPassword}
-                    onChange={(e) => setCustPassword(e.target.value)}
-                    placeholder={isUrdu ? 'Kam az kam 6 characters' : 'Min 6 characters'}
-                    className="w-full text-xs sm:text-sm rounded-xl bg-slate-900 border border-slate-700 text-white px-3 py-2 sm:py-2.5 focus:border-amber-400 focus:outline-hidden"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showCustPassword ? "text" : "password"}
+                      required
+                      value={custPassword}
+                      onChange={(e) => setCustPassword(e.target.value)}
+                      placeholder={isUrdu ? 'Kam az kam 6 characters' : 'Min 6 characters'}
+                      className="w-full text-xs sm:text-sm rounded-xl bg-slate-900 border border-slate-700 text-white pl-3 pr-10 py-2 sm:py-2.5 text-left focus:border-amber-400 focus:outline-hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCustPassword(!showCustPassword)}
+                      className="absolute right-3 top-2 sm:top-2.5 p-1 text-slate-400 hover:text-amber-400 transition-colors cursor-pointer"
+                      title={showCustPassword ? (isUrdu ? 'Password chupayein' : 'Hide password') : (isUrdu ? 'Password dekhein' : 'Show password')}
+                    >
+                      {showCustPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 {/* KHANEWAL LOCAL OPERATIONAL AREAS (Replaced Lahore/Karachi) */}

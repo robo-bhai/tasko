@@ -110,7 +110,7 @@ export default function App() {
     if (!currentUser) {
       setAuthNoticeReason(
         lang === 'ur'
-          ? 'سروس بک کرنے کے لیے برائے مہربانی پہلے لاگ ان کریں یا نیا اکاؤنٹ بنائیں۔'
+          ? 'Service book karne ke liye baraye meherbani pehle login karein ya naya account banayein.'
           : 'Please sign in or create an account to book this service.'
       );
       setPendingOrderAction({ category, preselectedId });
@@ -133,7 +133,7 @@ export default function App() {
     if (!currentUser) {
       setAuthNoticeReason(
         lang === 'ur'
-          ? 'ایونٹ پلاننگ کی درخواست جمع کروانے کے لیے پہلے لاگ ان کریں یا نیا اکاؤنٹ بنائیں۔'
+          ? 'Event planning ki darkhwast jama karwane ke liye pehle login karein ya naya account banayein.'
           : 'Please sign in or create an account to plan an event.'
       );
       setPendingOrderAction({ category: 'home_services' });
@@ -221,7 +221,7 @@ export default function App() {
   const whatsappAdminNumber = (Store.getSettings().whatsappSupportPhone || '+923000009988').replace(/[^0-9]/g, '');
   const partnerOnboardUrl = `https://wa.me/${whatsappAdminNumber}?text=${encodeURIComponent(
     isUrdu 
-      ? 'السلام علیکم! میں Khanewal Connect پر بطور سروس پارٹنر / کاریگر / ڈرائیور آن بورڈ ہونا چاہتا ہوں۔ برائے مہربانی مجھے رجسٹر کریں۔'
+      ? 'Assalam-o-Alaikum! Main Khanewal Connect par bataur service partner / karigar / driver onboard hona chahta hoon. Baraye meherbani mujhe register karein.'
       : 'Hello Admin, I want to onboard as a verified service partner on Khanewal Connect. Please register me.'
   )}`;
 
@@ -232,111 +232,255 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen bg-[#07080c] flex flex-col font-sans text-slate-100 selection:bg-amber-400 selection:text-slate-950 ${isUrdu ? 'rtl' : 'ltr'}`}>
-      {/* Top Bar Navigation */}
-      <Navbar
-        currentUser={currentUser}
-        activePortal={activePortal}
-        setActivePortal={setActivePortal}
-        onOpenOrderModal={handleOpenOrderModal}
-        onOpenHistory={() => setIsHistoryModalOpen(true)}
-        onOpenLiveTracker={handleOpenLiveTracker}
-        onOpenAuth={handleOpenAuthModal}
-        activeOrders={navbarActiveOrders}
-        lang={lang}
-        onToggleLang={handleToggleLang}
-      />
+    <div className="h-screen max-h-screen h-[100dvh] max-h-[100dvh] w-full flex flex-col overflow-hidden bg-[#07080c] text-slate-100 font-sans selection:bg-amber-400 selection:text-slate-950 ltr" dir="ltr">
+      {/* 1. 100% Static Top Bar Navigation */}
+      <div className="shrink-0 z-30 w-full sticky top-0 bg-[#090a0f] border-b border-amber-500/20">
+        <Navbar
+          currentUser={currentUser}
+          activePortal={activePortal}
+          setActivePortal={setActivePortal}
+          onOpenOrderModal={handleOpenOrderModal}
+          onOpenHistory={() => setIsHistoryModalOpen(true)}
+          onOpenLiveTracker={handleOpenLiveTracker}
+          onOpenAuth={handleOpenAuthModal}
+          activeOrders={navbarActiveOrders}
+          lang={lang}
+          onToggleLang={handleToggleLang}
+        />
+      </div>
 
-      {/* Main Content Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 md:px-8 pt-4 sm:pt-6 pb-32 sm:pb-24">
-        {activePortal === 'customer' && (
-          <CustomerHome
-            currentUser={currentUser}
-            onOpenOrderModal={handleOpenOrderModal}
-            onOpenEventPlanner={handleOpenEventPlanner}
-            onOpenLiveTracker={handleOpenLiveTracker}
-            onOpenAuth={handleOpenAuthModal}
-            activeOrders={customerOrders}
-            services={publishedServices}
-            vehicles={publishedVehicles}
-            lang={lang}
-          />
-        )}
+      {/* 2. Contained Safe Scroll Area (Trapped exclusively between static Header & Bottom Navigation) */}
+      <div 
+        id="main-scroll-viewport" 
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden w-full relative overscroll-contain flex flex-col"
+      >
+        <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 md:px-8 pt-4 sm:pt-6 pb-12">
+          {activePortal === 'customer' && (
+            <CustomerHome
+              currentUser={currentUser}
+              onOpenOrderModal={handleOpenOrderModal}
+              onOpenEventPlanner={handleOpenEventPlanner}
+              onOpenLiveTracker={handleOpenLiveTracker}
+              onOpenAuth={handleOpenAuthModal}
+              activeOrders={customerOrders}
+              services={publishedServices}
+              vehicles={publishedVehicles}
+              lang={lang}
+            />
+          )}
 
-        {activePortal === 'provider' && currentUser?.role === 'provider' && (
-          <ProviderDashboard
-            currentUser={currentUser}
-            orders={orders}
-            onOpenCustomerView={() => setActivePortal('customer')}
-          />
-        )}
+          {activePortal === 'provider' && currentUser?.role === 'provider' && (
+            <ProviderDashboard
+              currentUser={currentUser}
+              orders={orders}
+              onOpenCustomerView={() => setActivePortal('customer')}
+            />
+          )}
 
-        {activePortal === 'admin' && currentUser?.role === 'admin' && (
-          <AdminDashboard
-            orders={orders}
-            users={usersList}
-            services={services}
-            vehicles={vehicles}
-          />
-        )}
+          {activePortal === 'admin' && currentUser?.role === 'admin' && (
+            <AdminDashboard
+              orders={orders}
+              users={usersList}
+              services={services}
+              vehicles={vehicles}
+            />
+          )}
 
-        {/* Guard message if attempting to open provider/admin portal while logged out */}
-        {(activePortal === 'provider' && (!currentUser || currentUser.role !== 'provider')) && (
-          <div className="bg-white rounded-3xl border border-slate-200 p-8 md:p-12 text-center max-w-xl mx-auto my-12 shadow-sm space-y-5">
-            <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
-              <Truck className="w-8 h-8" />
+          {/* Guard message if attempting to open provider/admin portal while logged out */}
+          {(activePortal === 'provider' && (!currentUser || currentUser.role !== 'provider')) && (
+            <div className="bg-[#0e111a] rounded-3xl border border-amber-500/30 p-6 md:p-10 text-center max-w-xl mx-auto my-12 shadow-sm space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto">
+                <Truck className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-white">
+                {isUrdu ? 'Worker / Driver Portal ke liye Login Zaroori Hai' : 'Service Provider Login Required'}
+              </h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                {isUrdu 
+                  ? 'Apne qareebi orders, delivery requests aur aamdani dekhne ke liye apne partner account mein login karein ya naya provider account banayein.'
+                  : 'Sign in to your partner account or register as a technician/driver to manage jobs, view orders, and withdraw earnings.'}
+              </p>
+              <div className="flex justify-center gap-3 pt-2">
+                <button
+                  onClick={() => handleOpenAuthModal('login')}
+                  className="px-5 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  {t.login}
+                </button>
+                <a
+                  href={partnerOnboardUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-5 py-2.5 bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-200 text-xs font-bold rounded-xl transition-colors inline-flex items-center gap-1.5"
+                >
+                  <span>{isUrdu ? 'Onboarding Baraye Workers (WhatsApp)' : 'Onboard as Worker (WhatsApp)'}</span>
+                </a>
+              </div>
             </div>
-            <h3 className="text-xl font-bold text-slate-900">
-              {isUrdu ? 'ورکر / ڈرائیور پورٹل کے لیے لاگ ان کریں' : 'Service Provider Login Required'}
-            </h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-              {isUrdu 
-                ? 'اپنے قریبی آرڈرز، ڈیلیوری درخواستیں اور آمدنی دیکھنے کے لیے اپنے پارٹنر اکاؤنٹ میں لاگ ان کریں یا نیا پرووائیڈر اکاؤنٹ بنائیں۔'
-                : 'Sign in to your partner account or register as a technician/driver to manage jobs, view orders, and withdraw earnings.'}
-            </p>
-            <div className="flex justify-center gap-3 pt-2">
-              <button
-                onClick={() => handleOpenAuthModal('login')}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
-              >
-                {t.login}
-              </button>
-              <a
-                href={partnerOnboardUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors inline-flex items-center gap-1.5"
-              >
-                <span>{isUrdu ? 'آن بورڈنگ برائے ورکرز (WhatsApp)' : 'Onboard as Worker (WhatsApp)'}</span>
-              </a>
+          )}
+
+          {(activePortal === 'admin' && (!currentUser || currentUser.role !== 'admin')) && (
+            <div className="bg-[#0e111a] rounded-3xl border border-amber-500/30 p-6 md:p-10 text-center max-w-xl mx-auto my-12 shadow-sm space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto">
+                <ShieldCheck className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-white">
+                {isUrdu ? 'Administrator Login Darkar Hai' : 'Admin Login Required'}
+              </h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                {isUrdu 
+                  ? 'Master control panel, orders monitoring aur catalog manager tak rasaai ke liye apne admin account ke sath login karein.'
+                  : 'Please log in with your configured ADMIN_USERNAME and ADMIN_PASSWORD secrets to access operations and platform controls.'}
+              </p>
+              <div className="pt-2">
+                <button
+                  onClick={() => handleOpenAuthModal('login')}
+                  className="px-6 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  {isUrdu ? 'Admin Login Karein' : 'Sign in as Admin'}
+                </button>
+              </div>
+            </div>
+          )}
+        </main>
+
+        {/* Pakistani Production Footer */}
+        <footer className="shrink-0 bg-[#090a0f] text-slate-400 text-xs border-t border-slate-800 py-12 mt-auto">
+          <div className="max-w-7xl mx-auto px-4 md:px-8 space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-400 to-amber-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-md">
+                    KC
+                  </div>
+                  <span className="font-extrabold text-white text-base tracking-tight">
+                    {t.appName}
+                  </span>
+                </div>
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  {isUrdu 
+                    ? 'Khanewal City aur aas paas ke ilaqon ke liye No. 1 on-demand super app: kisi bhi local dukaan se khareedari, verified gharelu marammat o safai, aur cargo transport gaari ki fori on-demand booking.'
+                    : 'Khanewal City and surrounding tehsils unified on-demand super app for store deliveries, certified home repairs, and cargo transport.'}
+                </p>
+                <div className="text-[11px] text-slate-300 font-medium space-y-1">
+                  <div>📞 {isUrdu ? 'Khanewal Helpline: 0800-6664' : 'Khanewal Helpline: 0800-6664'}</div>
+                  <div>✉️ support@khanewalconnect.pk</div>
+                </div>
+              </div>
+
+              <div>
+                <h5 className="font-bold text-white uppercase tracking-wider text-[11px] mb-3">
+                  {isUrdu ? 'Bunyadi Services' : 'Core Services'}
+                </h5>
+                <ul className="space-y-2">
+                  <li>
+                    <button onClick={() => handleOpenOrderModal('custom_delivery')} className="hover:text-white transition-colors cursor-pointer">
+                      {t.catDeliveryTitle}
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => handleOpenOrderModal('home_services')} className="hover:text-white transition-colors cursor-pointer">
+                      {isUrdu ? 'AC Master Wash o Gas Charging' : 'AC Chemical Wash & Repair'}
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => handleOpenOrderModal('home_services')} className="hover:text-white transition-colors cursor-pointer">
+                      {isUrdu ? 'Certified Electrician o Plumbing' : 'Certified Electrician & Plumbing'}
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => handleOpenOrderModal('transport_cargo')} className="hover:text-white transition-colors cursor-pointer">
+                      {isUrdu ? 'Loader Riksha o Suzuki Pickup Booking' : 'Loader Rickshaw & Suzuki Pickup'}
+                    </button>
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h5 className="font-bold text-white uppercase tracking-wider text-[11px] mb-3">
+                  {isUrdu ? 'Portals o Rabitay' : 'Portals & Access'}
+                </h5>
+                <ul className="space-y-2">
+                  <li>
+                    <button onClick={() => setActivePortal('customer')} className="hover:text-white transition-colors cursor-pointer">
+                      {t.customerPortal}
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => setActivePortal('provider')} className="hover:text-white transition-colors cursor-pointer">
+                      {t.providerPortal}
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => setActivePortal('admin')} className="hover:text-white transition-colors cursor-pointer">
+                      {t.adminPortal}
+                    </button>
+                  </li>
+                  <li>
+                    <a
+                      href={partnerOnboardUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-emerald-400 transition-colors cursor-pointer text-slate-400"
+                    >
+                      {isUrdu ? 'Worker Onboarding (Admin WhatsApp)' : 'Partner Onboarding (Admin WhatsApp)'}
+                    </a>
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h5 className="font-bold text-white uppercase tracking-wider text-[11px] mb-3">
+                  {isUrdu ? 'Adaigi ke Mehfooz Tareeqay' : 'Secure Payments & Trust'}
+                </h5>
+                <div className="space-y-2.5 text-slate-400 leading-relaxed">
+                  <p>
+                    {isUrdu 
+                      ? 'SafePay escrow protection — adaigi sirf kaam ki tasallibaksh takmeel par muntaqil hoti hai.'
+                      : 'Khanewal SafePay Escrow protection for complete customer & worker security.'}
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1 text-[11px] font-semibold text-slate-300">
+                    <span className="bg-slate-800 border border-slate-700 px-2 py-0.5 rounded">Cash on Delivery</span>
+                    <span className="bg-slate-800 border border-slate-700 px-2 py-0.5 rounded">JazzCash</span>
+                    <span className="bg-slate-800 border border-slate-700 px-2 py-0.5 rounded">EasyPaisa</span>
+                    <span className="bg-slate-800 border border-slate-700 px-2 py-0.5 rounded">Raast Bank</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-500">
+              <span>© 2026 Khanewal Connect. All rights reserved.</span>
+              <span>Khanewal City · Cantt · Peoples Colony · Civil Lines · Tariq Abad · Kabirwala · Mian Channu · Jahanian</span>
             </div>
           </div>
-        )}
+        </footer>
+      </div>
 
-        {(activePortal === 'admin' && (!currentUser || currentUser.role !== 'admin')) && (
-          <div className="bg-white rounded-3xl border border-slate-200 p-8 md:p-12 text-center max-w-xl mx-auto my-12 shadow-sm space-y-5">
-            <div className="w-16 h-16 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mx-auto">
-              <ShieldCheck className="w-8 h-8" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900">
-              {isUrdu ? 'ایڈمنسٹریٹر لاگ ان درکار ہے' : 'Admin Login Required'}
-            </h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-              {isUrdu 
-                ? 'ماسٹر کنٹرول پینل، آرڈرز مانیٹرنگ اور کیٹلاگ مینیجر تک رسائی کے لیے اپنے ایڈمن اکاؤنٹ کے ساتھ لاگ ان کریں۔'
-                : 'Please log in with your configured ADMIN_USERNAME and ADMIN_PASSWORD secrets to access operations and platform controls.'}
-            </p>
-            <div className="pt-2">
-              <button
-                onClick={() => handleOpenAuthModal('login')}
-                className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
-              >
-                {isUrdu ? 'ایڈمن لاگ ان کریں' : 'Sign in as Admin'}
-              </button>
-            </div>
-          </div>
-        )}
-      </main>
+      {/* Floating WhatsApp Support Button */}
+      <FloatingWhatsAppButton isUrdu={isUrdu} />
+
+      {/* 3. 100% Static Bottom Navigation (sticky/pinned) */}
+      <div className="shrink-0 z-30 w-full sticky bottom-0">
+        <BottomNavigation
+          currentUser={currentUser}
+          activeOrders={navbarActiveOrders}
+          onNavigateHome={() => {
+            setActivePortal('customer');
+            document.getElementById('main-scroll-viewport')?.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenOrders={() => setIsHistoryModalOpen(true)}
+          onOpenBookNow={() => {
+            setActivePortal('customer');
+            setTimeout(() => {
+              document.getElementById('services-grid-section')?.scrollIntoView({ behavior: 'smooth' });
+            }, 60);
+          }}
+          onOpenAuth={handleOpenAuthModal}
+          onLogout={handleLogout}
+          isUrdu={isUrdu}
+        />
+      </div>
 
       {/* Modals & Dialogs */}
       <DeliveryOrderModal
@@ -412,141 +556,6 @@ export default function App() {
         onSuccess={handleAuthSuccess}
         noticeReason={authNoticeReason}
         lang={lang}
-      />
-
-      {/* Pakistani Production Footer */}
-      <footer className="bg-slate-900 text-slate-400 text-xs border-t border-slate-800 py-12 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-sky-500 text-white font-black text-sm flex items-center justify-center shadow-md">
-                  KC
-                </div>
-                <span className="font-extrabold text-white text-base tracking-tight">
-                  {t.appName}
-                </span>
-              </div>
-              <p className="text-slate-400 text-xs leading-relaxed">
-                {isUrdu 
-                  ? 'خانیوال سٹی اور آس پاس کے علاقوں کے لیے نمبر 1 آن ڈیمانڈ سپر ایپ: کسی بھی لوکل دکان سے خریداری، مصدقہ گھریلو مرمت و صفائی، اور کارگو ٹرانسپورٹ گاڑی کی فوری آن ڈیمانڈ بکنگ۔'
-                  : 'Khanewal City and surrounding tehsils unified on-demand super app for store deliveries, certified home repairs, and cargo transport.'}
-              </p>
-              <div className="text-[11px] text-slate-300 font-medium space-y-1">
-                <div>📞 {isUrdu ? 'خانیوال ہیلپ لائن: 6664-0800' : 'Khanewal Helpline: 0800-6664'}</div>
-                <div>✉️ support@khanewalconnect.pk</div>
-              </div>
-            </div>
-
-            <div>
-              <h5 className="font-bold text-white uppercase tracking-wider text-[11px] mb-3">
-                {isUrdu ? 'بنیادی سروسز' : 'Core Services'}
-              </h5>
-              <ul className="space-y-2">
-                <li>
-                  <button onClick={() => handleOpenOrderModal('custom_delivery')} className="hover:text-white transition-colors cursor-pointer">
-                    {t.catDeliveryTitle}
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => handleOpenOrderModal('home_services')} className="hover:text-white transition-colors cursor-pointer">
-                    {isUrdu ? 'اے سی ماسٹر واش و گیس چارجنگ' : 'AC Chemical Wash & Repair'}
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => handleOpenOrderModal('home_services')} className="hover:text-white transition-colors cursor-pointer">
-                    {isUrdu ? 'مستند الیکٹریشن و پلمبنگ' : 'Certified Electrician & Plumbing'}
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => handleOpenOrderModal('transport_cargo')} className="hover:text-white transition-colors cursor-pointer">
-                    {isUrdu ? 'لوڈر رکشہ و سوزوکی پک اپ بکنگ' : 'Loader Rickshaw & Suzuki Pickup'}
-                  </button>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h5 className="font-bold text-white uppercase tracking-wider text-[11px] mb-3">
-                {isUrdu ? 'پورٹلز و روابط' : 'Portals & Access'}
-              </h5>
-              <ul className="space-y-2">
-                <li>
-                  <button onClick={() => setActivePortal('customer')} className="hover:text-white transition-colors cursor-pointer">
-                    {t.customerPortal}
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => setActivePortal('provider')} className="hover:text-white transition-colors cursor-pointer">
-                    {t.providerPortal}
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => setActivePortal('admin')} className="hover:text-white transition-colors cursor-pointer">
-                    {t.adminPortal}
-                  </button>
-                </li>
-                <li>
-                  <a
-                    href={partnerOnboardUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-emerald-400 transition-colors cursor-pointer text-slate-400"
-                  >
-                    {isUrdu ? 'ورکر آن بورڈنگ (ایڈمن واٹس ایپ)' : 'Partner Onboarding (Admin WhatsApp)'}
-                  </a>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h5 className="font-bold text-white uppercase tracking-wider text-[11px] mb-3">
-                {isUrdu ? 'ادائیگی کے محفوظ طریقے' : 'Secure Payments & Trust'}
-              </h5>
-              <div className="space-y-2.5 text-slate-400 leading-relaxed">
-                <p>
-                  {isUrdu 
-                    ? 'سیف پے اسکرو پروٹیکشن — ادائیگی صرف کام کی تسلی بخش تکمیل پر منتقل ہوتی ہے۔'
-                    : 'Khanewal SafePay Escrow protection for complete customer & worker security.'}
-                </p>
-                <div className="flex flex-wrap gap-2 pt-1 text-[11px] font-semibold text-slate-300">
-                  <span className="bg-slate-800 border border-slate-700 px-2 py-0.5 rounded">Cash on Delivery</span>
-                  <span className="bg-slate-800 border border-slate-700 px-2 py-0.5 rounded">JazzCash</span>
-                  <span className="bg-slate-800 border border-slate-700 px-2 py-0.5 rounded">EasyPaisa</span>
-                  <span className="bg-slate-800 border border-slate-700 px-2 py-0.5 rounded">Raast Bank</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-500">
-            <span>© 2026 Khanewal Connect. All rights reserved.</span>
-            <span>خانیوال سٹی · کینٹ · پیپلز کالونی · سول لائنز · طارق آباد · کبیروالہ · میاں چنوں · جہانیاں</span>
-          </div>
-        </div>
-      </footer>
-
-      {/* Floating WhatsApp Support Button */}
-      <FloatingWhatsAppButton isUrdu={isUrdu} />
-
-      {/* Fixed Bottom Navigation View */}
-      <BottomNavigation
-        currentUser={currentUser}
-        activeOrders={navbarActiveOrders}
-        onNavigateHome={() => {
-          setActivePortal('customer');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        onOpenOrders={() => setIsHistoryModalOpen(true)}
-        onOpenBookNow={() => {
-          setActivePortal('customer');
-          setTimeout(() => {
-            document.getElementById('services-grid-section')?.scrollIntoView({ behavior: 'smooth' });
-          }, 60);
-        }}
-        onOpenAuth={handleOpenAuthModal}
-        onLogout={handleLogout}
-        isUrdu={isUrdu}
       />
     </div>
   );

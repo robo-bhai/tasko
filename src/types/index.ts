@@ -89,7 +89,7 @@ export interface TransportDetails {
 
 export interface EventPlanningDetails {
   eventType: string; // 'barat' | 'walima' | 'mehndi_mayun' | 'birthday' | 'corporate_seminar' | 'dawat_catering' | 'qawwali_mehfil' | 'milad_majlis' | 'other'
-  eventTitle: string; // e.g. "محمد حمزہ کی بارات و دعوت"
+  eventTitle: string; // e.g. "Muhammad Hamza ki Barat o Dawat"
   eventDate: string; // YYYY-MM-DD
   eventTimeSlot: 'day_lunch' | 'evening_dinner' | 'night_party' | 'full_day';
   guestCount: number; // e.g. 350

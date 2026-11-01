@@ -40,7 +40,8 @@ import {
   X,
   Printer,
   KeyRound,
-  Lock
+  Lock,
+  EyeOff
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -117,6 +118,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Database Reset Modal State (Strict GitHub Secrets 'RESET_KEY' Protection)
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [resetSecretKey, setResetSecretKey] = useState('');
+  const [showResetSecretKey, setShowResetSecretKey] = useState(false);
+  const [showNewUserPassword, setShowNewUserPassword] = useState(false);
   const [resetError, setResetError] = useState('');
   const [resetSuccess, setResetSuccess] = useState('');
 
@@ -544,7 +547,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               title="Protected Database Reset (Requires GitHub Secrets RESET_KEY)"
             >
               <KeyRound className="w-3.5 h-3.5 text-rose-400" />
-              <span>ری سیٹ ڈیٹا بیس (Secret Key)</span>
+              <span>Reset Database (Secret Key)</span>
             </button>
           </div>
         </div>
@@ -600,7 +603,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           }`}
         >
           <Package className="w-4 h-4" />
-          <span>آرڈرز و ڈسپیچ Orders & Dispatch ({orders.length})</span>
+          <span>Orders o Dispatch ({orders.length})</span>
         </button>
 
         <button
@@ -612,7 +615,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           }`}
         >
           <Users className="w-4 h-4" />
-          <span>یوزرز و ورکرز مینجمنٹ ({users.length})</span>
+          <span>Users o Workers ({users.length})</span>
         </button>
 
         <button
@@ -624,7 +627,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           }`}
         >
           <Settings className="w-4 h-4" />
-          <span>لائیو ریٹس اور واٹس ایپ سیٹنگز</span>
+          <span>Live Rates o WhatsApp Settings</span>
         </button>
 
         <button
@@ -636,7 +639,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           }`}
         >
           <Wrench className="w-4 h-4" />
-          <span>سروس کیٹلاگ و رکشہ ریٹس</span>
+          <span>Service Catalog o Riksha Rates</span>
         </button>
       </div>
 
@@ -668,7 +671,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <option value="custom_delivery">Custom Delivery</option>
                   <option value="home_services">Home Services</option>
                   <option value="transport_cargo">Transport & Cargo</option>
-                  <option value="event_planning">🎪 Event Planning (تقریبات)</option>
+                  <option value="event_planning">🎪 Event Planning (Shadi o Taqreebat)</option>
                 </select>
               </div>
 
@@ -804,12 +807,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     : 'bg-slate-50 text-slate-800 border-slate-300'
                                 }`}
                               >
-                                <option value="pending">⏳ Pending (انتظار برائے تصدیق)</option>
-                                <option value="assigned">👤 Assigned (ورکر تفویض کریں)</option>
-                                <option value="on_the_way">🛵 On The Way (راستے میں ہے)</option>
-                                <option value="work_started">🔧 Work Started (کام جاری ہے)</option>
-                                <option value="completed">✅ Completed (مکمل ہو گیا)</option>
-                                <option value="cancelled">❌ Cancelled (منسوخ کریں)</option>
+                                <option value="pending">⏳ Pending (Tasdeeq Ka Intezar)</option>
+                                <option value="assigned">👤 Assigned (Worker Assign Karein)</option>
+                                <option value="on_the_way">🛵 On The Way (Raastay Mein Hai)</option>
+                                <option value="work_started">🔧 Work Started (Kaam Jari Hai)</option>
+                                <option value="completed">✅ Completed (Mukammal Ho Gaya)</option>
+                                <option value="cancelled">❌ Cancelled (Mansookh Karein)</option>
                               </select>
                             </div>
 
@@ -818,7 +821,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <div className="p-3.5 rounded-xl bg-slate-950 border-2 border-amber-500/80 space-y-2.5 text-xs shadow-xl animate-in fade-in duration-200 text-white">
                                 <span className="font-bold text-amber-300 block flex items-center gap-1.5">
                                   <span>👤</span>
-                                  <span>ورکر / مینیجر تفویض کریں (Assign Worker Details):</span>
+                                  <span>Worker / Manager Assign Karein:</span>
                                 </span>
 
                                 {/* Quick select from existing registered providers */}
@@ -833,7 +836,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     }}
                                     className="w-full text-xs rounded-lg border border-amber-500/40 bg-slate-900 px-2.5 py-1.5 text-amber-200 font-medium focus:border-amber-400 focus:outline-hidden"
                                   >
-                                    <option value="">-- رجسٹرڈ ورکر منتخب کریں (یا نیچے نام لکھیں) --</option>
+                                    <option value="">-- Registered Worker Muntakhib Karein (Ya Naam Likhein) --</option>
                                     {providersList.map(prov => (
                                       <option key={prov.id} value={prov.id}>
                                         {prov.name} ({prov.phone}) - {prov.serviceSkill || prov.providerCategory || 'Verified'}
@@ -844,18 +847,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                                 <div className="grid grid-cols-2 gap-2">
                                   <div>
-                                    <label className="text-[10px] text-amber-400 font-bold block mb-1">ورکر کا نام (Worker Name):</label>
+                                    <label className="text-[10px] text-amber-400 font-bold block mb-1">Worker Ka Naam:</label>
                                     <input
                                       type="text"
                                       value={inlineWorkerName}
                                       onChange={(e) => setInlineWorkerName(e.target.value)}
-                                      placeholder="مثلاً: Muhammad Aslam"
+                                      placeholder="Maslan: Muhammad Aslam"
                                       className="w-full text-xs rounded-lg border border-slate-700 px-2.5 py-1.5 bg-slate-900 text-white font-medium placeholder:text-slate-500 focus:border-amber-400 focus:outline-hidden"
                                     />
                                   </div>
 
                                   <div>
-                                    <label className="text-[10px] text-amber-400 font-bold block mb-1">ورکر فون (Worker Phone):</label>
+                                    <label className="text-[10px] text-amber-400 font-bold block mb-1">Worker Phone:</label>
                                     <input
                                       type="tel"
                                       value={inlineWorkerPhone}
@@ -868,7 +871,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                                 <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="text-[10px] text-amber-300 font-bold">پہنچنے کا وقت (ETA):</span>
+                                    <span className="text-[10px] text-amber-300 font-bold">ETA:</span>
                                     <input
                                       type="number"
                                       value={inlineWorkerEta}
@@ -876,7 +879,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                       placeholder="20"
                                       className="w-14 text-xs rounded-lg border border-slate-700 px-1.5 py-1 bg-slate-900 font-mono text-center text-amber-300 font-bold focus:border-amber-400 focus:outline-hidden"
                                     />
-                                    <span className="text-[10px] text-slate-400">منٹ</span>
+                                    <span className="text-[10px] text-slate-400">mins</span>
                                   </div>
 
                                   <div className="flex items-center gap-2">
@@ -885,14 +888,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                       onClick={() => handleSaveInlineAssign(order.id)}
                                       className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-lg shadow-sm cursor-pointer"
                                     >
-                                      محفوظ و لائیو نشر کریں
+                                      Save o Broadcast Live
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setInlineOrderId(null)}
                                       className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-lg cursor-pointer"
                                     >
-                                      منسوخ
+                                      Cancel
                                     </button>
                                   </div>
                                 </div>
@@ -911,8 +914,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         📞 {order.assignedProviderPhone || 'No phone'}
                                       </span>
                                       {order.etaMinutes && (
-                                        <span className="text-[10px] text-amber-800 font-semibold block">
-                                          ⏱ پہنچنے کا وقت: ~{order.etaMinutes} منٹ
+                                        <span className="text-[10px] text-amber-300 font-semibold block">
+                                          ⏱ ETA: ~{order.etaMinutes} mins
                                         </span>
                                       )}
                                     </div>
@@ -920,19 +923,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     <button
                                       type="button"
                                       onClick={() => handleStartInlineAssign(order, order.status)}
-                                      className="text-[10px] text-blue-700 hover:text-blue-900 font-bold px-1.5 py-0.5 rounded-md hover:bg-blue-100 border border-blue-200 transition-colors cursor-pointer shrink-0"
+                                      className="text-[10px] text-blue-300 hover:text-white font-bold px-1.5 py-0.5 rounded-md hover:bg-blue-900/60 border border-blue-500/40 transition-colors cursor-pointer shrink-0"
                                       title="Edit Worker or Phone"
                                     >
-                                      تبدیل ورکر (Edit)
+                                      Edit Worker
                                     </button>
                                   </div>
                                 ) : (
                                   <button
                                     type="button"
                                     onClick={() => handleStartInlineAssign(order, 'assigned')}
-                                    className="text-[11px] text-amber-800 hover:text-amber-900 font-bold bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer w-fit"
+                                    className="text-[11px] text-amber-300 hover:text-white font-bold bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer w-fit"
                                   >
-                                    <span>+ ورکر کا نام اور فون درج کریں</span>
+                                    <span>+ Worker ka naam o phone darj karein</span>
                                   </button>
                                 )}
                               </div>
@@ -948,7 +951,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             title="Inspect Order Details & Print PDF Receipt"
                           >
                             <Eye className="w-4 h-4 text-amber-400" />
-                            <span className="text-[10px] hidden sm:inline">رسید / Details</span>
+                            <span className="text-[10px] hidden sm:inline">Receipt / Details</span>
                           </button>
                         </td>
                       </tr>
@@ -1447,7 +1450,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="flex items-center gap-2">
                   <KeyRound className="w-4 h-4 text-rose-400" />
                   <h4 className="font-bold text-rose-400 text-xs uppercase tracking-wider">
-                    5. سیکیورٹی زون اور ڈیٹا بیس ری سیٹ (GitHub Secrets 'RESET_KEY' Protection)
+                    5. Security Zone & Database Reset (GitHub Secrets 'RESET_KEY' Protection)
                   </h4>
                 </div>
                 <span className="text-[10px] text-rose-400/80 bg-rose-950 px-2 py-0.5 rounded border border-rose-800">
@@ -1458,10 +1461,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
                 <div className="space-y-1">
                   <p className="text-slate-300 font-semibold">
-                    ڈیٹا بیس کو ری سیٹ کرنے کے لیے GitHub Secrets کی کلید (<code className="font-mono text-amber-300 bg-black/40 px-1 py-0.5 rounded">RESET_KEY</code>) لازمی درکار ہے۔
+                    Database ko reset karne ke liye GitHub Secrets ki khufia key (<code className="font-mono text-amber-300 bg-black/40 px-1 py-0.5 rounded">RESET_KEY</code>) lazmi darkar hai.
                   </p>
                   <p className="text-slate-400 text-[11px]">
-                    اگر داخل کردہ کلید میچ نہیں کرے گی تو سسٹم کبھی بھی ڈیٹا صاف یا ری سیٹ نہیں کرے گا۔ تمام ریٹس، ورکرز اور آرڈرز محفوظ رہیں گے۔
+                    Agar dakhil karda key match nahi kare gi to system kabhi bhi data reset nahi kare ga. Tamam rates, workers aur orders mehfooz rahein ge.
                   </p>
                 </div>
 
@@ -1476,7 +1479,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold shrink-0 flex items-center justify-center gap-2 shadow-lg shadow-rose-950 transition-all cursor-pointer"
                 >
                   <KeyRound className="w-4 h-4" />
-                  <span>ری سیٹ ڈیٹا بیس تصدیق (Enter Key)</span>
+                  <span>Reset Database Tasdeeq (Enter Key)</span>
                 </button>
               </div>
             </div>
@@ -1503,10 +1506,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
-                  Storefront Availability Rule Active · لائیو رول لاگو ہے
+                  Storefront Availability Rule Active · Live Rule Lagu Hai
                 </span>
               </div>
-              <h3 className="text-base font-bold text-white mt-0.5">سروس کیٹلاگ، رکشہ و لوڈنگ گاڑیوں کے ریٹس اور سورس ورکرز</h3>
+              <h3 className="text-base font-bold text-white mt-0.5">Service Catalog, Riksha o Loading Gaariyon ke Rates aur Source Workers</h3>
               <p className="text-xs text-slate-400">
                 Services and vehicles ONLY appear on customer storefronts when an active verified provider or driver is assigned as a source.
               </p>
@@ -1518,7 +1521,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 className="px-3.5 py-2 bg-[#141825] hover:bg-[#1a2032] text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Plus className="w-4 h-4 text-amber-400" />
-                <span>+ نئی سروس شامل کریں</span>
+                <span>+ Nayi Service Shamil Karein</span>
               </button>
               <button
                 type="button"
@@ -1526,7 +1529,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 className="px-3.5 py-2 bg-[#141825] hover:bg-[#1a2032] text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Plus className="w-4 h-4 text-amber-400" />
-                <span>+ نیا رکشہ / کارگو گاڑی</span>
+                <span>+ Naya Riksha / Cargo Gaari</span>
               </button>
               <button
                 type="button"
@@ -1534,7 +1537,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
               >
                 <Save className="w-4 h-4" />
-                <span>تمام ریٹس محفوظ کریں</span>
+                <span>Tamam Rates Mehfooz Karein</span>
               </button>
             </div>
           </div>
@@ -1542,7 +1545,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* Quick Visibility Filter */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-[#0e111a] p-3 rounded-2xl border border-slate-800 shadow-xl text-xs">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-slate-400 font-semibold text-xs">کیٹلاگ فلٹر:</span>
+              <span className="text-slate-400 font-semibold text-xs">Catalog Filter:</span>
               <div className="flex flex-wrap gap-1.5">
                 <button
                   type="button"
@@ -1553,7 +1556,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       : 'bg-[#141825] text-slate-300 hover:bg-[#1b2135] border border-slate-800'
                   }`}
                 >
-                  تمام سروسز ({editingServices.length + editingVehicles.length})
+                  Tamam Services ({editingServices.length + editingVehicles.length})
                 </button>
                 <button
                   type="button"
@@ -1564,7 +1567,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       : 'bg-emerald-950/40 text-emerald-400 hover:bg-emerald-900/50 border border-emerald-500/30'
                   }`}
                 >
-                  ● لائیو اور دستیاب ({editingServices.filter(s => Store.isServiceAvailable(s)).length + editingVehicles.filter(v => Store.isVehicleAvailable(v)).length})
+                  ● Live o Dastyab ({editingServices.filter(s => Store.isServiceAvailable(s)).length + editingVehicles.filter(v => Store.isVehicleAvailable(v)).length})
                 </button>
                 <button
                   type="button"
@@ -1575,13 +1578,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       : 'bg-amber-950/40 text-amber-400 hover:bg-amber-900/50 border border-amber-500/30'
                   }`}
                 >
-                  ○ ہائیڈن / بغیر ورکر ({editingServices.filter(s => !Store.isServiceAvailable(s)).length + editingVehicles.filter(v => !Store.isVehicleAvailable(v)).length})
+                  ○ Hidden / Baghair Worker ({editingServices.filter(s => !Store.isServiceAvailable(s)).length + editingVehicles.filter(v => !Store.isVehicleAvailable(v)).length})
                 </button>
               </div>
             </div>
 
             <span className="text-[11px] text-amber-400/90 font-mono bg-[#141825] px-3 py-1 rounded-xl border border-slate-800">
-              {techniciansList.length} ٹیکنیشنز · {driversList.length} ڈرائیورز دستیاب
+              {techniciansList.length} Technicians · {driversList.length} Drivers Dastyab
             </span>
           </div>
 
@@ -1597,7 +1600,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
                 <Wrench className="w-4 h-4 text-amber-400" />
-                <span>1. گھریلو سروسز اور سورس ورکرز کی تفویض (Home Services)</span>
+                <span>1. Gharelu Services o Source Workers (Home Services)</span>
               </h4>
               <span className="text-[11px] text-slate-400">
                 {editingServices.filter(s => Store.isServiceAvailable(s)).length} of {editingServices.length} Published
@@ -1647,14 +1650,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       {/* Source Provider Assignment Dropdown */}
                       <div className="p-3 bg-[#141825] rounded-xl border border-slate-800 space-y-2">
                         <label className="block text-[11px] font-bold text-slate-200">
-                          تفویض کردہ کاریگر / ورکر (Assigned Source):
+                          Assigned Source Worker:
                         </label>
                         <select
                           value={srv.assignedProviderId || ''}
                           onChange={(e) => handleAssignServiceSource(srv.id, e.target.value)}
                           className="w-full text-xs rounded-lg border border-slate-700 px-2.5 py-1.5 bg-[#0a0d14] text-white font-medium focus:border-amber-400 focus:outline-hidden"
                         >
-                          <option value="" className="bg-[#0a0d14] text-slate-400">-- بغیر کاریگر (ہائیڈن رہے گی) --</option>
+                          <option value="" className="bg-[#0a0d14] text-slate-400">-- Baghair Worker (Hidden Rahe Gi) --</option>
                           {techniciansList.map(t => (
                             <option key={t.id} value={t.id} className="bg-[#0a0d14] text-white">
                               {t.name} ({t.phone}) - {t.serviceSkill || 'Technician'}
@@ -1664,7 +1667,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                         {!srv.assignedProviderId && (
                           <div className="flex items-center justify-between pt-1">
-                            <span className="text-[10px] text-amber-400">ورکر شامل کرنے کے بعد لائیو ہو گی۔</span>
+                            <span className="text-[10px] text-amber-400">Worker assign karne ke baad live ho gi.</span>
                             <button
                               type="button"
                               onClick={() => {
@@ -1675,7 +1678,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               }}
                               className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer"
                             >
-                              + نیا ورکر شامل کریں
+                              + Naya Worker Shamil Karein
                             </button>
                           </div>
                         )}
@@ -1685,7 +1688,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-3">
                         <div className="flex-1">
                           <label className="block text-[10px] font-semibold text-slate-400">
-                            ابتدائی ریٹ (PKR)
+                            Starting Rate (PKR)
                           </label>
                           <input
                             type="number"
@@ -1703,7 +1706,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           title="Delete service permanently from catalog"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                          <span>ڈیلیٹ</span>
+                          <span>Delete</span>
                         </button>
                       </div>
                     </div>
@@ -1717,7 +1720,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
                 <Truck className="w-4 h-4 text-amber-400" />
-                <span>2. کارگو و رکشہ بیڑا اور ڈرائیور تفویض (Cargo Fleet & Drivers)</span>
+                <span>2. Cargo o Riksha Fleet aur Driver Assign (Cargo Fleet)</span>
               </h4>
               <span className="text-[11px] text-slate-400">
                 {editingVehicles.filter(v => Store.isVehicleAvailable(v)).length} of {editingVehicles.length} Published
@@ -1745,7 +1748,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <span className="font-bold text-white block text-xs">{veh.name}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">گنجائش: {veh.capacityKg} کلوگرام</span>
+                          <span className="text-[10px] text-slate-400 font-mono">Capacity: {veh.capacityKg} kg</span>
                         </div>
                         <button
                           type="button"
@@ -1765,14 +1768,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       {/* Driver Source Selector */}
                       <div className="p-2.5 bg-[#141825] rounded-xl border border-slate-800 space-y-1.5">
                         <label className="block text-[10px] font-bold text-slate-200">
-                          تفویض شدہ ڈرائیور (Driver Source):
+                          Driver Source:
                         </label>
                         <select
                           value={veh.assignedProviderId || ''}
                           onChange={(e) => handleAssignVehicleSource(veh.id, e.target.value)}
                           className="w-full text-xs rounded-lg border border-slate-700 px-2 py-1.5 bg-[#0a0d14] text-white font-medium focus:border-amber-400 focus:outline-hidden"
                         >
-                          <option value="" className="bg-[#0a0d14] text-slate-400">-- بغیر ڈرائیور (ہائیڈن رہے گی) --</option>
+                          <option value="" className="bg-[#0a0d14] text-slate-400">-- Baghair Driver (Hidden Rahe Gi) --</option>
                           {driversList.map(d => (
                             <option key={d.id} value={d.id} className="bg-[#0a0d14] text-white">
                               {d.name} ({d.phone}) - {d.vehicleType || 'Driver'}
@@ -1782,7 +1785,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                         {!veh.assignedProviderId && (
                           <div className="flex items-center justify-between pt-0.5">
-                            <span className="text-[10px] text-amber-400">ڈرائیور تفویض ہونے پر لائیو ہوگی۔</span>
+                            <span className="text-[10px] text-amber-400">Driver assign hone par live hogi.</span>
                             <button
                               type="button"
                               onClick={() => {
@@ -1793,7 +1796,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               }}
                               className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer"
                             >
-                              + ڈرائیور شامل کریں
+                              + Driver Shamil Karein
                             </button>
                           </div>
                         )}
@@ -1802,7 +1805,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       {/* Rates Editor */}
                       <div className="space-y-2">
                         <div>
-                          <label className="block text-[10px] font-semibold text-slate-400">بنیادی کرایہ Base Fare (PKR)</label>
+                          <label className="block text-[10px] font-semibold text-slate-400">Base Fare (PKR)</label>
                           <input
                             type="number"
                             step={50}
@@ -1813,7 +1816,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="block text-[10px] font-semibold text-slate-400">فی کلومیٹر (PKR)</label>
+                            <label className="block text-[10px] font-semibold text-slate-400">Per KM (PKR)</label>
                             <input
                               type="number"
                               step={5}
@@ -1823,7 +1826,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             />
                           </div>
                           <div>
-                            <label className="block text-[10px] font-semibold text-slate-400">ہیلپر چارجز (PKR)</label>
+                            <label className="block text-[10px] font-semibold text-slate-400">Helper Charges (PKR)</label>
                             <input
                               type="number"
                               step={50}
@@ -1844,7 +1847,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           title="Delete vehicle permanently from catalog"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                          <span>گاڑی حذف کریں</span>
+                          <span>Gaari Delete Karein</span>
                         </button>
                       </div>
                     </div>
@@ -1867,7 +1870,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <div>
                   <h4 className="font-black text-white text-sm sm:text-base flex items-center gap-2">
-                    <span>خانیوال کنیکٹ - آرڈر آڈٹ و پی ڈی ایف رسید</span>
+                    <span>Khanewal Connect - Order Audit o PDF Receipt</span>
                   </h4>
                   <p className="text-[11px] text-amber-400 font-mono">Invoice Ref: #{selectedOrderDetails.id}</p>
                 </div>
@@ -2456,15 +2459,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-amber-400 font-bold mb-1">Assigned Login Password *</label>
-                  <input
-                    type="text"
-                    required
-                    value={newUserPassword}
-                    onChange={(e) => setNewUserPassword(e.target.value)}
-                    placeholder="Worker@123"
-                    className="w-full text-xs font-mono rounded-xl border border-slate-700 bg-[#141825] px-3.5 py-2.5 text-white placeholder-slate-500 focus:border-amber-400 focus:outline-hidden"
-                  />
+                  <label className="block text-amber-400 font-bold mb-1 text-left">Assigned Login Password *</label>
+                  <div className="relative">
+                    <input
+                      type={showNewUserPassword ? "text" : "password"}
+                      required
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      placeholder="Worker@123"
+                      className="w-full text-xs font-mono rounded-xl border border-slate-700 bg-[#141825] pl-3.5 pr-10 py-2.5 text-white placeholder-slate-500 focus:border-amber-400 focus:outline-hidden text-left"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewUserPassword(!showNewUserPassword)}
+                      className="absolute right-3 top-2.5 p-1 text-slate-400 hover:text-amber-400 transition-colors cursor-pointer"
+                      title={showNewUserPassword ? "Hide password" : "Show password"}
+                    >
+                      {showNewUserPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -2598,21 +2611,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               )}
 
               <div>
-                <label className="block text-amber-400 font-bold mb-1.5">
+                <label className="block text-amber-400 font-bold mb-1.5 text-left">
                   Khufia Key darj karein (Enter Secret Key) *
                 </label>
                 <div className="relative">
                   <input
-                    type="password"
+                    type={showResetSecretKey ? "text" : "password"}
                     required
                     value={resetSecretKey}
                     onChange={(e) => setResetSecretKey(e.target.value)}
                     placeholder="Enter RESET_KEY..."
-                    className="w-full text-xs font-mono font-bold rounded-xl border border-slate-700 bg-[#141825] px-3.5 py-2.5 text-white placeholder-slate-500 focus:border-rose-400 focus:outline-hidden"
+                    className="w-full text-xs font-mono font-bold rounded-xl border border-slate-700 bg-[#141825] pl-3.5 pr-10 py-2.5 text-white placeholder-slate-500 focus:border-rose-400 focus:outline-hidden text-left"
                   />
-                  <KeyRound className="w-4 h-4 text-slate-500 absolute right-3 top-3" />
+                  <button
+                    type="button"
+                    onClick={() => setShowResetSecretKey(!showResetSecretKey)}
+                    className="absolute right-3 top-2.5 p-1 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+                    title={showResetSecretKey ? "Hide key" : "Show key"}
+                  >
+                    {showResetSecretKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
-                <span className="text-[10px] text-slate-500 block mt-1">
+                <span className="text-[10px] text-slate-500 block mt-1 text-left">
                   Must match GitHub Secret <code className="font-mono text-slate-400">RESET_KEY</code>.
                 </span>
               </div>

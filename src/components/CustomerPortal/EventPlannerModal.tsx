@@ -309,7 +309,7 @@ export const EventPlannerModal: React.FC<EventPlannerModalProps> = ({
         )}
 
         {/* Form Body - Scrollable */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-4 text-xs">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0 space-y-4 text-xs">
           
           {/* STEP 1: EVENT TYPE */}
           {currentStep === 1 && (
@@ -734,7 +734,7 @@ export const EventPlannerModal: React.FC<EventPlannerModalProps> = ({
               onClick={() => setCurrentStep(prev => prev - 1)}
               className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer border border-slate-800"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronLeft className="w-4 h-4" />
               <span>Pichla Marhala (Back)</span>
             </button>
           ) : (
@@ -754,7 +754,7 @@ export const EventPlannerModal: React.FC<EventPlannerModalProps> = ({
               className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
             >
               <span>Agla Marhala (Next)</span>
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4" />
             </button>
           ) : (
             <button
