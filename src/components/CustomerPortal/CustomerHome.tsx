@@ -325,9 +325,11 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
         {/* 1. Header with branding and notification bell */}
         <div className="flex items-center justify-between gap-3 border-b border-amber-500/20 pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-400 via-amber-500 to-yellow-400 text-slate-950 flex items-center justify-center font-black text-lg shadow-lg shadow-amber-500/30 shrink-0">
-              KC
-            </div>
+            <img
+              src="/assets/aistudio/IMG-20261028-WA0027_c07670f1.jpg"
+              alt="Khanewal Connect Official Logo"
+              className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border-2 border-amber-400 shadow-xl shadow-amber-500/20 shrink-0"
+            />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg sm:text-xl font-black tracking-tight text-white">

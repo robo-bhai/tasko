@@ -11,14 +11,14 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
+        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'app-logo.png'],
         manifest: {
           id: '/',
           name: 'Khanewal Connect',
           short_name: 'KhwConnect',
           description: 'Khanewal City and nearby areas on-demand delivery, certified home repairs, and cargo transport.',
-          theme_color: '#0f172a',
-          background_color: '#ffffff',
+          theme_color: '#07080c',
+          background_color: '#07080c',
           display: 'standalone',
           start_url: '/',
           scope: '/',

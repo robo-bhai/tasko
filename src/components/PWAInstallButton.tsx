@@ -135,9 +135,11 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
             {/* Modal Header */}
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-600 text-slate-950 flex items-center justify-center font-black shadow-md">
-                  KC
-                </div>
+                <img
+                  src="/assets/aistudio/IMG-20261028-WA0027_c07670f1.jpg"
+                  alt="Khanewal Connect Official App Logo"
+                  className="w-12 h-12 rounded-full object-cover border-2 border-amber-400 shadow-lg shadow-amber-500/20 shrink-0"
+                />
                 <div>
                   <h3 className="font-extrabold text-base text-white">
                     {isUrdu ? 'Khanewal Connect App Installation' : 'Khanewal Connect App'}

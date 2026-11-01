@@ -151,9 +151,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* Header */}
         <div className="px-3.5 py-3 sm:px-6 sm:py-4 bg-[#090a0f] text-white flex items-center justify-between border-b border-amber-500/20 shrink-0">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 text-slate-950 flex items-center justify-center font-black text-xs sm:text-sm shadow-md shrink-0">
-              KC
-            </div>
+            <img
+              src="/assets/aistudio/IMG-20261028-WA0027_c07670f1.jpg"
+              alt="Khanewal Connect Official Logo"
+              className="w-9 h-9 sm:w-11 sm:h-11 rounded-full object-cover border-2 border-amber-400 shadow-md shrink-0"
+            />
             <div>
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <h3 className="text-xs sm:text-base font-extrabold text-white tracking-tight">

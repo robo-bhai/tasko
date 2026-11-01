@@ -350,9 +350,11 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
               <div className="space-y-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-400 to-amber-500 text-slate-950 font-black text-sm flex items-center justify-center shadow-md">
-                    KC
-                  </div>
+                  <img
+                    src="/assets/aistudio/IMG-20261028-WA0027_c07670f1.jpg"
+                    alt="Khanewal Connect Official Logo"
+                    className="w-9 h-9 rounded-full object-cover border-2 border-amber-400 shadow-md shrink-0"
+                  />
                   <span className="font-extrabold text-white text-base tracking-tight">
                     {t.appName}
                   </span>

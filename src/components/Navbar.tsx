@@ -62,27 +62,27 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-[#090a0f]/95 backdrop-blur-md border-b border-amber-500/20 shadow-xl text-white">
+    <header className="sticky top-0 z-40 bg-[#090a0f]/95 backdrop-blur-md border-b border-amber-500/20 shadow-xl text-white w-full overflow-hidden">
       {/* Top Location & Language Bar */}
-      <div className="bg-[#050608] text-slate-300 text-[11px] py-1.5 px-3 sm:px-6 border-b border-slate-900">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
-          <div className="flex items-center gap-2 truncate">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
-            <span className="truncate font-semibold text-slate-300">
+      <div className="bg-[#050608] text-slate-300 text-[10px] sm:text-[11px] py-1 px-2.5 sm:px-6 border-b border-slate-900 overflow-hidden">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-1.5 sm:gap-4">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+            <span className="truncate font-semibold text-slate-300 text-[10px] sm:text-[11px]">
               {isUrdu 
-                ? '📍 Khanewal City, Peoples Colony, Civil Lines, Tariq Abad & Chak No. mein on-demand dastyab' 
-                : '📍 Operating exclusively across Khanewal City, Cantt, Peoples Colony & Nearby Areas'}
+                ? '📍 Khanewal City, Cantt & Chak No. On-Demand' 
+                : '📍 Operating across Khanewal City & Nearby Areas'}
             </span>
           </div>
 
-          <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Language Switcher */}
             <button
               onClick={onToggleLang}
-              className="flex items-center gap-1.5 text-amber-300 hover:text-white bg-slate-900 hover:bg-slate-800 px-2.5 py-0.5 rounded-full text-xs font-bold transition-colors border border-amber-500/30 cursor-pointer"
+              className="flex items-center gap-1 text-amber-300 hover:text-white bg-slate-900 hover:bg-slate-800 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold transition-colors border border-amber-500/30 cursor-pointer shrink-0"
               title="Change Language (English / Roman Urdu)"
             >
-              <Globe className="w-3.5 h-3.5 text-amber-400" />
+              <Globe className="w-3 h-3 text-amber-400" />
               <span>{isUrdu ? 'English' : 'Roman Urdu'}</span>
             </button>
 
@@ -95,26 +95,28 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Main Bar */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-3">
+      <div className="max-w-7xl mx-auto px-2 sm:px-6 py-2 sm:py-2.5 flex items-center justify-between gap-1.5 sm:gap-3 w-full overflow-hidden">
         {/* Brand */}
-        <div className="flex items-center gap-4 sm:gap-6">
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
           <button 
             onClick={() => setActivePortal('customer')} 
-            className="flex items-center gap-2 sm:gap-2.5 text-left group cursor-pointer"
+            className="flex items-center gap-1.5 sm:gap-2.5 text-left group cursor-pointer shrink-0"
           >
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 text-slate-950 flex items-center justify-center font-black text-sm shadow-lg group-hover:scale-105 transition-transform shrink-0">
-              KC
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-black text-white text-base sm:text-lg tracking-tight group-hover:text-amber-400 transition-colors">
+            <img
+              src="/assets/aistudio/IMG-20261028-WA0027_c07670f1.jpg"
+              alt="Khanewal Connect Official Logo"
+              className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-amber-400/80 shadow-md group-hover:scale-105 transition-transform shrink-0"
+            />
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <span className="font-black text-white text-xs sm:text-base md:text-lg tracking-tight group-hover:text-amber-400 transition-colors whitespace-nowrap">
                   {t.appName}
                 </span>
-                <span className="bg-amber-400/10 text-amber-400 border border-amber-400/30 text-[10px] font-extrabold px-1.5 py-0.2 rounded-full uppercase tracking-wider">
+                <span className="hidden xs:inline-block bg-amber-400/10 text-amber-400 border border-amber-400/30 text-[9px] font-extrabold px-1.5 py-0.2 rounded-full uppercase tracking-wider">
                   KHANEWAL
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-medium hidden md:block">
+              <p className="text-[9px] sm:text-[10px] text-slate-400 font-medium hidden md:block">
                 {t.appSlogan}
               </p>
             </div>
@@ -147,7 +149,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Right Action Zone */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           {/* PWA Install Button */}
           <div className="hidden sm:block">
             <PWAInstallButton isUrdu={isUrdu} variant="navbar" />
@@ -157,12 +159,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           {currentUser && (
             <button
               onClick={() => onOpenLiveTracker()}
-              className="relative px-2.5 sm:px-3 py-1.5 rounded-xl border border-amber-500/30 bg-[#12141e] hover:bg-[#1a1c2a] text-amber-300 text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+              className="relative p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border border-amber-500/30 bg-[#12141e] hover:bg-[#1a1c2a] text-amber-300 text-xs font-bold flex items-center gap-1 transition-colors shadow-sm cursor-pointer shrink-0"
+              title={isUrdu ? 'Meri Live Tracking' : 'My Live Tracker'}
             >
               <Radio className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-              <span className="hidden md:inline">{isUrdu ? 'Meri Tracking' : 'My Live Tracker'}</span>
+              <span className="hidden md:inline">{isUrdu ? 'Tracking' : 'Tracker'}</span>
               {pendingOrActiveCount > 0 && (
-                <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 text-[10px] flex items-center justify-center font-black">
+                <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 text-[9px] flex items-center justify-center font-black">
                   {pendingOrActiveCount}
                 </span>
               )}
@@ -171,20 +174,21 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* User Logged In State vs Guest Visitor State */}
           {currentUser ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
               {/* Role Portal Switching Button */}
               {currentUser.role === 'admin' && (
                 <button
                   onClick={() => setActivePortal(activePortal === 'admin' ? 'customer' : 'admin')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1 cursor-pointer shrink-0 ${
                     activePortal === 'admin'
                       ? 'bg-amber-400 text-slate-950 shadow-md'
                       : 'bg-[#141624] text-amber-400 hover:bg-[#1c1f32] border border-amber-500/30'
                   }`}
+                  title={activePortal === 'admin' ? 'Customer View' : 'Admin Panel'}
                 >
                   <ShieldCheck className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">
-                    {activePortal === 'admin' ? (isUrdu ? 'Customer View' : 'Customer View') : (isUrdu ? 'Admin Panel' : 'Admin Panel')}
+                    {activePortal === 'admin' ? 'Customer' : 'Admin'}
                   </span>
                 </button>
               )}
@@ -192,34 +196,35 @@ export const Navbar: React.FC<NavbarProps> = ({
               {currentUser.role === 'provider' && (
                 <button
                   onClick={() => setActivePortal(activePortal === 'provider' ? 'customer' : 'provider')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1 cursor-pointer shrink-0 ${
                     activePortal === 'provider'
                       ? 'bg-amber-400 text-slate-950 shadow-md'
                       : 'bg-[#141624] text-amber-400 hover:bg-[#1c1f32] border border-amber-500/30'
                   }`}
+                  title={activePortal === 'provider' ? 'Customer View' : 'Worker Portal'}
                 >
                   <Briefcase className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">
-                    {activePortal === 'provider' ? (isUrdu ? 'Customer View' : 'Customer View') : (isUrdu ? 'Worker Portal' : 'Worker Portal')}
+                    {activePortal === 'provider' ? 'Customer' : 'Worker'}
                   </span>
                 </button>
               )}
 
               {/* User Profile Pill & Signout */}
-              <div className="flex items-center gap-2 bg-[#12141f] border border-amber-500/30 pl-2 pr-1 py-1 rounded-2xl">
+              <div className="flex items-center gap-1 sm:gap-1.5 bg-[#12141f] border border-amber-500/30 p-1 sm:pl-2 sm:pr-1 sm:py-1 rounded-xl sm:rounded-2xl shrink-0">
                 <img
                   src={currentUser.avatar}
                   alt={currentUser.name}
-                  className="w-6 h-6 rounded-full object-cover shrink-0 border border-amber-400/50"
+                  className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover shrink-0 border border-amber-400/50"
                   referrerPolicy="no-referrer"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80';
                   }}
                 />
-                <span className="text-xs font-bold text-white max-w-[100px] truncate hidden md:inline">
+                <span className="text-xs font-bold text-white max-w-[80px] truncate hidden md:inline">
                   {currentUser.name}
                 </span>
-                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded uppercase ${
+                <span className={`text-[9px] font-black px-1 py-0.2 rounded uppercase hidden xs:inline-block ${
                   currentUser.role === 'admin'
                     ? 'bg-amber-400 text-slate-950'
                     : currentUser.role === 'provider'
@@ -233,23 +238,23 @@ export const Navbar: React.FC<NavbarProps> = ({
                   title={t.logout}
                   className="p-1 text-slate-400 hover:text-red-400 rounded-lg hover:bg-red-950/40 transition-colors cursor-pointer"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               <button
                 onClick={() => onOpenAuth('login')}
-                className="px-2.5 sm:px-3.5 py-1.5 rounded-xl text-slate-300 hover:text-amber-400 hover:bg-slate-900 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl text-slate-300 hover:text-amber-400 hover:bg-slate-900 text-[11px] sm:text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shrink-0"
               >
-                <LogIn className="w-3.5 h-3.5" />
+                <LogIn className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 <span>{isUrdu ? 'Login' : 'Sign In'}</span>
               </button>
 
               <button
                 onClick={() => onOpenAuth('customer_signup')}
-                className="px-3 sm:px-4 py-1.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 text-xs font-black rounded-xl transition-all shadow-md hidden sm:flex items-center gap-1.5 cursor-pointer"
+                className="px-2.5 sm:px-3.5 py-1 sm:py-1.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 text-[11px] sm:text-xs font-black rounded-xl transition-all shadow-md hidden sm:flex items-center gap-1 cursor-pointer shrink-0"
               >
                 <span>{isUrdu ? 'Sign Up' : 'Sign Up'}</span>
               </button>
@@ -259,9 +264,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Mobile hamburger menu toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-1.5 text-slate-300 hover:text-amber-400 rounded-lg border border-slate-800"
+            className="lg:hidden p-1 sm:p-1.5 text-slate-300 hover:text-amber-400 rounded-lg border border-slate-800 shrink-0 cursor-pointer"
+            aria-label="Open mobile navigation menu"
           >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {mobileMenuOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5" />}
           </button>
         </div>
       </div>
@@ -297,17 +303,73 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
 
-          {!currentUser && (
+          {currentUser ? (
+            <div className="pt-2 border-t border-slate-800 space-y-2">
+              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800">
+                <div className="flex items-center gap-2">
+                  <img
+                    src={currentUser.avatar}
+                    alt={currentUser.name}
+                    className="w-7 h-7 rounded-full object-cover border border-amber-400/50"
+                  />
+                  <div>
+                    <div className="text-xs font-bold text-white">{currentUser.name}</div>
+                    <div className="text-[10px] text-amber-400 capitalize">{currentUser.role} Account</div>
+                  </div>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="px-2.5 py-1 rounded-lg bg-red-950/60 border border-red-500/30 text-red-300 text-xs font-bold flex items-center gap-1 hover:bg-red-900/80 cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>{isUrdu ? 'Logout' : 'Sign Out'}</span>
+                </button>
+              </div>
+
+              {currentUser.role === 'admin' && (
+                <button
+                  onClick={() => { setActivePortal(activePortal === 'admin' ? 'customer' : 'admin'); setMobileMenuOpen(false); }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-amber-400 text-slate-950 text-xs font-black flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>{activePortal === 'admin' ? 'Switch to Customer View' : 'Open Admin Operations Panel'}</span>
+                </button>
+              )}
+
+              {currentUser.role === 'provider' && (
+                <button
+                  onClick={() => { setActivePortal(activePortal === 'provider' ? 'customer' : 'provider'); setMobileMenuOpen(false); }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-amber-400 text-slate-950 text-xs font-black flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                >
+                  <Briefcase className="w-4 h-4" />
+                  <span>{activePortal === 'provider' ? 'Switch to Customer View' : 'Open Worker / Driver Portal'}</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => { onOpenLiveTracker(); setMobileMenuOpen(false); }}
+                className="w-full py-2.5 px-3 rounded-xl bg-[#141624] text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Radio className="w-4 h-4 text-amber-400 animate-pulse" />
+                <span>{isUrdu ? 'Meri Live Order Tracking' : 'My Live Order Tracking'}</span>
+                {pendingOrActiveCount > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 text-[10px] flex items-center justify-center font-black">
+                    {pendingOrActiveCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          ) : (
             <div className="pt-2 border-t border-slate-800 flex gap-2">
               <button
                 onClick={() => { onOpenAuth('login'); setMobileMenuOpen(false); }}
-                className="flex-1 py-2 text-center rounded-xl border border-slate-700 text-xs font-bold text-slate-300 bg-slate-900"
+                className="flex-1 py-2 text-center rounded-xl border border-slate-700 text-xs font-bold text-slate-300 bg-slate-900 cursor-pointer"
               >
                 {isUrdu ? 'Login' : 'Sign In'}
               </button>
               <button
                 onClick={() => { onOpenAuth('customer_signup'); setMobileMenuOpen(false); }}
-                className="flex-1 py-2 text-center rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-xs font-black"
+                className="flex-1 py-2 text-center rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-xs font-black cursor-pointer shadow-md"
               >
                 {isUrdu ? 'Sign Up' : 'Sign Up'}
               </button>
