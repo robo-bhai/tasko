@@ -17,20 +17,6 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize Brevo API Instance Safely
-let apiInstance: any = null;
-try {
-  apiInstance = new TransactionalEmailsApi();
-  if (process.env.BREVO_API_KEY) {
-    apiInstance.setApiKey(
-      TransactionalEmailsApiApiKeys.apiKey,
-      process.env.BREVO_API_KEY
-    );
-  }
-} catch (e) {
-  console.warn('Brevo API initialization warning:', e);
-}
-
 async function syncSuperAdminFromEnv() {
   if (!isDbConnected()) return;
   const adminEmail = process.env.ADMIN_USERNAME || 'admin@omniserve.com';
@@ -64,11 +50,30 @@ async function startServer() {
   await initDbPool();
   await syncSuperAdminFromEnv();
 
+  // Initialize Brevo API Instance inside startServer to ensure environment variables are fully loaded
+  let apiInstance: any = null;
+  try {
+    apiInstance = new TransactionalEmailsApi();
+    const activeApiKey = process.env.BREVO_API_KEY;
+    if (activeApiKey) {
+      apiInstance.setApiKey(
+        TransactionalEmailsApiApiKeys.apiKey,
+        activeApiKey
+      );
+      console.log('[Brevo] API client initialized successfully with key starting with:', activeApiKey.substring(0, 8) + '...');
+    } else {
+      console.warn('[Brevo Warning] BREVO_API_KEY is missing from environment variables!');
+    }
+  } catch (e) {
+    console.error('[Brevo Error] Failed to initialize TransactionalEmailsApi:', e);
+  }
+
   // API Routes
   app.get('/api/health', (req: Request, res: Response) => {
     res.json({
       status: 'healthy',
       database: isDbConnected() ? 'mysql_connected' : 'memory_fallback',
+      brevoConfigured: Boolean(process.env.BREVO_API_KEY),
       adminUser: process.env.ADMIN_USERNAME ? 'configured_from_secret' : 'default_admin',
       timestamp: new Date().toISOString(),
       uptime: process.uptime()
@@ -137,10 +142,10 @@ async function startServer() {
       const clientUrl = req.headers.origin || `http://localhost:${PORT}`;
       const resetUrl = `${clientUrl}/reset-password?token=${resetToken}`;
 
-      // Prepare Brevo Transactional Email
+      // Prepare and send Brevo Transactional Email
       if (apiInstance && process.env.BREVO_API_KEY) {
         const sendSmtpEmail = new SendSmtpEmail();
-        sendSmtpEmail.subject = "Password Reset Request - Omnitask Super App";
+        sendSmtpEmail.subject = "Password Reset Request - Khanewal Connect";
         sendSmtpEmail.htmlContent = `
           <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
             <h2>Password Reset Request</h2>
@@ -154,19 +159,20 @@ async function startServer() {
           </div>
         `;
         sendSmtpEmail.sender = {
-          name: process.env.SENDER_NAME || "Omnitask Support",
-          email: process.env.SENDER_EMAIL || "no-reply@omnitask.app"
+          name: process.env.SENDER_NAME || "kwl connect",
+          email: process.env.SENDER_EMAIL || "support@kwlconnect.online"
         };
         sendSmtpEmail.to = [{ email: user.email, name: user.name || 'User' }];
 
-        await apiInstance.sendTransacEmail(sendSmtpEmail);
+        const emailResponse = await apiInstance.sendTransacEmail(sendSmtpEmail);
+        console.log('[Brevo Success] Password reset email sent successfully:', emailResponse);
       } else {
-        console.warn('Brevo API key not configured. Skipping actual email send.');
+        console.warn('[Brevo Warning] Brevo API key or instance not configured. Skipping actual email send.');
       }
 
       return res.status(200).json({ success: true, message: 'Password reset link aapke email par bhej diya gaya hai.' });
     } catch (error: any) {
-      console.error('[Brevo Error] Failed to send reset email:', error);
+      console.erorr('[Brevo Error Detail]:', error.response ? JSON.stringify(error.response.body) : error.message);
       return res.status(500).json({ success: false, message: 'Email bhejne mein nakami hui. Baraye meherbani baad mein koshish karein.' });
     }
   });
