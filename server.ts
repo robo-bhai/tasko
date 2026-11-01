@@ -4,8 +4,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
-import pkg from '@getbrevo/brevo';
-const { TransactionalEmailsApi, SendSmtpEmail, TransactionalEmailsApiApiKeys } = pkg;
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const Brevo = require('@getbrevo/brevo');
+const { TransactionalEmailsApi, SendSmtpEmail, TransactionalEmailsApiApiKeys } = Brevo;
+
 import { initDbPool, isDbConnected, query } from './src/server/db.js';
 
 dotenv.config();
