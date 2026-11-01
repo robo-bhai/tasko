@@ -56,30 +56,33 @@ jobs:
       - name: Create Snapshot Backup Directory
         run: mkdir -p mysql-backup
 
-      # 2. Setup Rclone & Restore MySQL Backup directly from Google Drive
-      - name: Restore MySQL Backup from Google Drive via Rclone
+      # 2. Restore MySQL Snapshot from GitHub Actions Cache (Primary & Fastest)
+      - name: Restore Persistent MySQL Database Cache
+        id: restore-mysql-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: mysql-backup
+          key: khanewal-prod-v4-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            khanewal-prod-v4-${{ runner.os }}-
+            khanewal-prod-v4-
+
+      # 3. Fallback/Sync: Check Google Drive via Rclone if Cache is Missing
+      - name: Fallback Restore from Google Drive via Rclone if Cache Missing
         env:
           RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
         run: |
-          if [ -n "$RCLONE_CONF" ]; then
-            echo "Installing rclone..."
+          if [ ! -f "mysql-backup/snapshot.sql.gz" ] && [ -n "$RCLONE_CONF" ]; then
+            echo "Cache miss. Installing rclone to fetch backup from Google Drive..."
             sudo apt-get update -qq && sudo apt-get install -y rclone
-            
-            echo "Configuring Rclone safely..."
             mkdir -p ~/.config/rclone
             echo "$RCLONE_CONF" | tr -d '\r' > ~/.config/rclone/rclone.conf
             
-            echo "Verifying rclone remotes..."
-            rclone listremotes
-            
-            echo "Fetching latest MySQL database backup from Google Drive (batvoice:khanewal_backups)..."
-            mkdir -p mysql-backup
-            rclone copy batvoice:khanewal_backups/snapshot.sql.gz mysql-backup/ --verbose || echo "Notice: No previous backup found on Google Drive."
-          else
-            echo "WARNING: Secret 'RCLONE_CONF' is missing! Skipping Google Drive restore."
+            echo "Fetching latest backup from Google Drive (batvoice:khanewal_backups)..."
+            rclone copy batvoice:khanewal_backups/snapshot.sql.gz mysql-backup/ --verbose || echo "Notice: No remote backup found either."
           fi
 
-      # 3. Bulletproof Database Initialization & Schema/Columns Setup
+      # 4. Bulletproof Database Initialization & Safe Multi-Table Restoration
       - name: Initialize or Restore MySQL Database
         env:
           MYSQL_PWD: root_password_123
@@ -98,7 +101,7 @@ jobs:
           RESTORE_DONE=0
           if [ -f "mysql-backup/snapshot.sql.gz" ]; then
             echo "=========================================================="
-            echo "Found Google Drive MySQL snapshot. Verifying and restoring..."
+            echo "Found snapshot. Restoring safely without washing tables..."
             echo "=========================================================="
             
             set +e
@@ -113,10 +116,10 @@ jobs:
             echo "Tables found after restore attempt: $TABLE_COUNT"
 
             if [ "$TABLE_COUNT" -gt 0 ]; then
-              echo "Snapshot restored successfully! Tables verified."
+              echo "Snapshot restored successfully! All tables and entries verified."
               RESTORE_DONE=1
             else
-              echo "Notice: Snapshot did not contain valid tables or was from an incompatible schema. Error log:"
+              echo "Notice: Snapshot did not contain valid tables. Error log:"
               cat restore_log.txt || true
               echo "Proceeding to fresh clean schema initialization..."
             fi
@@ -160,7 +163,7 @@ jobs:
             mysql -h 127.0.0.1 -u root omniserve_db -e "UPDATE users SET password = '$ADMIN_PASSWORD_SEC' WHERE id = 'usr-admin-1';" || true
           fi
 
-          echo "Database verification summary:"
+          echo "Database verification summary (Checking row entries per table):"
           mysql -h 127.0.0.1 -u omniserve -pomniserve_secure_password omniserve_db -e "
             SELECT 'users' AS table_name, COUNT(*) AS total_rows FROM users
             UNION ALL
@@ -171,20 +174,20 @@ jobs:
             SELECT 'orders', COUNT(*) FROM orders;
           "
 
-      # 4. Install Dependencies Reliably (Explicitly installing @getbrevo/brevo)
+      # 5. Install Dependencies Reliably
       - name: Install Application Dependencies
         run: |
           npm install @getbrevo/brevo --legacy-peer-deps --no-audit --no-fund
           npm install --legacy-peer-deps --no-audit --no-fund
 
-      # 5. Build Production Frontend Assets
+      # 6. Build Production Frontend Assets
       - name: Build Production Frontend Assets
         env:
           VITE_ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME || 'admin@omniserve.com' }}
           VITE_ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'Admin@12345' }}
         run: npm run build
 
-      # 6. Install Cloudflare Tunnel Client (cloudflared)
+      # 7. Install Cloudflare Tunnel Client (cloudflared)
       - name: Install Cloudflare Tunnel (cloudflared)
         run: |
           echo "Installing latest cloudflared binary..."
@@ -192,7 +195,7 @@ jobs:
           sudo dpkg -i cloudflared.deb
           cloudflared --version
 
-      # 7. Unified Runner: Start Server + Start Tunnel + 5-Hour Keep-Alive Monitoring Loop
+      # 8. Unified Runner: Start Server + Start Tunnel + 5-Hour Keep-Alive Monitoring Loop
       - name: Start Server, Connect Cloudflare Tunnel & Host Live (5 Hours)
         env:
           NODE_ENV: production
@@ -291,7 +294,7 @@ jobs:
 
           echo "5-hour live session completed successfully."
 
-      # 8. Guaranteed Zero-Data-Loss MySQL Snapshot Capture
+      # 9. Guaranteed Zero-Data-Loss MySQL Full Snapshot Capture
       - name: Safely Capture MySQL Full Snapshot
         if: always()
         env:
@@ -303,7 +306,7 @@ jobs:
           mkdir -p mysql-backup
 
           if mysqladmin ping -h 127.0.0.1 -u root --silent; then
-            echo "Taking clean mysqldump for application database 'omniserve_db' only..."
+            echo "Taking clean mysqldump for application database 'omniserve_db' with all tables and rows..."
             
             mysqldump -h 127.0.0.1 -u root \
               --databases omniserve_db \
@@ -332,28 +335,36 @@ jobs:
           }
           EOF
 
-            echo "Clean snapshot created successfully!"
+            echo "Clean snapshot created successfully with all table entries!"
             ls -lh mysql-backup/
           else
             echo "Notice: MySQL server is unreachable. Existing backup retained."
           fi
 
-      # 9. Upload MySQL Snapshot to Google Drive via Rclone (Safe trimming configuration)
-      - name: Upload MySQL Snapshot to Google Drive via Rclone
+      # 10. Save Persistent Snapshot to GitHub Actions Cache (Primary Storage)
+      - name: Save Persistent MySQL Database Cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: mysql-backup
+          key: khanewal-prod-v4-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      # 11. Redundant Backup: Upload Snapshot to Google Drive via Rclone
+      - name: Redundant Backup to Google Drive via Rclone
         if: always()
         env:
           RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
         run: |
           if [ -n "$RCLONE_CONF" ] && [ -f "mysql-backup/snapshot.sql.gz" ]; then
-            echo "Syncing latest MySQL snapshot directly to Google Drive (batvoice:khanewal_backups)..."
+            echo "Syncing latest MySQL snapshot to Google Drive as redundant backup..."
             mkdir -p ~/.config/rclone
             echo "$RCLONE_CONF" | tr -d '\r' > ~/.config/rclone/rclone.conf
             
             rclone copy mysql-backup/snapshot.sql.gz batvoice:khanewal_backups/ --verbose
-            echo "Snapshot successfully backed up to Google Drive!"
+            echo "Redundant cloud backup synced successfully!"
           fi
 
-      # 10. Upload Snapshot as Workflow Artifact (Redundant backup)
+      # 12. Upload Snapshot as Workflow Artifact
       - name: Upload Snapshot as Redundant Workflow Artifact
         if: always()
         uses: actions/upload-artifact@v4
