@@ -16,7 +16,9 @@ import {
   MessageCircle,
   Sparkles,
   Eye,
-  EyeOff
+  EyeOff,
+  KeyRound,
+  ArrowLeft
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -37,7 +39,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const t = translations[lang];
   const isUrdu = lang === 'ur';
 
-  const [activeTab, setActiveTab] = useState<'login' | 'customer_signup'>('login');
+  const [activeTab, setActiveTab] = useState<'login' | 'customer_signup' | 'forgot_password'>('login');
   
   // Login fields
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -52,6 +54,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [showCustPassword, setShowCustPassword] = useState(false);
   const [custAddress, setCustAddress] = useState('');
   const [custAreaId, setCustAreaId] = useState(KHANEWAL_LOCAL_AREAS[0].id);
+
+  // Forgot Password field
+  const [forgotEmail, setForgotEmail] = useState('');
 
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -138,6 +143,45 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    if (!forgotEmail.trim()) {
+      setErrorMessage(isUrdu ? 'Barae meherbani email address darj karein.' : 'Please enter your email address.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.trim() })
+      });
+      const data = await res.json();
+      setIsSubmitting(false);
+
+      if (data.success) {
+        setSuccessMessage(
+          data.message || 
+          (isUrdu ? 'Password reset link aapke email par bhej diya gaya hai.' : 'Password reset link has been sent to your email.')
+        );
+      } else {
+        setErrorMessage(
+          data.message || 
+          (isUrdu ? 'Email bhejne mein kharabi aayi. Dobara koshish karein.' : 'Failed to send reset link. Please try again.')
+        );
+      }
+    } catch (err) {
+      setIsSubmitting(false);
+      setErrorMessage(
+        isUrdu ? 'Server se rabta nahi ho saka. Dobara koshish karein.' : 'Network error. Please try again later.'
+      );
+    }
+  };
+
   const whatsappAdminNumber = (Store.getSettings().whatsappSupportPhone || '+923040975351').replace(/[^0-9]/g, '');
   const partnerOnboardUrl = `https://wa.me/${whatsappAdminNumber}?text=${encodeURIComponent(
     isUrdu 
@@ -172,7 +216,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-amber-400 p-1 rounded-lg transition-colors hover:bg-slate-800"
+            className="text-slate-400 hover:text-amber-400 p-1 rounded-lg transition-colors hover:bg-slate-800 cursor-pointer"
           >
             <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
@@ -187,31 +231,33 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         )}
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-800 bg-[#0a0c12] p-1 gap-1 text-[11px] sm:text-xs font-semibold shrink-0">
-          <button
-            onClick={() => { setActiveTab('login'); setErrorMessage(''); }}
-            className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-3 rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
-              activeTab === 'login'
-                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-            }`}
-          >
-            <UserCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-            <span className="truncate">{isUrdu ? 'Login' : 'Sign In'}</span>
-          </button>
-          
-          <button
-            onClick={() => { setActiveTab('customer_signup'); setErrorMessage(''); }}
-            className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-3 rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
-              activeTab === 'customer_signup'
-                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-            }`}
-          >
-            <ShoppingBag className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-            <span className="truncate">{isUrdu ? 'Naya Account Banayein' : 'Create Account'}</span>
-          </button>
-        </div>
+        {activeTab !== 'forgot_password' && (
+          <div className="flex border-b border-slate-800 bg-[#0a0c12] p-1 gap-1 text-[11px] sm:text-xs font-semibold shrink-0">
+            <button
+              onClick={() => { setActiveTab('login'); setErrorMessage(''); setSuccessMessage(''); }}
+              className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-3 rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
+                activeTab === 'login'
+                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <UserCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+              <span className="truncate">{isUrdu ? 'Login' : 'Sign In'}</span>
+            </button>
+            
+            <button
+              onClick={() => { setActiveTab('customer_signup'); setErrorMessage(''); setSuccessMessage(''); }}
+              className={`flex-1 py-2 sm:py-2.5 px-2 sm:px-3 rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
+                activeTab === 'customer_signup'
+                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <ShoppingBag className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+              <span className="truncate">{isUrdu ? 'Naya Account Banayein' : 'Create Account'}</span>
+            </button>
+          </div>
+        )}
 
         {/* Body */}
         <div className="p-3.5 sm:p-6 overflow-y-auto flex-1">
@@ -251,9 +297,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-bold mb-1.5 text-left">
-                  {isUrdu ? 'Password' : 'Password'} *
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-slate-300 font-bold text-left">
+                    {isUrdu ? 'Password' : 'Password'} *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => { setActiveTab('forgot_password'); setErrorMessage(''); setSuccessMessage(''); }}
+                    className="text-amber-400 hover:underline text-[11px] font-medium cursor-pointer"
+                  >
+                    {isUrdu ? 'Password bhool gaye?' : 'Forgot Password?'}
+                  </button>
+                </div>
                 <div className="relative">
                   <Lock className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3 pointer-events-none" />
                   <input
@@ -401,6 +456,60 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 {isSubmitting ? (isUrdu ? 'Account Ban Raha Hai...' : 'Creating...') : (isUrdu ? 'Customer Account Mukammal Karein' : 'Complete Registration')}
               </button>
             </form>
+          )}
+
+          {/* TAB 3: FORGOT PASSWORD (BREVO INTEGRATED) */}
+          {activeTab === 'forgot_password' && (
+            <div className="space-y-4 text-xs">
+              <button
+                type="button"
+                onClick={() => { setActiveTab('login'); setErrorMessage(''); setSuccessMessage(''); }}
+                className="flex items-center gap-1.5 text-amber-400 hover:underline font-bold text-xs cursor-pointer mb-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>{isUrdu ? 'Wapas Login par jayein' : 'Back to Login'}</span>
+              </button>
+
+              <div className="flex items-center gap-2 mb-2">
+                <KeyRound className="w-5 h-5 text-amber-400" />
+                <h4 className="text-sm font-bold text-white">
+                  {isUrdu ? 'Password Reset Karein' : 'Reset Your Password'}
+                </h4>
+              </div>
+
+              <p className="text-slate-400 text-xs">
+                {isUrdu 
+                  ? 'Apna registered Email address darj karein. Hum aapko Brevo API ke zariye password reset karne ka link email bhejenge.'
+                  : 'Enter your registered email address. We will send you a password reset link via Brevo transactional email.'}
+              </p>
+
+              <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">
+                    {isUrdu ? 'Registered Email Address' : 'Registered Email Address'} *
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
+                    <input
+                      type="email"
+                      required
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="user@gmail.com"
+                      className="w-full rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 py-2.5 pl-9 pr-3 font-mono focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-3 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 text-xs font-black rounded-xl transition-all shadow-lg hover:shadow-amber-500/20 disabled:opacity-50 cursor-pointer"
+                >
+                  {isSubmitting ? (isUrdu ? 'Reset Link Bhej Raha Hai...' : 'Sending Link...') : (isUrdu ? 'Reset Link Bhejin (Brevo Email)' : 'Send Reset Link')}
+                </button>
+              </form>
+            </div>
           )}
 
           {/* Provider / Driver Onboarding Banner (Strictly directs to Admin WhatsApp) */}

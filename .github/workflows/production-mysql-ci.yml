@@ -56,7 +56,7 @@ jobs:
       - name: Create Snapshot Backup Directory
         run: mkdir -p mysql-backup
 
-      # 2. Restore MySQL Snapshot from Previous Workflow Run (Fresh isolated cache key)
+      # 2. Restore MySQL Snapshot from Previous Workflow Run
       - name: Restore Persistent MySQL Database Cache
         id: restore-mysql-cache
         uses: actions/cache/restore@v4
@@ -67,10 +67,12 @@ jobs:
             khanewal-prod-v4-${{ runner.os }}-
             khanewal-prod-v4-
 
-      # 3. Bulletproof Database Initialization (Safely skips corrupt system dumps)
+      # 3. Bulletproof Database Initialization & Schema/Columns Setup
       - name: Initialize or Restore MySQL Database
         env:
           MYSQL_PWD: root_password_123
+          ADMIN_USERNAME_SEC: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD_SEC: ${{ secrets.ADMIN_PASSWORD }}
         run: |
           echo "Waiting for MySQL container readiness..."
           until mysqladmin ping -h 127.0.0.1 -u root --silent; do
@@ -87,7 +89,6 @@ jobs:
             echo "Found existing cached MySQL snapshot. Verifying and restoring..."
             echo "=========================================================="
             
-            # Filter out any system schema 'mysql', 'sys', 'information_schema' statements that trigger Error 3552 in MySQL 8
             set +e
             zcat mysql-backup/snapshot.sql.gz \
               | sed -E '/(CREATE DATABASE|USE)[[:space:]]+`?(mysql|sys|performance_schema|information_schema)`?/Id' \
@@ -113,20 +114,29 @@ jobs:
             echo "=========================================================="
             echo "Initializing fresh production schema from db/schema.sql..."
             echo "=========================================================="
-            mysql -h 127.0.0.1 -u root omniserve_db < db/schema.sql
-            echo "Fresh schema and initial seed data initialized successfully."
+            if [ -f "db/schema.sql" ]; then
+              mysql -h 127.0.0.1 -u root omniserve_db < db/schema.sql
+            else
+              echo "WARNING: db/schema.sql not found!"
+            fi
+            echo "Fresh schema initialized successfully."
           fi
 
+          # Ensure Password Reset columns exist in users table (for Brevo auth integration)
+          echo "Checking and adding reset_token columns to users table if missing..."
+          mysql -h 127.0.0.1 -u root omniserve_db -e "
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR(255) NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expiry DATETIME NULL;
+          " || true
+
           # Sync Super Admin credentials from GitHub Secrets if provided
-          ADMIN_USER_SECRET="${{ secrets.ADMIN_USERNAME }}"
-          ADMIN_PASS_SECRET="${{ secrets.ADMIN_PASSWORD }}"
-          if [ -n "$ADMIN_USER_SECRET" ]; then
+          if [ -n "$ADMIN_USERNAME_SEC" ]; then
             echo "Applying configured ADMIN_USERNAME from GitHub secrets to MySQL..."
-            mysql -h 127.0.0.1 -u root omniserve_db -e "UPDATE users SET email = '$ADMIN_USER_SECRET' WHERE id = 'usr-admin-1';" || true
+            mysql -h 127.0.0.1 -u root omniserve_db -e "UPDATE users SET email = '$ADMIN_USERNAME_SEC' WHERE id = 'usr-admin-1';" || true
           fi
-          if [ -n "$ADMIN_PASS_SECRET" ]; then
+          if [ -n "$ADMIN_PASSWORD_SEC" ]; then
             echo "Applying configured ADMIN_PASSWORD from GitHub secrets to MySQL..."
-            mysql -h 127.0.0.1 -u root omniserve_db -e "UPDATE users SET password = '$ADMIN_PASS_SECRET' WHERE id = 'usr-admin-1';" || true
+            mysql -h 127.0.0.1 -u root omniserve_db -e "UPDATE users SET password = '$ADMIN_PASSWORD_SEC' WHERE id = 'usr-admin-1';" || true
           fi
 
           echo "Database verification summary:"
@@ -140,7 +150,7 @@ jobs:
             SELECT 'orders', COUNT(*) FROM orders;
           "
 
-      # 4. Install Dependencies Reliably
+      # 4. Install Dependencies Reliably (including Brevo package)
       - name: Install Application Dependencies
         run: |
           npm install --legacy-peer-deps --no-audit --no-fund
@@ -161,7 +171,6 @@ jobs:
           cloudflared --version
 
       # 7. Unified Runner: Start Server + Start Tunnel + 5-Hour Keep-Alive Monitoring Loop
-      # Keeping these in ONE step guarantees child processes are NOT terminated by GitHub Actions step boundaries!
       - name: Start Server, Connect Cloudflare Tunnel & Host Live (5 Hours)
         env:
           NODE_ENV: production
@@ -176,6 +185,10 @@ jobs:
           VITE_ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME || 'admin@omniserve.com' }}
           VITE_ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'Admin@12345' }}
           CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
+          # Brevo API Secrets loaded here:
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          SENDER_NAME: ${{ secrets.SENDER_NAME }}
         run: |
           echo "=========================================================================="
           echo " Launching Khanewal Connect Express Application..."
@@ -229,7 +242,6 @@ jobs:
           echo " Scheduled Live Session Duration: $DURATION_HOURS Hours ($TOTAL_SECONDS seconds)"
           echo " Custom Domain: https://84wala.uqn88.store"
           echo "=========================================================================="
-          echo "To stop early and save your MySQL database snapshot, click 'Cancel workflow' anytime."
 
           ELAPSED=0
           while [ $ELAPSED -lt $TOTAL_SECONDS ]; do
@@ -238,11 +250,9 @@ jobs:
             MINUTES_RUN=$((ELAPSED / 60))
             MINUTES_REMAINING=$(((TOTAL_SECONDS - ELAPSED) / 60))
 
-            # Query health probe
             HEALTH_STATUS=$(curl -s http://127.0.0.1:3000/api/health || echo '{"status":"unreachable"}')
             echo "[$(date -u +"%H:%M:%SZ")] Running: ${MINUTES_RUN}m elapsed | ${MINUTES_REMAINING}m remaining | Health: $HEALTH_STATUS"
 
-            # Auto-healing: If app crashed, restart it immediately
             if ! curl -s http://127.0.0.1:3000/api/health | grep -q "healthy"; then
               echo "WARNING: App health probe failed! Restarting server..."
               cat app.log | tail -n 30 || true
@@ -250,7 +260,6 @@ jobs:
               sleep 5
             fi
 
-            # Auto-healing: If tunnel crashed, restart it immediately
             if ! pgrep -f cloudflared > /dev/null; then
               echo "WARNING: Cloudflare Tunnel process terminated! Restarting tunnel..."
               if [ -n "$CLOUDFLARE_TUNNEL_TOKEN" ]; then
@@ -261,9 +270,7 @@ jobs:
 
           echo "5-hour live session completed successfully."
 
-      # =========================================================================
-      # 8. GUARANTEED ZERO-DATA-LOSS MYSQL SNAPSHOT (Runs on CANCEL, SUCCESS, TIMEOUT)
-      # =========================================================================
+      # 8. Guaranteed Zero-Data-Loss MySQL Snapshot
       - name: Safely Capture MySQL Full Snapshot
         if: always()
         env:
@@ -277,7 +284,6 @@ jobs:
           if mysqladmin ping -h 127.0.0.1 -u root --silent; then
             echo "Taking clean mysqldump for application database 'omniserve_db' only..."
             
-            # Dump ONLY application database 'omniserve_db' to avoid ERROR 3552 system tables
             mysqldump -h 127.0.0.1 -u root \
               --databases omniserve_db \
               --single-transaction \
@@ -307,12 +313,11 @@ jobs:
 
             echo "Clean snapshot created successfully!"
             ls -lh mysql-backup/
-            cat mysql-backup/snapshot-meta.json
           else
             echo "Notice: MySQL server is unreachable. Existing backup retained."
           fi
 
-      # 9. Save Persistent Snapshot to GitHub Actions Cache for Next Run
+      # 9. Save Persistent Snapshot to GitHub Actions Cache
       - name: Save Persistent MySQL Database Cache
         if: always()
         uses: actions/cache/save@v4
@@ -320,7 +325,7 @@ jobs:
           path: mysql-backup
           key: khanewal-prod-v4-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
 
-      # 10. Upload Snapshot as Workflow Artifact (90-Day Retention)
+      # 10. Upload Snapshot as Workflow Artifact
       - name: Upload Snapshot as Redundant Workflow Artifact
         if: always()
         uses: actions/upload-artifact@v4
