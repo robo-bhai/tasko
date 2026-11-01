@@ -172,7 +172,7 @@ async function startServer() {
 
       return res.status(200).json({ success: true, message: 'Password reset link aapke email par bhej diya gaya hai.' });
     } catch (error: any) {
-      console.erorr('[Brevo Error Detail]:', error.response ? JSON.stringify(error.response.body) : error.message);
+      console.error('[Brevo Error Detail]:', error.response ? JSON.stringify(error.response.body) : error.message);
       return res.status(500).json({ success: false, message: 'Email bhejne mein nakami hui. Baraye meherbani baad mein koshish karein.' });
     }
   });
