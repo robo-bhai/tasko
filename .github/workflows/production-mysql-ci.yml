@@ -56,7 +56,7 @@ jobs:
       - name: Create Snapshot Backup Directory
         run: mkdir -p mysql-backup
 
-      # 2. Setup Rclone & Restore MySQL Backup from Google Drive
+      # 2. Setup Rclone & Restore MySQL Backup directly from Google Drive
       - name: Restore MySQL Backup from Google Drive via Rclone
         env:
           RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
@@ -65,19 +65,18 @@ jobs:
             echo "Installing rclone..."
             sudo apt-get update -qq && sudo apt-get install -y rclone
             
-            echo "Configuring Rclone..."
+            echo "Configuring Rclone safely..."
             mkdir -p ~/.config/rclone
-            echo "$RCLONE_CONF" > ~/.config/rclone/rclone.conf
+            printf "%s\n" "$RCLONE_CONF" > ~/.config/rclone/rclone.conf
             
-            echo "Fetching latest MySQL database backup from Google Drive (batvoice)..."
+            echo "Fetching latest MySQL database backup from Google Drive (batvoice:khanewal_backups)..."
             mkdir -p mysql-backup
-            rclone copy batvoice:khanewal_backups/snapshot.sql.gz mysql-backup/ || echo "Notice: No previous backup found on Google Drive."
+            rclone copy batvoice:khanewal_backups/snapshot.sql.gz mysql-backup/ --verbose || echo "Notice: No previous backup found on Google Drive."
           else
             echo "WARNING: Secret 'RCLONE_CONF' is missing! Skipping Google Drive restore."
           fi
 
-
-      # 4. Bulletproof Database Initialization & Schema/Columns Setup
+      # 3. Bulletproof Database Initialization & Schema/Columns Setup
       - name: Initialize or Restore MySQL Database
         env:
           MYSQL_PWD: root_password_123
@@ -96,7 +95,7 @@ jobs:
           RESTORE_DONE=0
           if [ -f "mysql-backup/snapshot.sql.gz" ]; then
             echo "=========================================================="
-            echo "Found existing cached MySQL snapshot. Verifying and restoring..."
+            echo "Found Google Drive MySQL snapshot. Verifying and restoring..."
             echo "=========================================================="
             
             set +e
@@ -132,7 +131,7 @@ jobs:
             echo "Fresh schema initialized successfully."
           fi
 
-          # Ensure Password Reset columns exist in users table safely (fixed syntax)
+          # Ensure Password Reset columns exist in users table safely
           echo "Checking and adding reset_token columns to users table if missing..."
           mysql -h 127.0.0.1 -u root omniserve_db -e "
             SET @exist_token = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'omniserve_db' AND TABLE_NAME = 'users' AND COLUMN_NAME = 'reset_token');
@@ -169,20 +168,20 @@ jobs:
             SELECT 'orders', COUNT(*) FROM orders;
           "
 
-      # 5. Install Dependencies Reliably (Explicitly installing @getbrevo/brevo)
+      # 4. Install Dependencies Reliably (Explicitly installing @getbrevo/brevo)
       - name: Install Application Dependencies
         run: |
           npm install @getbrevo/brevo --legacy-peer-deps --no-audit --no-fund
           npm install --legacy-peer-deps --no-audit --no-fund
 
-      # 6. Build Production Frontend Assets
+      # 5. Build Production Frontend Assets
       - name: Build Production Frontend Assets
         env:
           VITE_ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME || 'admin@omniserve.com' }}
           VITE_ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'Admin@12345' }}
         run: npm run build
 
-      # 7. Install Cloudflare Tunnel Client (cloudflared)
+      # 6. Install Cloudflare Tunnel Client (cloudflared)
       - name: Install Cloudflare Tunnel (cloudflared)
         run: |
           echo "Installing latest cloudflared binary..."
@@ -190,7 +189,7 @@ jobs:
           sudo dpkg -i cloudflared.deb
           cloudflared --version
 
-      # 8. Unified Runner: Start Server + Start Tunnel + 5-Hour Keep-Alive Monitoring Loop
+      # 7. Unified Runner: Start Server + Start Tunnel + 5-Hour Keep-Alive Monitoring Loop
       - name: Start Server, Connect Cloudflare Tunnel & Host Live (5 Hours)
         env:
           NODE_ENV: production
@@ -205,7 +204,6 @@ jobs:
           VITE_ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME || 'admin@omniserve.com' }}
           VITE_ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'Admin@12345' }}
           CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
-          # Brevo API Secrets loaded here:
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_NAME: ${{ secrets.SENDER_NAME }}
@@ -290,7 +288,7 @@ jobs:
 
           echo "5-hour live session completed successfully."
 
-      # 9. Guaranteed Zero-Data-Loss MySQL Snapshot
+      # 8. Guaranteed Zero-Data-Loss MySQL Snapshot Capture
       - name: Safely Capture MySQL Full Snapshot
         if: always()
         env:
@@ -337,30 +335,22 @@ jobs:
             echo "Notice: MySQL server is unreachable. Existing backup retained."
           fi
 
-      # 10. Upload MySQL Snapshot to Google Drive via Rclone
+      # 9. Upload MySQL Snapshot to Google Drive via Rclone (Safe printf configuration)
       - name: Upload MySQL Snapshot to Google Drive via Rclone
         if: always()
         env:
           RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
         run: |
           if [ -n "$RCLONE_CONF" ] && [ -f "mysql-backup/snapshot.sql.gz" ]; then
-            echo "Syncing latest MySQL snapshot to Google Drive (batvoice:khanewal_backups)..."
+            echo "Syncing latest MySQL snapshot directly to Google Drive (batvoice:khanewal_backups)..."
             mkdir -p ~/.config/rclone
-            echo "$RCLONE_CONF" > ~/.config/rclone/rclone.conf
+            printf "%s\n" "$RCLONE_CONF" > ~/.config/rclone/rclone.conf
             
             rclone copy mysql-backup/snapshot.sql.gz batvoice:khanewal_backups/ --verbose
             echo "Snapshot successfully backed up to Google Drive!"
           fi
 
-      # 11. Save Persistent Snapshot to GitHub Actions Cache
-      - name: Save Persistent MySQL Database Cache
-        if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: mysql-backup
-          key: khanewal-prod-v4-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
-
-      # 12. Upload Snapshot as Workflow Artifact
+      # 10. Upload Snapshot as Workflow Artifact (Redundant backup)
       - name: Upload Snapshot as Redundant Workflow Artifact
         if: always()
         uses: actions/upload-artifact@v4
