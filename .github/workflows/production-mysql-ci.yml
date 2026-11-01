@@ -56,16 +56,16 @@ jobs:
       - name: Create Snapshot Backup Directory
         run: mkdir -p mysql-backup
 
-      # 2. Restore MySQL Snapshot from GitHub Actions Cache (Primary & Fastest)
+      # 2. Restore MySQL Snapshot from GitHub Actions Cache (V5 with dynamic fallback prefix)
       - name: Restore Persistent MySQL Database Cache
         id: restore-mysql-cache
         uses: actions/cache/restore@v4
         with:
           path: mysql-backup
-          key: khanewal-prod-v4-${{ runner.os }}-${{ github.run_id }}
+          key: khanewal-prod-v5-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
-            khanewal-prod-v4-${{ runner.os }}-
-            khanewal-prod-v4-
+            khanewal-prod-v5-${{ runner.os }}-
+            khanewal-prod-v5-
 
       # 3. Fallback/Sync: Check Google Drive via Rclone if Cache is Missing
       - name: Fallback Restore from Google Drive via Rclone if Cache Missing
@@ -73,7 +73,7 @@ jobs:
           RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
         run: |
           if [ ! -f "mysql-backup/snapshot.sql.gz" ] && [ -n "$RCLONE_CONF" ]; then
-            echo "Cache miss. Installing rclone to fetch backup from Google Drive..."
+            echo "Cache miss. Installing rclone to fetch latest backup from Google Drive..."
             sudo apt-get update -qq && sudo apt-get install -y rclone
             mkdir -p ~/.config/rclone
             echo "$RCLONE_CONF" | tr -d '\r' > ~/.config/rclone/rclone.conf
@@ -341,13 +341,13 @@ jobs:
             echo "Notice: MySQL server is unreachable. Existing backup retained."
           fi
 
-      # 10. Save Persistent Snapshot to GitHub Actions Cache (Primary Storage)
+      # 10. Save Persistent Snapshot to GitHub Actions Cache (V5 with unique timestamp suffix)
       - name: Save Persistent MySQL Database Cache
         if: always()
         uses: actions/cache/save@v4
         with:
           path: mysql-backup
-          key: khanewal-prod-v4-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: khanewal-prod-v5-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}-${{ env.GITHUB_RUN_NUMBER || 'latest' }}
 
       # 11. Redundant Backup: Upload Snapshot to Google Drive via Rclone
       - name: Redundant Backup to Google Drive via Rclone
