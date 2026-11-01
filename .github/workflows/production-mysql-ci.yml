@@ -56,7 +56,27 @@ jobs:
       - name: Create Snapshot Backup Directory
         run: mkdir -p mysql-backup
 
-      # 2. Restore MySQL Snapshot from Previous Workflow Run
+      # 2. Setup Rclone & Restore MySQL Backup from Google Drive
+      - name: Restore MySQL Backup from Google Drive via Rclone
+        env:
+          RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
+        run: |
+          if [ -n "$RCLONE_CONF" ]; then
+            echo "Installing rclone..."
+            sudo apt-get update -qq && sudo apt-get install -y rclone
+            
+            echo "Configuring Rclone..."
+            mkdir -p ~/.config/rclone
+            echo "$RCLONE_CONF" > ~/.config/rclone/rclone.conf
+            
+            echo "Fetching latest MySQL database backup from Google Drive (batvoice)..."
+            mkdir -p mysql-backup
+            rclone copy batvoice:khanewal_backups/snapshot.sql.gz mysql-backup/ || echo "Notice: No previous backup found on Google Drive."
+          else
+            echo "WARNING: Secret 'RCLONE_CONF' is missing! Skipping Google Drive restore."
+          fi
+
+      # 3. Restore MySQL Snapshot from GitHub Actions Cache (Fallback)
       - name: Restore Persistent MySQL Database Cache
         id: restore-mysql-cache
         uses: actions/cache/restore@v4
@@ -67,7 +87,7 @@ jobs:
             khanewal-prod-v4-${{ runner.os }}-
             khanewal-prod-v4-
 
-      # 3. Bulletproof Database Initialization & Schema/Columns Setup
+      # 4. Bulletproof Database Initialization & Schema/Columns Setup
       - name: Initialize or Restore MySQL Database
         env:
           MYSQL_PWD: root_password_123
@@ -159,20 +179,20 @@ jobs:
             SELECT 'orders', COUNT(*) FROM orders;
           "
 
-      # 4. Install Dependencies Reliably (Explicitly installing @getbrevo/brevo)
+      # 5. Install Dependencies Reliably (Explicitly installing @getbrevo/brevo)
       - name: Install Application Dependencies
         run: |
           npm install @getbrevo/brevo --legacy-peer-deps --no-audit --no-fund
           npm install --legacy-peer-deps --no-audit --no-fund
 
-      # 5. Build Production Frontend Assets
+      # 6. Build Production Frontend Assets
       - name: Build Production Frontend Assets
         env:
           VITE_ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME || 'admin@omniserve.com' }}
           VITE_ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'Admin@12345' }}
         run: npm run build
 
-      # 6. Install Cloudflare Tunnel Client (cloudflared)
+      # 7. Install Cloudflare Tunnel Client (cloudflared)
       - name: Install Cloudflare Tunnel (cloudflared)
         run: |
           echo "Installing latest cloudflared binary..."
@@ -180,7 +200,7 @@ jobs:
           sudo dpkg -i cloudflared.deb
           cloudflared --version
 
-      # 7. Unified Runner: Start Server + Start Tunnel + 5-Hour Keep-Alive Monitoring Loop
+      # 8. Unified Runner: Start Server + Start Tunnel + 5-Hour Keep-Alive Monitoring Loop
       - name: Start Server, Connect Cloudflare Tunnel & Host Live (5 Hours)
         env:
           NODE_ENV: production
@@ -280,7 +300,7 @@ jobs:
 
           echo "5-hour live session completed successfully."
 
-      # 8. Guaranteed Zero-Data-Loss MySQL Snapshot
+      # 9. Guaranteed Zero-Data-Loss MySQL Snapshot
       - name: Safely Capture MySQL Full Snapshot
         if: always()
         env:
@@ -327,7 +347,22 @@ jobs:
             echo "Notice: MySQL server is unreachable. Existing backup retained."
           fi
 
-      # 9. Save Persistent Snapshot to GitHub Actions Cache
+      # 10. Upload MySQL Snapshot to Google Drive via Rclone
+      - name: Upload MySQL Snapshot to Google Drive via Rclone
+        if: always()
+        env:
+          RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
+        run: |
+          if [ -n "$RCLONE_CONF" ] && [ -f "mysql-backup/snapshot.sql.gz" ]; then
+            echo "Syncing latest MySQL snapshot to Google Drive (batvoice:khanewal_backups)..."
+            mkdir -p ~/.config/rclone
+            echo "$RCLONE_CONF" > ~/.config/rclone/rclone.conf
+            
+            rclone copy mysql-backup/snapshot.sql.gz batvoice:khanewal_backups/ --verbose
+            echo "Snapshot successfully backed up to Google Drive!"
+          fi
+
+      # 11. Save Persistent Snapshot to GitHub Actions Cache
       - name: Save Persistent MySQL Database Cache
         if: always()
         uses: actions/cache/save@v4
@@ -335,7 +370,7 @@ jobs:
           path: mysql-backup
           key: khanewal-prod-v4-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
 
-      # 10. Upload Snapshot as Workflow Artifact
+      # 12. Upload Snapshot as Workflow Artifact
       - name: Upload Snapshot as Redundant Workflow Artifact
         if: always()
         uses: actions/upload-artifact@v4
