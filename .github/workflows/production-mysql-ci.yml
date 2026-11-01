@@ -122,11 +122,20 @@ jobs:
             echo "Fresh schema initialized successfully."
           fi
 
-          # Ensure Password Reset columns exist in users table (for Brevo auth integration)
+          # Ensure Password Reset columns exist in users table safely (fixed syntax)
           echo "Checking and adding reset_token columns to users table if missing..."
           mysql -h 127.0.0.1 -u root omniserve_db -e "
-            ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR(255) NULL;
-            ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expiry DATETIME NULL;
+            SET @exist_token = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'omniserve_db' AND TABLE_NAME = 'users' AND COLUMN_NAME = 'reset_token');
+            SET @sql_token = IF(@exist_token = 0, 'ALTER TABLE users ADD COLUMN reset_token VARCHAR(255) NULL;', 'SELECT \"reset_token exists\"');
+            PREPARE stmt1 FROM @sql_token;
+            EXECUTE stmt1;
+            DEALLOCATE PREPARE stmt1;
+
+            SET @exist_expiry = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'omniserve_db' AND TABLE_NAME = 'users' AND COLUMN_NAME = 'reset_token_expiry');
+            SET @sql_expiry = IF(@exist_expiry = 0, 'ALTER TABLE users ADD COLUMN reset_token_expiry DATETIME NULL;', 'SELECT \"reset_token_expiry exists\"');
+            PREPARE stmt2 FROM @sql_expiry;
+            EXECUTE stmt2;
+            DEALLOCATE PREPARE stmt2;
           " || true
 
           # Sync Super Admin credentials from GitHub Secrets if provided
