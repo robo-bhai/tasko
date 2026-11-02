@@ -240,15 +240,76 @@ export const subscribeToStore = (listener: StoreListener) => {
 
 // Store API
 export const Store = {
-  // Initialize Cloud Firestore Zero-Loss Persistent Sync
+  // Sync individual user to MySQL backend (restored by GitHub Actions on restart)
+  syncUserToBackend: async (user: User) => {
+    try {
+      await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(user)
+      });
+    } catch (err) {
+      console.warn('[Store] MySQL user sync note:', err);
+    }
+  },
+
+  // Batch sync all users to MySQL backend
+  syncAllUsersToBackend: async (users: User[]) => {
+    try {
+      await fetch('/api/users/sync-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ users })
+      });
+    } catch (err) {
+      console.warn('[Store] MySQL batch user sync note:', err);
+    }
+  },
+
+  // Sync individual order to MySQL backend
+  syncOrderToBackend: async (order: Order) => {
+    try {
+      await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(order)
+      });
+    } catch (err) {
+      console.warn('[Store] MySQL order sync note:', err);
+    }
+  },
+
+  // Initialize Dual-Layer Zero-Loss Persistent Sync (MySQL + Cloud Firestore)
   initCloudSync: async () => {
     try {
+      // 1. Fetch persistent state from MySQL backend (restored from GitHub Actions cache on runner restart)
+      try {
+        const backendRes = await fetch('/api/sync/all-state');
+        if (backendRes.ok) {
+          const backendData = await backendRes.json();
+          if (backendData.success && Array.isArray(backendData.users) && backendData.users.length > 0) {
+            const localUsers = loadFromStorage<User[]>(STORAGE_KEY_USERS, INITIAL_USERS);
+            const userMap = new Map<string, User>();
+            INITIAL_USERS.forEach(u => userMap.set(u.id, u));
+            localUsers.forEach(u => userMap.set(u.id, u));
+            backendData.users.forEach((u: User) => userMap.set(u.id, u));
+            const mergedUsers = Array.from(userMap.values());
+            saveToStorage(STORAGE_KEY_USERS, mergedUsers);
+            notifyStoreChanged();
+            console.log(`[Store] Restored ${backendData.users.length} users from MySQL persistent cache!`);
+          }
+        }
+      } catch (err) {
+        console.warn('[Store] MySQL backend sync note:', err);
+      }
+
+      // 2. Fetch persistent state from Cloud Firestore
       const cloudData = await CloudSyncService.loadCloudState();
       if (cloudData && cloudData.users && cloudData.users.length > 0) {
-        const localUsers = loadFromStorage<User[]>(STORAGE_KEY_USERS, INITIAL_USERS);
+        const currentUsers = loadFromStorage<User[]>(STORAGE_KEY_USERS, INITIAL_USERS);
         const mergedUsersMap = new Map<string, User>();
         INITIAL_USERS.forEach(u => mergedUsersMap.set(u.id, u));
-        localUsers.forEach(u => mergedUsersMap.set(u.id, u));
+        currentUsers.forEach(u => mergedUsersMap.set(u.id, u));
         cloudData.users.forEach(u => mergedUsersMap.set(u.id, u));
         const mergedUsers = Array.from(mergedUsersMap.values());
         saveToStorage(STORAGE_KEY_USERS, mergedUsers);
@@ -266,16 +327,18 @@ export const Store = {
         }
 
         notifyStoreChanged();
-      } else {
-        // Upload initial seed state to Cloud Firestore
-        await CloudSyncService.uploadFullBackup({
-          users: Store.getUsers(),
-          orders: Store.getOrders(),
-          settings: Store.getSettings()
-        });
       }
 
-      // Live subscription to Cloud Firestore changes
+      // 3. Guarantee zero data loss: batch sync all current local users to BOTH MySQL and Cloud Firestore
+      const finalUsers = Store.getUsers();
+      Store.syncAllUsersToBackend(finalUsers);
+      await CloudSyncService.uploadFullBackup({
+        users: finalUsers,
+        orders: Store.getOrders(),
+        settings: Store.getSettings()
+      });
+
+      // 4. Live subscription to Cloud Firestore changes
       CloudSyncService.subscribeToCloudChanges({
         onUsersChange: (newUsers) => {
           if (newUsers.length > 0) {
@@ -283,7 +346,9 @@ export const Store = {
             const map = new Map<string, User>();
             currentUsers.forEach(u => map.set(u.id, u));
             newUsers.forEach(u => map.set(u.id, u));
-            saveToStorage(STORAGE_KEY_USERS, Array.from(map.values()));
+            const merged = Array.from(map.values());
+            saveToStorage(STORAGE_KEY_USERS, merged);
+            Store.syncAllUsersToBackend(merged);
             notifyStoreChanged();
           }
         },
@@ -303,14 +368,15 @@ export const Store = {
     }
   },
 
-  // Manual or automatic snapshot backup to Cloud Firestore
+  // Manual or automatic snapshot backup to Cloud Firestore & MySQL
   backupDatabaseToCloud: async () => {
     try {
-      await CloudSyncService.uploadFullBackup({
-        users: Store.getUsers(),
-        orders: Store.getOrders(),
-        settings: Store.getSettings()
-      });
+      const users = Store.getUsers();
+      const orders = Store.getOrders();
+      const settings = Store.getSettings();
+
+      Store.syncAllUsersToBackend(users);
+      await CloudSyncService.uploadFullBackup({ users, orders, settings });
       return true;
     } catch {
       return false;
@@ -420,8 +486,9 @@ export const Store = {
     Store.setCurrentUser(newUser);
     notifyStoreChanged();
 
-    // Zero-Loss Cloud Firestore Persistence & Backup
+    // Zero-Loss Cloud Firestore & MySQL Persistence
     CloudSyncService.saveUser(newUser);
+    Store.syncUserToBackend(newUser);
     CloudSyncService.uploadFullBackup({
       users,
       orders: Store.getOrders(),
@@ -489,8 +556,9 @@ export const Store = {
     saveToStorage(STORAGE_KEY_USERS, users);
     notifyStoreChanged();
 
-    // Zero-Loss Cloud Firestore Persistence & Backup
+    // Zero-Loss Cloud Firestore & MySQL Persistence
     CloudSyncService.saveUser(newProvider);
+    Store.syncUserToBackend(newProvider);
     CloudSyncService.uploadFullBackup({
       users,
       orders: Store.getOrders(),
@@ -769,7 +837,7 @@ export const Store = {
       newOrder.category;
     const price = newOrder.pricing?.total || 0;
 
-    // Trigger Real-time Firebase notification for Admin
+    // Trigger Real-time Firebase notification for Admin ONLY
     NotificationService.createNotification({
       recipientId: 'all_admins',
       recipientRole: 'admin',
@@ -777,10 +845,23 @@ export const Store = {
       body: `${newOrder.customerName || 'Customer'} ne '${orderTitle}' book kiya (PKR ${price}).`,
       orderId: newOrder.id,
       type: 'order_created'
-    }).catch((err) => console.warn('Notification trigger error:', err));
+    }).catch((err) => console.warn('Admin notification trigger error:', err));
 
-    // Zero-Loss Cloud Firestore Persistence & Backup
+    // Trigger Real-time Firebase confirmation notification strictly for THIS Customer
+    if (newOrder.customerId) {
+      NotificationService.createNotification({
+        recipientId: newOrder.customerId,
+        recipientRole: 'customer',
+        title: `Order Book Ho Chuka Hai: #${newOrder.id}`,
+        body: `Aapka order kamyabi se book ho gaya hai (${orderTitle}). Team jald rabta karegi.`,
+        orderId: newOrder.id,
+        type: 'order_created'
+      }).catch((err) => console.warn('Customer notification trigger error:', err));
+    }
+
+    // Zero-Loss Cloud Firestore & MySQL Persistence
     CloudSyncService.saveOrder(newOrder);
+    Store.syncOrderToBackend(newOrder);
     CloudSyncService.uploadFullBackup({
       users: Store.getUsers(),
       orders,
@@ -880,8 +961,44 @@ export const Store = {
 
     notifyStoreChanged();
 
-    // Zero-Loss Cloud Firestore Persistence & Backup
+    // Trigger Real-time Firebase notification strictly for the Customer who owns this order
+    const statusMessages: Record<OrderStatus, string> = {
+      pending: 'Order dispatch line mein mojud hai.',
+      assigned: `Aapke order ke liye worker assign kar diya gaya hai.`,
+      on_the_way: updatedOrder.category === 'home_services' 
+        ? 'Technician aapke patey ki taraf rawana ho chuka hai.' 
+        : 'Rider / Driver aapke pickup address par pohnch raha hai.',
+      work_started: 'Professional ne kaam shuru kar diya hai.',
+      completed: 'Aapka order mukammal ho chuka hai! Khanewal Connect chunne ka shukriya.',
+      cancelled: providerNote ? `Order mansookh kar diya gaya: ${providerNote}` : 'Aapka order mansookh kar diya gaya hai.'
+    };
+
+    if (updatedOrder.customerId) {
+      NotificationService.createNotification({
+        recipientId: updatedOrder.customerId,
+        recipientRole: 'customer',
+        title: `Order #${updatedOrder.id} Update`,
+        body: statusMessages[newStatus] || `Aapke order ka status ab '${newStatus}' hai.`,
+        orderId: updatedOrder.id,
+        type: newStatus === 'assigned' ? 'order_assigned' : 'order_status'
+      }).catch((err) => console.warn('Customer status notification error:', err));
+    }
+
+    // If order completed or cancelled, notify Admin
+    if (newStatus === 'completed' || newStatus === 'cancelled') {
+      NotificationService.createNotification({
+        recipientId: 'all_admins',
+        recipientRole: 'admin',
+        title: `Order #${updatedOrder.id} ${newStatus === 'completed' ? 'Completed' : 'Cancelled'}`,
+        body: `${updatedOrder.customerName} ka order #${updatedOrder.id} status '${newStatus}' update ho gaya hai.`,
+        orderId: updatedOrder.id,
+        type: 'order_status'
+      }).catch((err) => console.warn('Admin status notification error:', err));
+    }
+
+    // Zero-Loss Cloud Firestore & MySQL Persistence
     CloudSyncService.saveOrder(updatedOrder);
+    Store.syncOrderToBackend(updatedOrder);
     CloudSyncService.uploadFullBackup({
       users: Store.getUsers(),
       orders,
@@ -1000,6 +1117,18 @@ export const Store = {
       type: 'order_assigned'
     }).catch((err) => console.warn('Customer notification trigger error:', err));
 
+    // If assigned to a provider, send targeted notification to that provider
+    if (params.providerId) {
+      NotificationService.createNotification({
+        recipientId: params.providerId,
+        recipientRole: 'provider',
+        title: `Naya Kaam Assign: #${updatedOrder.id}`,
+        body: `Aapko order #${updatedOrder.id} (${updatedOrder.customerName} - ${updatedOrder.deliveryAddress}) assign kiya gaya hai.`,
+        orderId: updatedOrder.id,
+        type: 'order_assigned'
+      }).catch((err) => console.warn('Provider notification trigger error:', err));
+    }
+
     // Zero-Loss Cloud Firestore Persistence & Backup
     CloudSyncService.saveOrder(updatedOrder);
     CloudSyncService.uploadFullBackup({
@@ -1046,6 +1175,35 @@ export const Store = {
     orders[idx] = updatedOrder;
     saveToStorage(STORAGE_KEY_ORDERS, orders);
     notifyStoreChanged();
+
+    // Notify customer that worker has accepted/been assigned
+    NotificationService.createNotification({
+      recipientId: updatedOrder.customerId,
+      recipientRole: 'customer',
+      title: `Worker Assigned: #${updatedOrder.id}`,
+      body: `${provider.name} (${provider.phone}) ne aapka order qubool kar liya hai.`,
+      orderId: updatedOrder.id,
+      type: 'order_assigned'
+    }).catch((err) => console.warn('Customer notification trigger error:', err));
+
+    // Notify admin
+    NotificationService.createNotification({
+      recipientId: 'all_admins',
+      recipientRole: 'admin',
+      title: `Worker Assigned: #${updatedOrder.id}`,
+      body: `${provider.name} ne order #${updatedOrder.id} accept kiya.`,
+      orderId: updatedOrder.id,
+      type: 'order_assigned'
+    }).catch((err) => console.warn('Admin notification trigger error:', err));
+
+    // Zero-Loss Cloud Firestore Persistence & Backup
+    CloudSyncService.saveOrder(updatedOrder);
+    CloudSyncService.uploadFullBackup({
+      users: Store.getUsers(),
+      orders,
+      settings: Store.getSettings()
+    });
+
     return updatedOrder;
   },
 

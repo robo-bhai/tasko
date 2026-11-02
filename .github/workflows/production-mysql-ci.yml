@@ -162,19 +162,19 @@ jobs:
             echo "Injecting Firebase credentials directly from GitHub Secrets..."
             echo "=========================================================="
             cat <<EOF > firebase-applet-config.json
-          {
-            "projectId": "$SEC_FIREBASE_PROJECT_ID",
-            "appId": "${SEC_FIREBASE_APP_ID}",
-            "apiKey": "${SEC_FIREBASE_API_KEY}",
-            "authDomain": "${SEC_FIREBASE_AUTH_DOMAIN:-${SEC_FIREBASE_PROJECT_ID}.firebaseapp.com}",
-            "firestoreDatabaseId": "${SEC_FIREBASE_FIRESTORE_DATABASE_ID:-ai-studio-omnitasksuperapp-57a34a31-4e02-4160-a3fe-27190e12f1f7}",
-            "storageBucket": "${SEC_FIREBASE_STORAGE_BUCKET:-${SEC_FIREBASE_PROJECT_ID}.firebasestorage.app}",
-            "messagingSenderId": "${SEC_FIREBASE_MESSAGING_SENDER_ID}",
-            "measurementId": "",
-            "oAuthClientId": "${SEC_FIREBASE_OAUTH_CLIENT_ID}",
-            "recaptchaSiteKey": ""
-          }
-          EOF
+{
+  "projectId": "$SEC_FIREBASE_PROJECT_ID",
+  "appId": "${SEC_FIREBASE_APP_ID}",
+  "apiKey": "${SEC_FIREBASE_API_KEY}",
+  "authDomain": "${SEC_FIREBASE_AUTH_DOMAIN:-${SEC_FIREBASE_PROJECT_ID}.firebaseapp.com}",
+  "firestoreDatabaseId": "${SEC_FIREBASE_FIRESTORE_DATABASE_ID:-(default)}",
+  "storageBucket": "${SEC_FIREBASE_STORAGE_BUCKET:-${SEC_FIREBASE_PROJECT_ID}.firebasestorage.app}",
+  "messagingSenderId": "${SEC_FIREBASE_MESSAGING_SENDER_ID}",
+  "measurementId": "",
+  "oAuthClientId": "${SEC_FIREBASE_OAUTH_CLIENT_ID}",
+  "recaptchaSiteKey": ""
+}
+EOF
             echo "firebase-applet-config.json dynamically configured from GitHub Secrets!"
           else
             echo "Notice: FIREBASE_PROJECT_ID secret not provided in GitHub Secrets. Using existing configuration."
@@ -189,7 +189,7 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
           VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_FIRESTORE_DATABASE_ID: ${{ secrets.FIREBASE_FIRESTORE_DATABASE_ID || secrets.FIREBASE_DATABASE_ID }}
+          VITE_FIREBASE_FIRESTORE_DATABASE_ID: ${{ secrets.FIREBASE_FIRESTORE_DATABASE_ID || secrets.FIREBASE_DATABASE_ID || '(default)' }}
           VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_OAUTH_CLIENT_ID: ${{ secrets.FIREBASE_OAUTH_CLIENT_ID }}
@@ -222,14 +222,14 @@ jobs:
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
           FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
           FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          FIREBASE_FIRESTORE_DATABASE_ID: ${{ secrets.FIREBASE_FIRESTORE_DATABASE_ID || secrets.FIREBASE_DATABASE_ID }}
+          FIREBASE_FIRESTORE_DATABASE_ID: ${{ secrets.FIREBASE_FIRESTORE_DATABASE_ID || secrets.FIREBASE_DATABASE_ID || '(default)' }}
           FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
           VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_FIRESTORE_DATABASE_ID: ${{ secrets.FIREBASE_FIRESTORE_DATABASE_ID || secrets.FIREBASE_DATABASE_ID }}
+          VITE_FIREBASE_FIRESTORE_DATABASE_ID: ${{ secrets.FIREBASE_FIRESTORE_DATABASE_ID || secrets.FIREBASE_DATABASE_ID || '(default)' }}
           VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_OAUTH_CLIENT_ID: ${{ secrets.FIREBASE_OAUTH_CLIENT_ID }}
@@ -299,6 +299,22 @@ jobs:
             # Query health probe
             HEALTH_STATUS=$(curl -s http://127.0.0.1:3000/api/health || echo '{"status":"unreachable"}')
             echo "[$(date -u +"%H:%M:%SZ")] Running: ${MINUTES_RUN}m elapsed | ${MINUTES_REMAINING}m remaining | Health: $HEALTH_STATUS"
+
+            # Periodic Zero-Loss MySQL snapshot every 10 minutes (guarantees recent data even on abrupt runner stop)
+            if [ $((ELAPSED % 600)) -eq 0 ]; then
+              if mysqladmin ping -h 127.0.0.1 -u root --silent; then
+                mysqldump -h 127.0.0.1 -u root \
+                  --databases omniserve_db \
+                  --single-transaction \
+                  --routines \
+                  --triggers \
+                  --events \
+                  --add-drop-table \
+                  --complete-insert \
+                  | gzip -9 > mysql-backup/snapshot.sql.gz 2>/dev/null || true
+                echo "[$(date -u +"%H:%M:%SZ")] Periodic zero-loss MySQL snapshot refreshed successfully."
+              fi
+            fi
 
             # Auto-healing: If app crashed, restart it immediately
             if ! curl -s http://127.0.0.1:3000/api/health | grep -q "healthy"; then

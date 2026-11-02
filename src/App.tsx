@@ -87,14 +87,27 @@ export default function App() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
 
-  // Subscribe to real-time Firebase Notifications
+  // Subscribe to real-time Firebase Notifications with Push click handler
   useEffect(() => {
     const unsubscribe = NotificationService.subscribe(
       currentUser?.id || null,
       currentUser?.role,
       (items) => setNotifications(items)
     );
-    return unsubscribe;
+
+    const handlePushOrderOpen = (e: Event) => {
+      const customEvent = e as CustomEvent<{ orderId?: string }>;
+      if (customEvent.detail?.orderId) {
+        setSelectedOrderId(customEvent.detail.orderId);
+        setIsLiveTrackerOpen(true);
+      }
+    };
+    window.addEventListener('open-order-tracker', handlePushOrderOpen);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('open-order-tracker', handlePushOrderOpen);
+    };
   }, [currentUser]);
 
   const unreadNotificationsCount = notifications.filter(n => !n.isRead).length;
@@ -606,7 +619,7 @@ export default function App() {
         onClose={() => setIsNotificationsModalOpen(false)}
         notifications={notifications}
         onMarkAsRead={(id) => NotificationService.markAsRead(id)}
-        onMarkAllAsRead={() => currentUser && NotificationService.markAllAsRead(currentUser.id)}
+        onMarkAllAsRead={() => currentUser && NotificationService.markAllAsRead(currentUser.id, currentUser.role)}
         onSelectOrder={(orderId) => {
           setSelectedOrderId(orderId);
           setIsLiveTrackerOpen(true);

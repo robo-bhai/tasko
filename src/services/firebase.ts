@@ -28,8 +28,21 @@ export const firebaseConfig = {
 // Initialize Firebase App (reuse app if already initialized)
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Initialize Firestore with custom databaseId
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Initialize Firestore safely: Support both named custom databases and default database
+function initFirestoreSafe() {
+  const customId = firebaseConfig.firestoreDatabaseId;
+  if (!customId || customId === '(default)' || customId === 'default' || customId.trim() === '') {
+    return getFirestore(app);
+  }
+  try {
+    return getFirestore(app, customId.trim());
+  } catch (err) {
+    console.warn(`[Firebase] Fallback to default Firestore database from: "${customId}"`, err);
+    return getFirestore(app);
+  }
+}
+
+export const db = initFirestoreSafe();
 
 // Initialize Firebase Auth
 export const auth = getAuth(app);
