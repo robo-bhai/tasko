@@ -161,20 +161,23 @@ jobs:
             echo "=========================================================="
             echo "Injecting Firebase credentials directly from GitHub Secrets..."
             echo "=========================================================="
-            cat <<EOF > firebase-applet-config.json
-{
-  "projectId": "$SEC_FIREBASE_PROJECT_ID",
-  "appId": "${SEC_FIREBASE_APP_ID}",
-  "apiKey": "${SEC_FIREBASE_API_KEY}",
-  "authDomain": "${SEC_FIREBASE_AUTH_DOMAIN:-${SEC_FIREBASE_PROJECT_ID}.firebaseapp.com}",
-  "firestoreDatabaseId": "${SEC_FIREBASE_FIRESTORE_DATABASE_ID:-(default)}",
-  "storageBucket": "${SEC_FIREBASE_STORAGE_BUCKET:-${SEC_FIREBASE_PROJECT_ID}.firebasestorage.app}",
-  "messagingSenderId": "${SEC_FIREBASE_MESSAGING_SENDER_ID}",
-  "measurementId": "",
-  "oAuthClientId": "${SEC_FIREBASE_OAUTH_CLIENT_ID}",
-  "recaptchaSiteKey": ""
-}
-EOF
+            node -e '
+              const fs = require("fs");
+              const pId = process.env.SEC_FIREBASE_PROJECT_ID || "";
+              const config = {
+                projectId: pId,
+                appId: process.env.SEC_FIREBASE_APP_ID || "",
+                apiKey: process.env.SEC_FIREBASE_API_KEY || "",
+                authDomain: process.env.SEC_FIREBASE_AUTH_DOMAIN || (pId ? `${pId}.firebaseapp.com` : ""),
+                firestoreDatabaseId: process.env.SEC_FIREBASE_FIRESTORE_DATABASE_ID || "(default)",
+                storageBucket: process.env.SEC_FIREBASE_STORAGE_BUCKET || (pId ? `${pId}.firebasestorage.app` : ""),
+                messagingSenderId: process.env.SEC_FIREBASE_MESSAGING_SENDER_ID || "",
+                measurementId: "",
+                oAuthClientId: process.env.SEC_FIREBASE_OAUTH_CLIENT_ID || "",
+                recaptchaSiteKey: ""
+              };
+              fs.writeFileSync("firebase-applet-config.json", JSON.stringify(config, null, 2));
+            '
             echo "firebase-applet-config.json dynamically configured from GitHub Secrets!"
           else
             echo "Notice: FIREBASE_PROJECT_ID secret not provided in GitHub Secrets. Using existing configuration."
