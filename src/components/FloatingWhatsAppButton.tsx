@@ -27,7 +27,13 @@ export const FloatingWhatsAppButton: React.FC<FloatingWhatsAppButtonProps> = ({ 
   const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodedMessage}`;
 
   return (
-    <aside aria-label="Support Assistance" className="fixed bottom-20 sm:bottom-24 right-4 sm:right-6 z-40 flex flex-col items-end gap-2 group">
+    <aside 
+      aria-label="Support Assistance" 
+      className="fixed right-4 sm:right-6 z-40 flex flex-col items-end gap-2 group"
+      style={{
+        bottom: 'calc(4.75rem + max(env(safe-area-inset-bottom, 0px), var(--android-bottom-inset, 0px)))'
+      }}
+    >
       {/* Tooltip speech bubble */}
       {isOpenTooltip && (
         <div className="bg-[#0e111a] text-slate-100 text-xs font-medium py-2 px-3.5 rounded-2xl shadow-2xl border border-amber-500/40 flex items-center gap-2 max-w-xs animate-in fade-in slide-in-from-bottom-2 duration-300">

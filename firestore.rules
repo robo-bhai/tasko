@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    // Default deny-by-default for unspecified paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Users Collection (Zero-Loss Persistent Storage across all sessions & GitHub restarts)
+    match /users/{userId} {
+      allow get, list: if true;
+      allow create, update, delete: if isValidId(userId);
+    }
+
+    // Orders Collection (Zero-Loss Order Tracking & Lifecycle)
+    match /orders/{orderId} {
+      allow get, list: if true;
+      allow create, update, delete: if isValidId(orderId);
+    }
+
+    // Settings Collection (Dynamic Pricing & System Config)
+    match /settings/{settingId} {
+      allow get, list: if true;
+      allow create, update, delete: if isValidId(settingId);
+    }
+
+    // Notifications Collection (Real-Time Push Alerts & Chimes)
+    match /notifications/{notificationId} {
+      allow get, list: if true;
+      allow create, update, delete: if isValidId(notificationId);
+    }
+
+    // Reviews Collection (Public Customer Feedback)
+    match /reviews/{reviewId} {
+      allow get, list: if true;
+      allow create, update, delete: if isValidId(reviewId);
+    }
+
+    // System Backups Collection (Automated Snapshots & Zero-Loss Recovery)
+    match /system_backups/{backupId} {
+      allow get, list: if true;
+      allow create, update, delete: if isValidId(backupId);
+    }
+  }
+}

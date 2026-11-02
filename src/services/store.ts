@@ -8,6 +8,8 @@ import {
   OrderReview,
   SystemSettings
 } from '../types';
+import { NotificationService } from './notifications';
+import { CloudSyncService } from './cloudSync';
 
 const STORAGE_KEY_ORDERS = 'omniserve_orders_v1';
 const STORAGE_KEY_USERS = 'omniserve_users_v1';
@@ -238,6 +240,83 @@ export const subscribeToStore = (listener: StoreListener) => {
 
 // Store API
 export const Store = {
+  // Initialize Cloud Firestore Zero-Loss Persistent Sync
+  initCloudSync: async () => {
+    try {
+      const cloudData = await CloudSyncService.loadCloudState();
+      if (cloudData && cloudData.users && cloudData.users.length > 0) {
+        const localUsers = loadFromStorage<User[]>(STORAGE_KEY_USERS, INITIAL_USERS);
+        const mergedUsersMap = new Map<string, User>();
+        INITIAL_USERS.forEach(u => mergedUsersMap.set(u.id, u));
+        localUsers.forEach(u => mergedUsersMap.set(u.id, u));
+        cloudData.users.forEach(u => mergedUsersMap.set(u.id, u));
+        const mergedUsers = Array.from(mergedUsersMap.values());
+        saveToStorage(STORAGE_KEY_USERS, mergedUsers);
+
+        if (cloudData.orders && cloudData.orders.length > 0) {
+          const localOrders = loadFromStorage<Order[]>(STORAGE_KEY_ORDERS, INITIAL_ORDERS);
+          const mergedOrdersMap = new Map<string, Order>();
+          localOrders.forEach(o => mergedOrdersMap.set(o.id, o));
+          cloudData.orders.forEach(o => mergedOrdersMap.set(o.id, o));
+          saveToStorage(STORAGE_KEY_ORDERS, Array.from(mergedOrdersMap.values()));
+        }
+
+        if (cloudData.settings) {
+          saveToStorage(STORAGE_KEY_SETTINGS, cloudData.settings);
+        }
+
+        notifyStoreChanged();
+      } else {
+        // Upload initial seed state to Cloud Firestore
+        await CloudSyncService.uploadFullBackup({
+          users: Store.getUsers(),
+          orders: Store.getOrders(),
+          settings: Store.getSettings()
+        });
+      }
+
+      // Live subscription to Cloud Firestore changes
+      CloudSyncService.subscribeToCloudChanges({
+        onUsersChange: (newUsers) => {
+          if (newUsers.length > 0) {
+            const currentUsers = Store.getUsers();
+            const map = new Map<string, User>();
+            currentUsers.forEach(u => map.set(u.id, u));
+            newUsers.forEach(u => map.set(u.id, u));
+            saveToStorage(STORAGE_KEY_USERS, Array.from(map.values()));
+            notifyStoreChanged();
+          }
+        },
+        onOrdersChange: (newOrders) => {
+          if (newOrders.length > 0) {
+            const currentOrders = Store.getOrders();
+            const map = new Map<string, Order>();
+            currentOrders.forEach(o => map.set(o.id, o));
+            newOrders.forEach(o => map.set(o.id, o));
+            saveToStorage(STORAGE_KEY_ORDERS, Array.from(map.values()));
+            notifyStoreChanged();
+          }
+        }
+      });
+    } catch (err) {
+      console.warn('[Store] initCloudSync fallback to local:', err);
+    }
+  },
+
+  // Manual or automatic snapshot backup to Cloud Firestore
+  backupDatabaseToCloud: async () => {
+    try {
+      await CloudSyncService.uploadFullBackup({
+        users: Store.getUsers(),
+        orders: Store.getOrders(),
+        settings: Store.getSettings()
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
   getSuperAdminCredentials: () => {
     return {
       username: DEFAULT_ADMIN_USERNAME,
@@ -340,6 +419,15 @@ export const Store = {
     saveToStorage(STORAGE_KEY_USERS, users);
     Store.setCurrentUser(newUser);
     notifyStoreChanged();
+
+    // Zero-Loss Cloud Firestore Persistence & Backup
+    CloudSyncService.saveUser(newUser);
+    CloudSyncService.uploadFullBackup({
+      users,
+      orders: Store.getOrders(),
+      settings: Store.getSettings()
+    });
+
     return newUser;
   },
 
@@ -400,6 +488,15 @@ export const Store = {
     users.push(newProvider);
     saveToStorage(STORAGE_KEY_USERS, users);
     notifyStoreChanged();
+
+    // Zero-Loss Cloud Firestore Persistence & Backup
+    CloudSyncService.saveUser(newProvider);
+    CloudSyncService.uploadFullBackup({
+      users,
+      orders: Store.getOrders(),
+      settings: Store.getSettings()
+    });
+
     return newProvider;
   },
 
@@ -456,6 +553,12 @@ export const Store = {
         saveToStorage(STORAGE_KEY_CURRENT_USER, updatedUser);
       }
       notifyStoreChanged();
+      CloudSyncService.saveUser(updatedUser);
+      CloudSyncService.uploadFullBackup({
+        users,
+        orders: Store.getOrders(),
+        settings: Store.getSettings()
+      });
     }
   },
 
@@ -483,6 +586,12 @@ export const Store = {
       }
     }
     notifyStoreChanged();
+    CloudSyncService.saveUser(users[idx]);
+    CloudSyncService.uploadFullBackup({
+      users,
+      orders: Store.getOrders(),
+      settings: Store.getSettings()
+    });
     return users[idx];
   },
 
@@ -497,6 +606,12 @@ export const Store = {
         Store.logout();
       }
       notifyStoreChanged();
+      CloudSyncService.saveUser(users[idx]);
+      CloudSyncService.uploadFullBackup({
+        users,
+        orders: Store.getOrders(),
+        settings: Store.getSettings()
+      });
       return true;
     }
     return false;
@@ -513,6 +628,12 @@ export const Store = {
         Store.logout();
       }
       notifyStoreChanged();
+      CloudSyncService.saveUser(users[idx]);
+      CloudSyncService.uploadFullBackup({
+        users,
+        orders: Store.getOrders(),
+        settings: Store.getSettings()
+      });
       return true;
     }
     return false;
@@ -526,6 +647,12 @@ export const Store = {
       users[idx].isDeleted = false;
       saveToStorage(STORAGE_KEY_USERS, users);
       notifyStoreChanged();
+      CloudSyncService.saveUser(users[idx]);
+      CloudSyncService.uploadFullBackup({
+        users,
+        orders: Store.getOrders(),
+        settings: Store.getSettings()
+      });
       return true;
     }
     return false;
@@ -544,6 +671,12 @@ export const Store = {
         Store.logout();
       }
       notifyStoreChanged();
+      CloudSyncService.saveUser(users[idx]);
+      CloudSyncService.uploadFullBackup({
+        users,
+        orders: Store.getOrders(),
+        settings: Store.getSettings()
+      });
       return true;
     }
     return false;
@@ -557,6 +690,12 @@ export const Store = {
       users[idx].status = 'active';
       saveToStorage(STORAGE_KEY_USERS, users);
       notifyStoreChanged();
+      CloudSyncService.saveUser(users[idx]);
+      CloudSyncService.uploadFullBackup({
+        users,
+        orders: Store.getOrders(),
+        settings: Store.getSettings()
+      });
       return true;
     }
     return false;
@@ -577,6 +716,15 @@ export const Store = {
     const updated: SystemSettings = { ...current, ...newSettings };
     saveToStorage(STORAGE_KEY_SETTINGS, updated);
     notifyStoreChanged();
+
+    // Zero-Loss Cloud Firestore Persistence & Backup
+    CloudSyncService.saveSettings(updated);
+    CloudSyncService.uploadFullBackup({
+      users: Store.getUsers(),
+      orders: Store.getOrders(),
+      settings: updated
+    });
+
     return updated;
   },
 
@@ -613,6 +761,32 @@ export const Store = {
     orders.unshift(newOrder);
     saveToStorage(STORAGE_KEY_ORDERS, orders);
     notifyStoreChanged();
+
+    const orderTitle = newOrder.serviceDetails?.serviceName || 
+      newOrder.deliveryDetails?.itemName || 
+      newOrder.transportDetails?.vehicleName || 
+      newOrder.eventDetails?.eventTitle || 
+      newOrder.category;
+    const price = newOrder.pricing?.total || 0;
+
+    // Trigger Real-time Firebase notification for Admin
+    NotificationService.createNotification({
+      recipientId: 'all_admins',
+      recipientRole: 'admin',
+      title: `Naya Order Recieved: #${newOrder.id}`,
+      body: `${newOrder.customerName || 'Customer'} ne '${orderTitle}' book kiya (PKR ${price}).`,
+      orderId: newOrder.id,
+      type: 'order_created'
+    }).catch((err) => console.warn('Notification trigger error:', err));
+
+    // Zero-Loss Cloud Firestore Persistence & Backup
+    CloudSyncService.saveOrder(newOrder);
+    CloudSyncService.uploadFullBackup({
+      users: Store.getUsers(),
+      orders,
+      settings: Store.getSettings()
+    });
+
     return newOrder;
   },
 
@@ -705,6 +879,15 @@ export const Store = {
     }
 
     notifyStoreChanged();
+
+    // Zero-Loss Cloud Firestore Persistence & Backup
+    CloudSyncService.saveOrder(updatedOrder);
+    CloudSyncService.uploadFullBackup({
+      users: Store.getUsers(),
+      orders,
+      settings: Store.getSettings()
+    });
+
     return updatedOrder;
   },
 
@@ -798,6 +981,33 @@ export const Store = {
     }
 
     notifyStoreChanged();
+
+    // Trigger Real-time Firebase notification for Customer
+    const statusText = params.status === 'assigned' 
+      ? `Worker Assign: ${params.providerName || 'Karigar'} (ETA: ${params.etaMinutes || 20}m)`
+      : params.status === 'on_the_way'
+      ? `Worker Rawana Ho Chuka Hai (ETA: ${params.etaMinutes || 15}m)`
+      : params.status === 'completed'
+      ? `Order Mukammal Ho Gaya! Review dein.`
+      : `Order Status: ${params.status}`;
+
+    NotificationService.createNotification({
+      recipientId: updatedOrder.customerId,
+      recipientRole: 'customer',
+      title: `Order #${updatedOrder.id} Update`,
+      body: statusText,
+      orderId: updatedOrder.id,
+      type: 'order_assigned'
+    }).catch((err) => console.warn('Customer notification trigger error:', err));
+
+    // Zero-Loss Cloud Firestore Persistence & Backup
+    CloudSyncService.saveOrder(updatedOrder);
+    CloudSyncService.uploadFullBackup({
+      users: Store.getUsers(),
+      orders,
+      settings: Store.getSettings()
+    });
+
     return updatedOrder;
   },
 

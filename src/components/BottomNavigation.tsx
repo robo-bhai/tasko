@@ -72,14 +72,17 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       {/* Sticky Bottom Navigation Bar */}
       <nav 
         aria-label="Bottom Navigation"
-        className="w-full bg-[#07080d]/98 backdrop-blur-md border-t border-amber-500/30 px-3 py-1.5 shadow-[0_-8px_30px_rgba(0,0,0,0.8)] pb-[max(0.375rem,env(safe-area-inset-bottom))]"
+        className="w-full bg-[#07080d]/98 backdrop-blur-md border-t border-amber-500/30 px-3 pt-2 shadow-[0_-8px_30px_rgba(0,0,0,0.8)] select-none"
+        style={{
+          paddingBottom: 'calc(0.625rem + max(env(safe-area-inset-bottom, 0px), var(--android-bottom-inset, 0px)))'
+        }}
       >
         <div className="max-w-md mx-auto flex items-center justify-around relative">
           
           {/* 1. Home */}
           <button
             onClick={() => handleTabClick('home')}
-            className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer touch-manipulation ${
               activeTab === 'home' ? 'text-amber-400 font-bold' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -90,7 +93,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           {/* 2. Orders */}
           <button
             onClick={() => handleTabClick('orders')}
-            className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+            className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer touch-manipulation ${
               activeTab === 'orders' ? 'text-amber-400 font-bold' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -109,7 +112,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
               onClick={() => {
                 onOpenBookNow();
               }}
-              className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/40 ring-4 ring-[#07080d] hover:scale-105 active:scale-95 transition-all cursor-pointer"
+              className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/40 ring-4 ring-[#07080d] hover:scale-105 active:scale-95 transition-all cursor-pointer touch-manipulation"
               title={isUrdu ? 'Book Now' : 'Book Now'}
             >
               <Plus className="w-6 h-6 stroke-[3]" />
@@ -122,7 +125,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           {/* 4. Wallet */}
           <button
             onClick={() => handleTabClick('wallet')}
-            className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer touch-manipulation ${
               activeTab === 'wallet' ? 'text-amber-400 font-bold' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -133,7 +136,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           {/* 5. Profile */}
           <button
             onClick={() => handleTabClick('profile')}
-            className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer touch-manipulation ${
               activeTab === 'profile' ? 'text-amber-400 font-bold' : 'text-slate-400 hover:text-slate-200'
             }`}
           >

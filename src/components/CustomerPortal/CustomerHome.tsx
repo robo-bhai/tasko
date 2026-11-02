@@ -55,6 +55,8 @@ interface CustomerHomeProps {
   services: HomeServiceItem[];
   vehicles: TransportVehicleItem[];
   lang: Language;
+  onOpenNotifications?: () => void;
+  unreadNotificationsCount?: number;
 }
 
 export const CustomerHome: React.FC<CustomerHomeProps> = ({
@@ -66,7 +68,9 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
   activeOrders,
   services,
   vehicles,
-  lang
+  lang,
+  onOpenNotifications,
+  unreadNotificationsCount = 0
 }) => {
   const t = translations[lang];
   const isUrdu = lang === 'ur';
@@ -348,17 +352,25 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                if (currentUser) {
+                if (onOpenNotifications) {
+                  onOpenNotifications();
+                } else if (currentUser) {
                   onOpenLiveTracker();
                 } else {
                   onOpenAuth('login', isUrdu ? 'Notifications dekhnay ke liye login karein' : 'Please sign in to view notifications');
                 }
               }}
               className="relative p-2.5 rounded-xl bg-[#141624] border border-amber-500/30 text-amber-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-              title={isUrdu ? 'Notifications' : 'Notifications'}
+              title={isUrdu ? 'Live Notifications' : 'Live Notifications'}
             >
               <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-[#0a0b12]" />
+              {unreadNotificationsCount > 0 ? (
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black flex items-center justify-center animate-pulse shadow-md">
+                  {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                </span>
+              ) : (
+                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-[#0a0b12]" />
+              )}
             </button>
           </div>
         </div>

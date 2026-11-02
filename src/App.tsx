@@ -20,6 +20,8 @@ import { EventPlannerModal } from './components/CustomerPortal/EventPlannerModal
 import { ProviderDashboard } from './components/ProviderPortal/ProviderDashboard';
 import { AdminDashboard } from './components/AdminPortal/AdminDashboard';
 import { AuthModal } from './components/AuthModal';
+import { NotificationsModal } from './components/NotificationsModal';
+import { NotificationService, AppNotification } from './services/notifications';
 import { FloatingWhatsAppButton } from './components/FloatingWhatsAppButton';
 import { BottomNavigation } from './components/BottomNavigation';
 import { 
@@ -81,6 +83,22 @@ export default function App() {
     preselectedId?: string;
   } | null>(null);
 
+  // Real-time Firebase Notifications State
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
+
+  // Subscribe to real-time Firebase Notifications
+  useEffect(() => {
+    const unsubscribe = NotificationService.subscribe(
+      currentUser?.id || null,
+      currentUser?.role,
+      (items) => setNotifications(items)
+    );
+    return unsubscribe;
+  }, [currentUser]);
+
+  const unreadNotificationsCount = notifications.filter(n => !n.isRead).length;
+
   // Toggle Language
   const handleToggleLang = () => {
     const nextLang: Language = lang === 'ur' ? 'en' : 'ur';
@@ -92,8 +110,11 @@ export default function App() {
     }
   };
 
-  // Subscribe to central store updates
+  // Subscribe to central store updates and initialize Cloud Firestore Zero-Loss Sync
   useEffect(() => {
+    // Zero-Loss Cloud Firestore Hydration & Real-time Sync
+    Store.initCloudSync();
+
     const unsubscribe = subscribeToStore(() => {
       setOrders(Store.getOrders());
       setUsersList(Store.getUsers());
@@ -101,7 +122,22 @@ export default function App() {
       setVehicles(Store.getVehiclesCatalog());
       setCurrentUser(Store.getCurrentUser());
     });
-    return unsubscribe;
+
+    const handleFlushBackup = () => {
+      Store.backupDatabaseToCloud();
+    };
+
+    window.addEventListener('beforeunload', handleFlushBackup);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        Store.backupDatabaseToCloud();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('beforeunload', handleFlushBackup);
+    };
   }, []);
 
   // Handlers for opening booking modals (Gated by Auth)
@@ -246,6 +282,8 @@ export default function App() {
           activeOrders={navbarActiveOrders}
           lang={lang}
           onToggleLang={handleToggleLang}
+          unreadNotificationsCount={unreadNotificationsCount}
+          onOpenNotifications={() => setIsNotificationsModalOpen(true)}
         />
       </div>
 
@@ -266,6 +304,8 @@ export default function App() {
               services={publishedServices}
               vehicles={publishedVehicles}
               lang={lang}
+              unreadNotificationsCount={unreadNotificationsCount}
+              onOpenNotifications={() => setIsNotificationsModalOpen(true)}
             />
           )}
 
@@ -558,6 +598,20 @@ export default function App() {
         onSuccess={handleAuthSuccess}
         noticeReason={authNoticeReason}
         lang={lang}
+      />
+
+      {/* Real-time Firebase Alerts Modal */}
+      <NotificationsModal
+        isOpen={isNotificationsModalOpen}
+        onClose={() => setIsNotificationsModalOpen(false)}
+        notifications={notifications}
+        onMarkAsRead={(id) => NotificationService.markAsRead(id)}
+        onMarkAllAsRead={() => currentUser && NotificationService.markAllAsRead(currentUser.id)}
+        onSelectOrder={(orderId) => {
+          setSelectedOrderId(orderId);
+          setIsLiveTrackerOpen(true);
+        }}
+        isUrdu={isUrdu}
       />
     </div>
   );

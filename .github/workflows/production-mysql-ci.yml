@@ -56,38 +56,21 @@ jobs:
       - name: Create Snapshot Backup Directory
         run: mkdir -p mysql-backup
 
-      # 2. Restore MySQL Snapshot from GitHub Actions Cache (V5 with dynamic fallback prefix)
+      # 2. Restore MySQL Snapshot from Previous Workflow Run (Fresh isolated cache key)
       - name: Restore Persistent MySQL Database Cache
         id: restore-mysql-cache
         uses: actions/cache/restore@v4
         with:
           path: mysql-backup
-          key: khanewal-prod-v5-${{ runner.os }}-${{ github.run_id }}
+          key: khanewal-prod-v4-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
-            khanewal-prod-v5-${{ runner.os }}-
-            khanewal-prod-v5-
+            khanewal-prod-v4-${{ runner.os }}-
+            khanewal-prod-v4-
 
-      # 3. Fallback/Sync: Check Google Drive via Rclone if Cache is Missing
-      - name: Fallback Restore from Google Drive via Rclone if Cache Missing
-        env:
-          RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
-        run: |
-          if [ ! -f "mysql-backup/snapshot.sql.gz" ] && [ -n "$RCLONE_CONF" ]; then
-            echo "Cache miss. Installing rclone to fetch latest backup from Google Drive..."
-            sudo apt-get update -qq && sudo apt-get install -y rclone
-            mkdir -p ~/.config/rclone
-            echo "$RCLONE_CONF" | tr -d '\r' > ~/.config/rclone/rclone.conf
-            
-            echo "Fetching latest backup from Google Drive (batvoice:khanewal_backups)..."
-            rclone copy batvoice:khanewal_backups/snapshot.sql.gz mysql-backup/ --verbose || echo "Notice: No remote backup found either."
-          fi
-
-      # 4. Bulletproof Database Initialization & Safe Multi-Table Restoration
+      # 3. Bulletproof Database Initialization (Safely skips corrupt system dumps)
       - name: Initialize or Restore MySQL Database
         env:
           MYSQL_PWD: root_password_123
-          ADMIN_USERNAME_SEC: ${{ secrets.ADMIN_USERNAME }}
-          ADMIN_PASSWORD_SEC: ${{ secrets.ADMIN_PASSWORD }}
         run: |
           echo "Waiting for MySQL container readiness..."
           until mysqladmin ping -h 127.0.0.1 -u root --silent; do
@@ -101,9 +84,10 @@ jobs:
           RESTORE_DONE=0
           if [ -f "mysql-backup/snapshot.sql.gz" ]; then
             echo "=========================================================="
-            echo "Found snapshot. Restoring safely without washing tables..."
+            echo "Found existing cached MySQL snapshot. Verifying and restoring..."
             echo "=========================================================="
             
+            # Filter out any system schema 'mysql', 'sys', 'information_schema' statements that trigger Error 3552 in MySQL 8
             set +e
             zcat mysql-backup/snapshot.sql.gz \
               | sed -E '/(CREATE DATABASE|USE)[[:space:]]+`?(mysql|sys|performance_schema|information_schema)`?/Id' \
@@ -116,10 +100,10 @@ jobs:
             echo "Tables found after restore attempt: $TABLE_COUNT"
 
             if [ "$TABLE_COUNT" -gt 0 ]; then
-              echo "Snapshot restored successfully! All tables and entries verified."
+              echo "Snapshot restored successfully! Tables verified."
               RESTORE_DONE=1
             else
-              echo "Notice: Snapshot did not contain valid tables. Error log:"
+              echo "Notice: Snapshot did not contain valid tables or was from an incompatible schema. Error log:"
               cat restore_log.txt || true
               echo "Proceeding to fresh clean schema initialization..."
             fi
@@ -129,41 +113,23 @@ jobs:
             echo "=========================================================="
             echo "Initializing fresh production schema from db/schema.sql..."
             echo "=========================================================="
-            if [ -f "db/schema.sql" ]; then
-              mysql -h 127.0.0.1 -u root omniserve_db < db/schema.sql
-            else
-              echo "WARNING: db/schema.sql not found!"
-            fi
-            echo "Fresh schema initialized successfully."
+            mysql -h 127.0.0.1 -u root omniserve_db < db/schema.sql
+            echo "Fresh schema and initial seed data initialized successfully."
           fi
-
-          # Ensure Password Reset columns exist in users table safely
-          echo "Checking and adding reset_token columns to users table if missing..."
-          mysql -h 127.0.0.1 -u root omniserve_db -e "
-            SET @exist_token = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'omniserve_db' AND TABLE_NAME = 'users' AND COLUMN_NAME = 'reset_token');
-            SET @sql_token = IF(@exist_token = 0, 'ALTER TABLE users ADD COLUMN reset_token VARCHAR(255) NULL;', 'SELECT \"reset_token exists\"');
-            PREPARE stmt1 FROM @sql_token;
-            EXECUTE stmt1;
-            DEALLOCATE PREPARE stmt1;
-
-            SET @exist_expiry = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'omniserve_db' AND TABLE_NAME = 'users' AND COLUMN_NAME = 'reset_token_expiry');
-            SET @sql_expiry = IF(@exist_expiry = 0, 'ALTER TABLE users ADD COLUMN reset_token_expiry DATETIME NULL;', 'SELECT \"reset_token_expiry exists\"');
-            PREPARE stmt2 FROM @sql_expiry;
-            EXECUTE stmt2;
-            DEALLOCATE PREPARE stmt2;
-          " || true
 
           # Sync Super Admin credentials from GitHub Secrets if provided
-          if [ -n "$ADMIN_USERNAME_SEC" ]; then
+          ADMIN_USER_SECRET="${{ secrets.ADMIN_USERNAME }}"
+          ADMIN_PASS_SECRET="${{ secrets.ADMIN_PASSWORD }}"
+          if [ -n "$ADMIN_USER_SECRET" ]; then
             echo "Applying configured ADMIN_USERNAME from GitHub secrets to MySQL..."
-            mysql -h 127.0.0.1 -u root omniserve_db -e "UPDATE users SET email = '$ADMIN_USERNAME_SEC' WHERE id = 'usr-admin-1';" || true
+            mysql -h 127.0.0.1 -u root omniserve_db -e "UPDATE users SET email = '$ADMIN_USER_SECRET' WHERE id = 'usr-admin-1';" || true
           fi
-          if [ -n "$ADMIN_PASSWORD_SEC" ]; then
+          if [ -n "$ADMIN_PASS_SECRET" ]; then
             echo "Applying configured ADMIN_PASSWORD from GitHub secrets to MySQL..."
-            mysql -h 127.0.0.1 -u root omniserve_db -e "UPDATE users SET password = '$ADMIN_PASSWORD_SEC' WHERE id = 'usr-admin-1';" || true
+            mysql -h 127.0.0.1 -u root omniserve_db -e "UPDATE users SET password = '$ADMIN_PASS_SECRET' WHERE id = 'usr-admin-1';" || true
           fi
 
-          echo "Database verification summary (Checking row entries per table):"
+          echo "Database verification summary:"
           mysql -h 127.0.0.1 -u omniserve -pomniserve_secure_password omniserve_db -e "
             SELECT 'users' AS table_name, COUNT(*) AS total_rows FROM users
             UNION ALL
@@ -174,20 +140,62 @@ jobs:
             SELECT 'orders', COUNT(*) FROM orders;
           "
 
-      # 5. Install Dependencies Reliably
+      # 4. Install Dependencies Reliably
       - name: Install Application Dependencies
         run: |
-          npm install @getbrevo/brevo --legacy-peer-deps --no-audit --no-fund
           npm install --legacy-peer-deps --no-audit --no-fund
 
-      # 6. Build Production Frontend Assets
+      # 4b. Configure Firebase from GitHub Secrets (Zero-Loss Persistence)
+      - name: Configure Firebase from GitHub Secrets
+        env:
+          SEC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          SEC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          SEC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          SEC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          SEC_FIREBASE_FIRESTORE_DATABASE_ID: ${{ secrets.FIREBASE_FIRESTORE_DATABASE_ID || secrets.FIREBASE_DATABASE_ID }}
+          SEC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          SEC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          SEC_FIREBASE_OAUTH_CLIENT_ID: ${{ secrets.FIREBASE_OAUTH_CLIENT_ID }}
+        run: |
+          if [ -n "$SEC_FIREBASE_PROJECT_ID" ]; then
+            echo "=========================================================="
+            echo "Injecting Firebase credentials directly from GitHub Secrets..."
+            echo "=========================================================="
+            cat <<EOF > firebase-applet-config.json
+          {
+            "projectId": "$SEC_FIREBASE_PROJECT_ID",
+            "appId": "${SEC_FIREBASE_APP_ID}",
+            "apiKey": "${SEC_FIREBASE_API_KEY}",
+            "authDomain": "${SEC_FIREBASE_AUTH_DOMAIN:-${SEC_FIREBASE_PROJECT_ID}.firebaseapp.com}",
+            "firestoreDatabaseId": "${SEC_FIREBASE_FIRESTORE_DATABASE_ID:-ai-studio-omnitasksuperapp-57a34a31-4e02-4160-a3fe-27190e12f1f7}",
+            "storageBucket": "${SEC_FIREBASE_STORAGE_BUCKET:-${SEC_FIREBASE_PROJECT_ID}.firebasestorage.app}",
+            "messagingSenderId": "${SEC_FIREBASE_MESSAGING_SENDER_ID}",
+            "measurementId": "",
+            "oAuthClientId": "${SEC_FIREBASE_OAUTH_CLIENT_ID}",
+            "recaptchaSiteKey": ""
+          }
+          EOF
+            echo "firebase-applet-config.json dynamically configured from GitHub Secrets!"
+          else
+            echo "Notice: FIREBASE_PROJECT_ID secret not provided in GitHub Secrets. Using existing configuration."
+          fi
+
+      # 5. Build Production Frontend Assets
       - name: Build Production Frontend Assets
         env:
           VITE_ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME || 'admin@omniserve.com' }}
           VITE_ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'Admin@12345' }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_FIRESTORE_DATABASE_ID: ${{ secrets.FIREBASE_FIRESTORE_DATABASE_ID || secrets.FIREBASE_DATABASE_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_OAUTH_CLIENT_ID: ${{ secrets.FIREBASE_OAUTH_CLIENT_ID }}
         run: npm run build
 
-      # 7. Install Cloudflare Tunnel Client (cloudflared)
+      # 6. Install Cloudflare Tunnel Client (cloudflared)
       - name: Install Cloudflare Tunnel (cloudflared)
         run: |
           echo "Installing latest cloudflared binary..."
@@ -195,7 +203,8 @@ jobs:
           sudo dpkg -i cloudflared.deb
           cloudflared --version
 
-      # 8. Unified Runner: Start Server + Start Tunnel + 5-Hour Keep-Alive Monitoring Loop
+      # 7. Unified Runner: Start Server + Start Tunnel + 5-Hour Keep-Alive Monitoring Loop
+      # Keeping these in ONE step guarantees child processes are NOT terminated by GitHub Actions step boundaries!
       - name: Start Server, Connect Cloudflare Tunnel & Host Live (5 Hours)
         env:
           NODE_ENV: production
@@ -209,10 +218,22 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'Admin@12345' }}
           VITE_ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME || 'admin@omniserve.com' }}
           VITE_ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'Admin@12345' }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_FIRESTORE_DATABASE_ID: ${{ secrets.FIREBASE_FIRESTORE_DATABASE_ID || secrets.FIREBASE_DATABASE_ID }}
+          FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_FIRESTORE_DATABASE_ID: ${{ secrets.FIREBASE_FIRESTORE_DATABASE_ID || secrets.FIREBASE_DATABASE_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_OAUTH_CLIENT_ID: ${{ secrets.FIREBASE_OAUTH_CLIENT_ID }}
           CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
-          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
-          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
-          SENDER_NAME: ${{ secrets.SENDER_NAME }}
         run: |
           echo "=========================================================================="
           echo " Launching Khanewal Connect Express Application..."
@@ -266,6 +287,7 @@ jobs:
           echo " Scheduled Live Session Duration: $DURATION_HOURS Hours ($TOTAL_SECONDS seconds)"
           echo " Custom Domain: https://84wala.uqn88.store"
           echo "=========================================================================="
+          echo "To stop early and save your MySQL database snapshot, click 'Cancel workflow' anytime."
 
           ELAPSED=0
           while [ $ELAPSED -lt $TOTAL_SECONDS ]; do
@@ -274,9 +296,11 @@ jobs:
             MINUTES_RUN=$((ELAPSED / 60))
             MINUTES_REMAINING=$(((TOTAL_SECONDS - ELAPSED) / 60))
 
+            # Query health probe
             HEALTH_STATUS=$(curl -s http://127.0.0.1:3000/api/health || echo '{"status":"unreachable"}')
             echo "[$(date -u +"%H:%M:%SZ")] Running: ${MINUTES_RUN}m elapsed | ${MINUTES_REMAINING}m remaining | Health: $HEALTH_STATUS"
 
+            # Auto-healing: If app crashed, restart it immediately
             if ! curl -s http://127.0.0.1:3000/api/health | grep -q "healthy"; then
               echo "WARNING: App health probe failed! Restarting server..."
               cat app.log | tail -n 30 || true
@@ -284,6 +308,7 @@ jobs:
               sleep 5
             fi
 
+            # Auto-healing: If tunnel crashed, restart it immediately
             if ! pgrep -f cloudflared > /dev/null; then
               echo "WARNING: Cloudflare Tunnel process terminated! Restarting tunnel..."
               if [ -n "$CLOUDFLARE_TUNNEL_TOKEN" ]; then
@@ -294,7 +319,9 @@ jobs:
 
           echo "5-hour live session completed successfully."
 
-      # 9. Guaranteed Zero-Data-Loss MySQL Full Snapshot Capture
+      # =========================================================================
+      # 8. GUARANTEED ZERO-DATA-LOSS MYSQL SNAPSHOT (Runs on CANCEL, SUCCESS, TIMEOUT)
+      # =========================================================================
       - name: Safely Capture MySQL Full Snapshot
         if: always()
         env:
@@ -306,8 +333,9 @@ jobs:
           mkdir -p mysql-backup
 
           if mysqladmin ping -h 127.0.0.1 -u root --silent; then
-            echo "Taking clean mysqldump for application database 'omniserve_db' with all tables and rows..."
+            echo "Taking clean mysqldump for application database 'omniserve_db' only..."
             
+            # Dump ONLY application database 'omniserve_db' to avoid ERROR 3552 system tables
             mysqldump -h 127.0.0.1 -u root \
               --databases omniserve_db \
               --single-transaction \
@@ -335,36 +363,22 @@ jobs:
           }
           EOF
 
-            echo "Clean snapshot created successfully with all table entries!"
+            echo "Clean snapshot created successfully!"
             ls -lh mysql-backup/
+            cat mysql-backup/snapshot-meta.json
           else
             echo "Notice: MySQL server is unreachable. Existing backup retained."
           fi
 
-      # 10. Save Persistent Snapshot to GitHub Actions Cache (V5 with unique timestamp suffix)
+      # 9. Save Persistent Snapshot to GitHub Actions Cache for Next Run
       - name: Save Persistent MySQL Database Cache
         if: always()
         uses: actions/cache/save@v4
         with:
           path: mysql-backup
-          key: khanewal-prod-v5-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}-${{ env.GITHUB_RUN_NUMBER || 'latest' }}
+          key: khanewal-prod-v4-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
 
-      # 11. Redundant Backup: Upload Snapshot to Google Drive via Rclone
-      - name: Redundant Backup to Google Drive via Rclone
-        if: always()
-        env:
-          RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
-        run: |
-          if [ -n "$RCLONE_CONF" ] && [ -f "mysql-backup/snapshot.sql.gz" ]; then
-            echo "Syncing latest MySQL snapshot to Google Drive as redundant backup..."
-            mkdir -p ~/.config/rclone
-            echo "$RCLONE_CONF" | tr -d '\r' > ~/.config/rclone/rclone.conf
-            
-            rclone copy mysql-backup/snapshot.sql.gz batvoice:khanewal_backups/ --verbose
-            echo "Redundant cloud backup synced successfully!"
-          fi
-
-      # 12. Upload Snapshot as Workflow Artifact
+      # 10. Upload Snapshot as Workflow Artifact (90-Day Retention)
       - name: Upload Snapshot as Redundant Workflow Artifact
         if: always()
         uses: actions/upload-artifact@v4

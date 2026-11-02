@@ -18,7 +18,8 @@ import {
   Briefcase,
   Menu,
   X,
-  Radio
+  Radio,
+  Bell
 } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
 
@@ -33,6 +34,8 @@ interface NavbarProps {
   activeOrders: Order[];
   lang: Language;
   onToggleLang: () => void;
+  unreadNotificationsCount?: number;
+  onOpenNotifications?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -45,7 +48,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuth,
   activeOrders,
   lang,
-  onToggleLang
+  onToggleLang,
+  unreadNotificationsCount = 0,
+  onOpenNotifications
 }) => {
   const t = translations[lang];
   const isUrdu = lang === 'ur';
@@ -171,6 +176,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </button>
           )}
+
+          {/* Real-time Notifications Bell */}
+          <button
+            onClick={() => onOpenNotifications && onOpenNotifications()}
+            className="relative p-1.5 sm:px-2 sm:py-1.5 rounded-xl border border-amber-500/30 bg-[#12141e] hover:bg-[#1a1c2a] text-amber-300 text-xs font-bold flex items-center justify-center transition-colors shadow-sm cursor-pointer shrink-0"
+            title={isUrdu ? 'Notifications' : 'Notifications'}
+          >
+            <Bell className="w-3.5 h-3.5 text-amber-400" />
+            {unreadNotificationsCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-400 text-slate-950 text-[9px] flex items-center justify-center font-black animate-pulse">
+                {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+              </span>
+            )}
+          </button>
 
           {/* User Logged In State vs Guest Visitor State */}
           {currentUser ? (
