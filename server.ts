@@ -4,6 +4,16 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { initDbPool, isDbConnected, query } from './src/server/db.js';
+import { 
+  initPasswordResetsTable, 
+  createPasswordResetToken, 
+  verifyPasswordResetToken, 
+  markTokenAsUsed, 
+  sendBrevoEmail, 
+  getPasswordResetEmailHtml, 
+  getPasswordResetSuccessEmailHtml, 
+  getOrderNotificationEmailHtml 
+} from './src/server/brevo.js';
 
 dotenv.config();
 
@@ -47,6 +57,7 @@ async function startServer() {
   // Attempt MySQL database connection
   await initDbPool();
   await syncSuperAdminFromEnv();
+  await initPasswordResetsTable();
 
   // API Routes
   app.get('/api/health', (req: Request, res: Response) => {
@@ -99,6 +110,208 @@ async function startServer() {
       projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || 'noman-e5b08',
       databaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || 'ai-studio-omnitasksuperapp-57a34a31-4e02-4160-a3fe-27190e12f1f7'
     });
+  });
+
+  // =========================================================================
+  // BREVO EMAIL & 5-MINUTE EXPIRING FORGOT PASSWORD SYSTEM
+  // =========================================================================
+  app.post('/api/auth/forgot-password', async (req: Request, res: Response) => {
+    const { email } = req.body;
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ success: false, error: 'Barae meherbani durust email address darj karein.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    let userName = 'Valued User';
+    let userFound = false;
+
+    // 1. Search in MySQL
+    if (isDbConnected()) {
+      try {
+        const rows = await query('SELECT id, name, email FROM users WHERE LOWER(email) = ? LIMIT 1', [cleanEmail]);
+        if (rows && rows.length > 0) {
+          userFound = true;
+          userName = (rows[0] as any).name || 'Valued User';
+        }
+      } catch (err: any) {
+        console.warn('[Forgot Password] MySQL search error:', err.message);
+      }
+    }
+
+    // 2. Search in memory cache
+    if (!userFound) {
+      const mem = memoryUsers.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+      if (mem) {
+        userFound = true;
+        userName = mem.name || 'Valued User';
+      }
+    }
+
+    // 3. Check Super Admin
+    const adminEmail = (process.env.ADMIN_USERNAME || process.env.VITE_ADMIN_USERNAME || 'admin@omniserve.com').toLowerCase();
+    if (!userFound && cleanEmail === adminEmail) {
+      userFound = true;
+      userName = 'Super Administrator';
+    }
+
+    if (!userFound) {
+      return res.status(404).json({
+        success: false,
+        error: 'Is email se koi registered account dastiyab nahi mila. Barae meherbani email dobara check karein.'
+      });
+    }
+
+    try {
+      // Generate secure 5-minute expiry token
+      const token = await createPasswordResetToken(cleanEmail, userName);
+
+      // Determine application base url
+      const origin = req.headers.origin || (req.get('host') ? `${req.protocol}://${req.get('host')}` : '');
+      const resetUrl = `${origin}/?resetToken=${token}`;
+
+      console.log(`[Forgot Password] Generated 5-minute valid token for ${cleanEmail}: ${resetUrl}`);
+
+      // Dispatch professional branded HTML email via Brevo API
+      const emailResult = await sendBrevoEmail({
+        toEmail: cleanEmail,
+        toName: userName,
+        subject: 'Khanewal Connect - Password Reset Link (5 Minutes Valid)',
+        htmlContent: getPasswordResetEmailHtml(userName, resetUrl),
+        textContent: `Assalam-o-Alaikum ${userName},\n\nAapke Khanewal Connect account ka password reset karne ka link:\n${resetUrl}\n\nYeh link sirf 5 MINUTES ke liye valid hai.\n\nKhanewal Connect Team`
+      });
+
+      res.json({
+        success: true,
+        message: 'Password reset link aapke email par kamyabi se bhej diya gaya hai (Valid for 5 minutes).',
+        email: cleanEmail,
+        expiresInMinutes: 5,
+        brevoDispatched: emailResult.success
+      });
+    } catch (err: any) {
+      console.error('[Forgot Password] Error handling request:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.get('/api/auth/verify-reset-token', async (req: Request, res: Response) => {
+    const token = req.query.token as string;
+    if (!token) {
+      return res.status(400).json({ valid: false, error: 'Token missing' });
+    }
+    const result = await verifyPasswordResetToken(token);
+    res.json(result);
+  });
+
+  app.post('/api/auth/reset-password', async (req: Request, res: Response) => {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.status(400).json({ success: false, error: 'Token aur naya password dono darkar hain.' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, error: 'Password kam az kam 6 characters ka hona chahiye.' });
+    }
+
+    const verification = await verifyPasswordResetToken(token);
+    if (!verification.valid || !verification.email) {
+      return res.status(400).json({ 
+        success: false, 
+        error: verification.error || 'Yeh password reset link expire ho chuka hai ya ghalat hai.' 
+      });
+    }
+
+    const email = verification.email;
+    const name = verification.name || 'Valued User';
+
+    try {
+      // 1. Update in MySQL
+      if (isDbConnected()) {
+        await query('UPDATE users SET password = ? WHERE LOWER(email) = ?', [newPassword, email]);
+        console.log(`[Password Reset] Password updated in MySQL database for user: ${email}`);
+      }
+
+      // 2. Update in memory cache
+      const memIdx = memoryUsers.findIndex(u => u.email && u.email.toLowerCase() === email);
+      if (memIdx >= 0) {
+        memoryUsers[memIdx].password = newPassword;
+      }
+
+      // 3. Mark token as used
+      await markTokenAsUsed(token);
+
+      // 4. Send success email via Brevo
+      sendBrevoEmail({
+        toEmail: email,
+        toName: name,
+        subject: 'Khanewal Connect - Password Successfully Reset',
+        htmlContent: getPasswordResetSuccessEmailHtml(name),
+        textContent: `Assalam-o-Alaikum ${name},\n\nAapke Khanewal Connect account ka password kamyabi se tabdeel ho chuka hai.`
+      }).catch(err => console.warn('[Password Reset] Confirmation email note:', err.message));
+
+      res.json({
+        success: true,
+        message: 'Aapka password kamyabi se tabdeel ho chuka hai! Ab aap naye password se login kar sakte hain.'
+      });
+    } catch (err: any) {
+      console.error('[Password Reset] Database update error:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // =========================================================================
+  // BREVO NOTIFICATIONS DISPATCH EMAIL (Admin & Users)
+  // =========================================================================
+  app.post('/api/notifications/dispatch-email', async (req: Request, res: Response) => {
+    const { 
+      type, 
+      recipientRole, 
+      recipientEmail, 
+      recipientName, 
+      orderId, 
+      orderData, 
+      title, 
+      message 
+    } = req.body;
+
+    const adminEmail = process.env.ADMIN_USERNAME || process.env.VITE_ADMIN_USERNAME || 'admin@omniserve.com';
+    const targetEmail = (recipientRole === 'admin' ? adminEmail : recipientEmail)?.trim();
+
+    if (!targetEmail) {
+      return res.status(400).json({ success: false, error: 'Recipient email address is required' });
+    }
+
+    try {
+      const emailSubject = title || `Khanewal Connect Update: #${orderId || ''}`;
+      const htmlContent = orderData ? getOrderNotificationEmailHtml({
+        title: emailSubject,
+        orderId: orderId || orderData.id || 'N/A',
+        customerName: orderData.customerName || recipientName || 'Customer',
+        customerPhone: orderData.customerPhone,
+        serviceOrItem: orderData.serviceName || orderData.itemName || orderData.category || 'Service / Delivery',
+        totalPrice: Number(orderData.pricing?.total || orderData.totalPrice || 0),
+        deliveryAddress: orderData.deliveryAddress || 'Khanewal',
+        status: orderData.status || 'pending',
+        isForAdmin: recipientRole === 'admin',
+        notes: message
+      }) : `
+        <div style="background:#131722;color:#ffffff;padding:24px;border-radius:14px;border:1px solid #f59e0b;font-family:sans-serif;">
+          <h2 style="color:#f59e0b;margin-top:0;">${emailSubject}</h2>
+          <p style="color:#e2e8f0;font-size:14px;line-height:1.6;">${message || 'Aapko Khanewal Connect ki taraf se notification mosool hua hai.'}</p>
+        </div>
+      `;
+
+      const result = await sendBrevoEmail({
+        toEmail: targetEmail,
+        toName: recipientName || (recipientRole === 'admin' ? 'Super Administrator' : 'Valued User'),
+        subject: emailSubject,
+        htmlContent
+      });
+
+      res.json(result);
+    } catch (err: any) {
+      console.error('[Notification Email Dispatch] Error:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
   });
 
   // =========================================================================

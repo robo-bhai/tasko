@@ -20,6 +20,7 @@ import { EventPlannerModal } from './components/CustomerPortal/EventPlannerModal
 import { ProviderDashboard } from './components/ProviderPortal/ProviderDashboard';
 import { AdminDashboard } from './components/AdminPortal/AdminDashboard';
 import { AuthModal } from './components/AuthModal';
+import { ResetPasswordModal } from './components/ResetPasswordModal';
 import { NotificationsModal } from './components/NotificationsModal';
 import { NotificationService, AppNotification } from './services/notifications';
 import { FloatingWhatsAppButton } from './components/FloatingWhatsAppButton';
@@ -78,6 +79,23 @@ export default function App() {
   // Auth Modal State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authNoticeReason, setAuthNoticeReason] = useState<string | undefined>();
+
+  // 5-Minute Password Reset Modal State (Auto-opened on ?resetToken=...)
+  const [resetToken, setResetToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('resetToken');
+    }
+    return null;
+  });
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return Boolean(params.get('resetToken'));
+    }
+    return false;
+  });
+
   const [pendingOrderAction, setPendingOrderAction] = useState<{
     category: 'custom_delivery' | 'home_services' | 'transport_cargo';
     preselectedId?: string;
@@ -610,6 +628,32 @@ export default function App() {
         }}
         onSuccess={handleAuthSuccess}
         noticeReason={authNoticeReason}
+        lang={lang}
+      />
+
+      {/* 5-Minute Expiring Brevo Password Reset Modal */}
+      <ResetPasswordModal
+        isOpen={isResetPasswordModalOpen}
+        token={resetToken}
+        onClose={() => {
+          setIsResetPasswordModalOpen(false);
+          setResetToken(null);
+          if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('resetToken');
+            window.history.replaceState({}, '', url.pathname + url.search);
+          }
+        }}
+        onPasswordResetSuccess={(email) => {
+          setIsResetPasswordModalOpen(false);
+          setResetToken(null);
+          setAuthNoticeReason(
+            isUrdu 
+              ? 'Password kamyabi se tabdeel ho chuka hai! Ab naye password se login karein.' 
+              : 'Password reset successfully! Please sign in with your new password.'
+          );
+          setIsAuthModalOpen(true);
+        }}
         lang={lang}
       />
 

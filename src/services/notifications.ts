@@ -121,14 +121,22 @@ export const NotificationService = {
   async createNotification(notif: {
     recipientId: string;
     recipientRole?: 'admin' | 'customer' | 'provider' | 'all';
+    recipientEmail?: string;
     title: string;
     body: string;
     orderId?: string;
+    order?: any;
+    note?: string;
     type: 'order_created' | 'order_assigned' | 'order_status' | 'system_alert';
   }): Promise<string> {
     const newRecord: AppNotification = {
       id: 'notif-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
-      ...notif,
+      recipientId: notif.recipientId,
+      recipientRole: notif.recipientRole,
+      title: notif.title,
+      body: notif.body,
+      orderId: notif.orderId,
+      type: notif.type,
       isRead: false,
       createdAt: new Date().toISOString()
     };
@@ -136,6 +144,27 @@ export const NotificationService = {
     // Save locally
     const current = getLocalNotifications();
     saveLocalNotifications([newRecord, ...current]);
+
+    // Dispatch transactional email via Brevo and backend notification router
+    try {
+      fetch('/api/notifications/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: notif.type,
+          recipientRole: notif.recipientRole,
+          recipientId: notif.recipientId,
+          recipientEmail: notif.recipientEmail,
+          title: notif.title,
+          body: notif.body,
+          orderId: notif.orderId,
+          order: notif.order,
+          note: notif.note
+        })
+      }).catch(err => console.warn('Email notification dispatch error:', err));
+    } catch {
+      // ignore
+    }
 
     // Push to Firestore if connected
     try {

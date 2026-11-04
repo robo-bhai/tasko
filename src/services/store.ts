@@ -800,6 +800,27 @@ export const Store = {
     return loadFromStorage<Order[]>(STORAGE_KEY_ORDERS, INITIAL_ORDERS);
   },
 
+  dispatchNotificationEmail: (payload: {
+    type: string;
+    recipientRole: 'admin' | 'customer';
+    recipientEmail?: string;
+    recipientName?: string;
+    orderId?: string;
+    orderData?: any;
+    title?: string;
+    message?: string;
+  }) => {
+    try {
+      fetch('/api/notifications/dispatch-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).catch(err => console.warn('[Brevo Email Dispatch] Notice:', err.message));
+    } catch {
+      // offline / mock fallback
+    }
+  },
+
   getOrderById: (orderId: string): Order | undefined => {
     return Store.getOrders().find(o => o.id === orderId);
   },
@@ -847,6 +868,24 @@ export const Store = {
       type: 'order_created'
     }).catch((err) => console.warn('Admin notification trigger error:', err));
 
+    // Dispatch professional Brevo email to Admin
+    Store.dispatchNotificationEmail({
+      type: 'order_created',
+      recipientRole: 'admin',
+      orderId: newOrder.id,
+      title: `[Khanewal Connect] Naya Order Recieved: #${newOrder.id}`,
+      message: `${newOrder.customerName || 'Customer'} ne '${orderTitle}' book kiya hai. Kul raqam: PKR ${price}.`,
+      orderData: {
+        id: newOrder.id,
+        customerName: newOrder.customerName,
+        customerPhone: newOrder.customerPhone,
+        serviceName: orderTitle,
+        pricing: newOrder.pricing,
+        deliveryAddress: newOrder.deliveryAddress,
+        status: newOrder.status
+      }
+    });
+
     // Trigger Real-time Firebase confirmation notification strictly for THIS Customer
     if (newOrder.customerId) {
       NotificationService.createNotification({
@@ -857,6 +896,30 @@ export const Store = {
         orderId: newOrder.id,
         type: 'order_created'
       }).catch((err) => console.warn('Customer notification trigger error:', err));
+
+      // Look up customer email and dispatch Brevo confirmation email
+      const customer = Store.getUsers().find(u => u.id === newOrder.customerId);
+      const custEmail = customer?.email || (newOrder as any).customerEmail;
+      if (custEmail && custEmail.includes('@')) {
+        Store.dispatchNotificationEmail({
+          type: 'order_created',
+          recipientRole: 'customer',
+          recipientEmail: custEmail,
+          recipientName: newOrder.customerName,
+          orderId: newOrder.id,
+          title: `[Khanewal Connect] Order Book Ho Chuka Hai: #${newOrder.id}`,
+          message: `Aapka order kamyabi se register ho chuka hai (${orderTitle}). Hamari team jald rabta karegi.`,
+          orderData: {
+            id: newOrder.id,
+            customerName: newOrder.customerName,
+            customerPhone: newOrder.customerPhone,
+            serviceName: orderTitle,
+            pricing: newOrder.pricing,
+            deliveryAddress: newOrder.deliveryAddress,
+            status: newOrder.status
+          }
+        });
+      }
     }
 
     // Zero-Loss Cloud Firestore & MySQL Persistence
@@ -982,6 +1045,30 @@ export const Store = {
         orderId: updatedOrder.id,
         type: newStatus === 'assigned' ? 'order_assigned' : 'order_status'
       }).catch((err) => console.warn('Customer status notification error:', err));
+
+      // Dispatch Brevo email to Customer on status change
+      const cust = Store.getUsers().find(u => u.id === updatedOrder.customerId);
+      const custEmail = cust?.email;
+      if (custEmail && custEmail.includes('@')) {
+        Store.dispatchNotificationEmail({
+          type: 'order_status',
+          recipientRole: 'customer',
+          recipientEmail: custEmail,
+          recipientName: updatedOrder.customerName,
+          orderId: updatedOrder.id,
+          title: `[Khanewal Connect] Order #${updatedOrder.id} Status: ${label}`,
+          message: statusMessages[newStatus] || `Aapke order ka status ab '${newStatus}' hai.`,
+          orderData: {
+            id: updatedOrder.id,
+            customerName: updatedOrder.customerName,
+            customerPhone: updatedOrder.customerPhone,
+            serviceName: updatedOrder.category,
+            pricing: updatedOrder.pricing,
+            deliveryAddress: updatedOrder.deliveryAddress,
+            status: newStatus
+          }
+        });
+      }
     }
 
     // If order completed or cancelled, notify Admin
@@ -994,6 +1081,24 @@ export const Store = {
         orderId: updatedOrder.id,
         type: 'order_status'
       }).catch((err) => console.warn('Admin status notification error:', err));
+
+      // Dispatch Brevo email to Admin on order completion / cancellation
+      Store.dispatchNotificationEmail({
+        type: 'order_status',
+        recipientRole: 'admin',
+        orderId: updatedOrder.id,
+        title: `[Khanewal Connect] Order #${updatedOrder.id} ${newStatus === 'completed' ? 'Completed' : 'Cancelled'}`,
+        message: `${updatedOrder.customerName} ka order #${updatedOrder.id} status '${newStatus}' update ho gaya hai.`,
+        orderData: {
+          id: updatedOrder.id,
+          customerName: updatedOrder.customerName,
+          customerPhone: updatedOrder.customerPhone,
+          serviceName: updatedOrder.category,
+          pricing: updatedOrder.pricing,
+          deliveryAddress: updatedOrder.deliveryAddress,
+          status: newStatus
+        }
+      });
     }
 
     // Zero-Loss Cloud Firestore & MySQL Persistence
@@ -1116,6 +1221,30 @@ export const Store = {
       orderId: updatedOrder.id,
       type: 'order_assigned'
     }).catch((err) => console.warn('Customer notification trigger error:', err));
+
+    // Dispatch Brevo email to Customer
+    const adminTargetCust = Store.getUsers().find(u => u.id === updatedOrder.customerId);
+    const targetCustEmail = adminTargetCust?.email;
+    if (targetCustEmail && targetCustEmail.includes('@')) {
+      Store.dispatchNotificationEmail({
+        type: 'order_status',
+        recipientRole: 'customer',
+        recipientEmail: targetCustEmail,
+        recipientName: updatedOrder.customerName,
+        orderId: updatedOrder.id,
+        title: `[Khanewal Connect] Order #${updatedOrder.id} Update: ${params.status}`,
+        message: statusText,
+        orderData: {
+          id: updatedOrder.id,
+          customerName: updatedOrder.customerName,
+          customerPhone: updatedOrder.customerPhone,
+          serviceName: updatedOrder.category,
+          pricing: updatedOrder.pricing,
+          deliveryAddress: updatedOrder.deliveryAddress,
+          status: params.status
+        }
+      });
+    }
 
     // If assigned to a provider, send targeted notification to that provider
     if (params.providerId) {
