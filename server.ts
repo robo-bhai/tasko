@@ -24,11 +24,12 @@ const __dirname = path.dirname(__filename);
 let memoryUsers: any[] = [];
 let memoryOrders: any[] = [];
 let memorySettings: any = null;
+let runtimeAdminPasswordOverride: string | null = null;
 
 async function syncSuperAdminFromEnv() {
   if (!isDbConnected()) return;
   const adminEmail = process.env.ADMIN_USERNAME || process.env.VITE_ADMIN_USERNAME || 'admin@omniserve.com';
-  const adminPassword = process.env.ADMIN_PASSWORD || process.env.VITE_ADMIN_PASSWORD || 'Admin@12345';
+  const adminPassword = runtimeAdminPasswordOverride || process.env.ADMIN_PASSWORD || process.env.VITE_ADMIN_PASSWORD || 'Admin@12345';
 
   try {
     const existing = await query('SELECT id FROM users WHERE id = ? OR email = ? LIMIT 1', ['usr-admin-1', adminEmail]);
@@ -185,7 +186,9 @@ async function startServer() {
         message: 'Password reset link aapke email par kamyabi se bhej diya gaya hai (Valid for 5 minutes).',
         email: cleanEmail,
         expiresInMinutes: 5,
-        brevoDispatched: emailResult.success
+        brevoDispatched: emailResult.success,
+        resetToken: token,
+        resetUrl
       });
     } catch (err: any) {
       console.error('[Forgot Password] Error handling request:', err);
@@ -220,20 +223,65 @@ async function startServer() {
       });
     }
 
-    const email = verification.email;
+    const email = verification.email.toLowerCase().trim();
     const name = verification.name || 'Valued User';
+    const adminEmail = (process.env.ADMIN_USERNAME || process.env.VITE_ADMIN_USERNAME || 'admin@omniserve.com').toLowerCase();
 
     try {
+      let updatedUser: any = null;
+
       // 1. Update in MySQL
       if (isDbConnected()) {
         await query('UPDATE users SET password = ? WHERE LOWER(email) = ?', [newPassword, email]);
+        if (email === adminEmail) {
+          await query('UPDATE users SET password = ? WHERE id = ? OR LOWER(email) = ?', [newPassword, 'usr-admin-1', adminEmail]);
+        }
         console.log(`[Password Reset] Password updated in MySQL database for user: ${email}`);
+
+        // Fetch refreshed user record
+        const rows = await query(`
+          SELECT 
+            id, name, email, phone, password, role, avatar, address, 
+            wallet_balance as walletBalance, status, provider_category as providerCategory, 
+            service_skill as serviceSkill, vehicle_type as vehicleType, rating, 
+            completed_jobs_count as completedJobsCount, is_online as isOnline, 
+            DATE_FORMAT(created_at, '%Y-%m-%d') as joinedDate
+          FROM users WHERE LOWER(email) = ? LIMIT 1
+        `, [email]);
+        if (rows && rows.length > 0) {
+          updatedUser = rows[0];
+        }
       }
 
       // 2. Update in memory cache
       const memIdx = memoryUsers.findIndex(u => u.email && u.email.toLowerCase() === email);
       if (memIdx >= 0) {
         memoryUsers[memIdx].password = newPassword;
+        if (!updatedUser) updatedUser = memoryUsers[memIdx];
+      }
+      if (email === adminEmail) {
+        runtimeAdminPasswordOverride = newPassword;
+        const adm = memoryUsers.find(u => u.id === 'usr-admin-1' || (u.email && u.email.toLowerCase() === adminEmail));
+        if (adm) {
+          adm.password = newPassword;
+          if (!updatedUser) updatedUser = adm;
+        } else {
+          const freshAdmin = {
+            id: 'usr-admin-1',
+            name: 'Super Administrator',
+            email: adminEmail,
+            phone: '+92 300 0009988',
+            password: newPassword,
+            role: 'admin',
+            avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+            address: 'Main Complex, Civil Lines, Khanewal',
+            walletBalance: 150000,
+            status: 'active',
+            joinedDate: '2024-11-01'
+          };
+          memoryUsers.push(freshAdmin);
+          if (!updatedUser) updatedUser = freshAdmin;
+        }
       }
 
       // 3. Mark token as used
@@ -250,12 +298,104 @@ async function startServer() {
 
       res.json({
         success: true,
+        email,
+        user: updatedUser,
         message: 'Aapka password kamyabi se tabdeel ho chuka hai! Ab aap naye password se login kar sakte hain.'
       });
     } catch (err: any) {
       console.error('[Password Reset] Database update error:', err);
       res.status(500).json({ success: false, error: err.message });
     }
+  });
+
+  // Dedicated Backend User Authentication with Real Password Check
+  app.post('/api/auth/login', async (req: Request, res: Response) => {
+    const { identifier, password } = req.body;
+    if (!identifier || !password) {
+      return res.status(400).json({ success: false, error: 'Email/phone aur password dono darkar hain.' });
+    }
+
+    const cleanId = String(identifier).trim().toLowerCase();
+    const cleanPhone = String(identifier).trim().replace(/\s+/g, '');
+    let foundUser: any = null;
+
+    // 1. Check MySQL if connected
+    if (isDbConnected()) {
+      try {
+        const rows = await query(`
+          SELECT 
+            id, name, email, phone, password, role, avatar, address, 
+            wallet_balance as walletBalance, status, provider_category as providerCategory, 
+            service_skill as serviceSkill, vehicle_type as vehicleType, rating, 
+            completed_jobs_count as completedJobsCount, is_online as isOnline, 
+            DATE_FORMAT(created_at, '%Y-%m-%d') as joinedDate
+          FROM users 
+          WHERE LOWER(email) = ? OR REPLACE(phone, ' ', '') = ?
+          LIMIT 1
+        `, [cleanId, cleanPhone]);
+        if (rows && rows.length > 0) {
+          foundUser = rows[0];
+        }
+      } catch (err: any) {
+        console.warn('[API /api/auth/login] MySQL error:', err.message);
+      }
+    }
+
+    // 2. Fallback to memoryUsers
+    if (!foundUser) {
+      foundUser = memoryUsers.find(u => 
+        (u.email && u.email.toLowerCase() === cleanId) || 
+        (u.phone && u.phone.replace(/\s+/g, '') === cleanPhone)
+      );
+    }
+
+    // 3. Fallback check for Super Admin
+    const adminEmail = (process.env.ADMIN_USERNAME || process.env.VITE_ADMIN_USERNAME || 'admin@omniserve.com').toLowerCase();
+    if (!foundUser && cleanId === adminEmail) {
+      const adminPassword = runtimeAdminPasswordOverride || process.env.ADMIN_PASSWORD || process.env.VITE_ADMIN_PASSWORD || 'Admin@12345';
+      foundUser = {
+        id: 'usr-admin-1',
+        name: 'Super Administrator',
+        email: adminEmail,
+        phone: '+92 300 0009988',
+        password: adminPassword,
+        role: 'admin',
+        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+        address: 'Main Complex, Civil Lines, Khanewal',
+        walletBalance: 150000,
+        status: 'active',
+        joinedDate: '2024-11-01'
+      };
+    }
+
+    if (!foundUser) {
+      return res.status(404).json({
+        success: false,
+        error: 'Is email ya mobile number se koi account registered nahi mila.'
+      });
+    }
+
+    if (foundUser.status === 'blocked' || foundUser.status === 'suspended') {
+      return res.status(403).json({
+        success: false,
+        error: 'Aapka account administrator ki taraf se block ya suspend kiya gaya hai.'
+      });
+    }
+
+    // Strict password verification against updated DB record
+    if (foundUser.password !== password) {
+      return res.status(401).json({
+        success: false,
+        error: 'Ghalat password (Incorrect password). Baraye meherbani durust password darj karein.'
+      });
+    }
+
+    console.log(`[API /api/auth/login] User authenticated successfully: ${foundUser.email} (${foundUser.role})`);
+    res.json({
+      success: true,
+      user: foundUser,
+      message: 'Login kamyabi se mukammal ho gaya.'
+    });
   });
 
   // =========================================================================

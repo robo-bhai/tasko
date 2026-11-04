@@ -65,7 +65,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const selectedArea = KHANEWAL_LOCAL_AREAS.find(a => a.id === custAreaId) || KHANEWAL_LOCAL_AREAS[0];
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
     setSuccessMessage('');
@@ -80,8 +80,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      const authRes = Store.authenticateUser(loginIdentifier.trim(), loginPassword.trim());
+    try {
+      const authRes = await Store.authenticateUserAsync(loginIdentifier.trim(), loginPassword.trim());
       setIsSubmitting(false);
 
       if (!authRes.success || !authRes.user) {
@@ -97,7 +97,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onSuccess(authRes.user!);
         onClose();
       }, 500);
-    }, 400);
+    } catch (err: any) {
+      setIsSubmitting(false);
+      setErrorMessage(err.message || 'Error authenticating');
+    }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {

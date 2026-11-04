@@ -163,13 +163,10 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
           : 'Success! Your password has been updated successfully.'
       );
 
-      // Also update local store user password if user exists in client state
-      if (userEmail) {
-        const users = Store.getUsers();
-        const userIdx = users.findIndex(u => u.email.toLowerCase() === userEmail.toLowerCase());
-        if (userIdx >= 0) {
-          users[userIdx].password = newPassword;
-        }
+      // Update client store, localStorage, and Firestore with new password immediately
+      const targetEmail = data.email || userEmail;
+      if (targetEmail) {
+        Store.updateUserPassword(targetEmail, newPassword);
       }
 
       setTimeout(() => {

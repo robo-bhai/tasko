@@ -568,6 +568,78 @@ export const Store = {
     return newProvider;
   },
 
+  updateUserPassword: (emailOrPhone: string, newPassword: string): User | null => {
+    const users = Store.getUsers();
+    const clean = emailOrPhone.trim().toLowerCase();
+    const cleanPhone = emailOrPhone.trim().replace(/\s+/g, '');
+    const idx = users.findIndex(u => 
+      (u.email && u.email.toLowerCase() === clean) || 
+      (u.phone && u.phone.replace(/\s+/g, '') === cleanPhone)
+    );
+
+    if (idx >= 0) {
+      users[idx].password = newPassword;
+      saveToStorage(STORAGE_KEY_USERS, users);
+
+      const cur = Store.getCurrentUser();
+      if (cur && (cur.id === users[idx].id || cur.email.toLowerCase() === clean)) {
+        cur.password = newPassword;
+        saveToStorage(STORAGE_KEY_CURRENT_USER, cur);
+      }
+
+      notifyStoreChanged();
+      CloudSyncService.saveUser(users[idx]);
+      CloudSyncService.uploadFullBackup({
+        users,
+        orders: Store.getOrders(),
+        settings: Store.getSettings()
+      });
+      Store.syncUserToBackend(users[idx]);
+      console.log(`[Store] Updated password in local storage & synced to cloud for: ${users[idx].email}`);
+      return users[idx];
+    }
+    return null;
+  },
+
+  authenticateUserAsync: async (identifier: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> => {
+    const cleanId = identifier.trim().toLowerCase();
+
+    // 1. Authenticate against Backend API (Live MySQL & Validated DB Password)
+    try {
+      const resp = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: cleanId, password: password.trim() })
+      });
+      const data = await resp.json();
+
+      if (resp.ok && data.success && data.user) {
+        const serverUser = data.user as User;
+        const users = Store.getUsers();
+        const existingIdx = users.findIndex(u => u.id === serverUser.id || u.email.toLowerCase() === serverUser.email.toLowerCase());
+        
+        if (existingIdx >= 0) {
+          users[existingIdx] = { ...users[existingIdx], ...serverUser, password: password.trim() };
+        } else {
+          users.push({ ...serverUser, password: password.trim() });
+        }
+
+        saveToStorage(STORAGE_KEY_USERS, users);
+        Store.setCurrentUser(serverUser);
+        notifyStoreChanged();
+        CloudSyncService.saveUser(serverUser);
+        return { success: true, user: serverUser };
+      } else if (resp.status === 401 || resp.status === 403 || resp.status === 404) {
+        return { success: false, error: data.error || 'Ghalat password ya account mojood nahi hai.' };
+      }
+    } catch (err) {
+      console.warn('[Store Auth] Backend auth endpoint unreachable, checking local store:', err);
+    }
+
+    // 2. Local Fallback Authentication
+    return Store.authenticateUser(cleanId, password.trim());
+  },
+
   authenticateUser: (identifier: string, password?: string): { success: boolean; user?: User; error?: string } => {
     const users = Store.getUsers();
     const cleanId = identifier.trim().toLowerCase();
