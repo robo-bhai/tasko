@@ -24,6 +24,8 @@ export interface User {
   rating?: number;
   completedJobsCount?: number;
   isOnline?: boolean;
+  cloudUpdatedAt?: any;
+  passwordUpdatedAt?: string;
 }
 
 export interface SystemSettings {

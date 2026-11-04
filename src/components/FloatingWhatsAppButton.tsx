@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, X } from 'lucide-react';
-import { Store } from '../services/store';
+import { Store, subscribeToStore } from '../services/store';
 import { SystemSettings } from '../types';
 
 interface FloatingWhatsAppButtonProps {
@@ -15,8 +15,12 @@ export const FloatingWhatsAppButton: React.FC<FloatingWhatsAppButtonProps> = ({ 
     const handleUpdate = () => {
       setSettings(Store.getSettings());
     };
+    const unsubscribe = subscribeToStore(handleUpdate);
     window.addEventListener('omniserve_store_updated', handleUpdate);
-    return () => window.removeEventListener('omniserve_store_updated', handleUpdate);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('omniserve_store_updated', handleUpdate);
+    };
   }, []);
 
   // Clean phone number for wa.me link (digits only, e.g. 923001234567)

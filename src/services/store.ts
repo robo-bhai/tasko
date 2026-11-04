@@ -228,7 +228,16 @@ export type StoreListener = () => void;
 const listeners: Set<StoreListener> = new Set();
 
 export const notifyStoreChanged = () => {
-  listeners.forEach(fn => fn());
+  listeners.forEach(fn => {
+    try {
+      fn();
+    } catch (e) {
+      console.warn('Store listener error:', e);
+    }
+  });
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('omniserve_store_updated'));
+  }
 };
 
 export const subscribeToStore = (listener: StoreListener) => {
@@ -282,73 +291,108 @@ export const Store = {
   // Initialize Dual-Layer Zero-Loss Persistent Sync (MySQL + Cloud Firestore)
   initCloudSync: async () => {
     try {
-      // 1. Fetch persistent state from MySQL backend (restored from GitHub Actions cache on runner restart)
+      // 1. Fetch live system settings & catalog from Server API (MySQL + Disk)
+      try {
+        const [settingsRes, catalogRes] = await Promise.all([
+          fetch('/api/settings'),
+          fetch('/api/catalog')
+        ]);
+        if (settingsRes.ok) {
+          const sData = await settingsRes.json();
+          if (sData.success && sData.settings) {
+            saveToStorage(STORAGE_KEY_SETTINGS, sData.settings);
+          }
+        }
+        if (catalogRes.ok) {
+          const cData = await catalogRes.json();
+          if (cData.success) {
+            if (Array.isArray(cData.services) && cData.services.length > 0) {
+              saveToStorage(STORAGE_KEY_SERVICES, cData.services);
+            }
+            if (Array.isArray(cData.vehicles) && cData.vehicles.length > 0) {
+              saveToStorage(STORAGE_KEY_VEHICLES, cData.vehicles);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Store] Server settings/catalog fetch note:', err);
+      }
+
+      // 2. Fetch persistent state from MySQL backend
       try {
         const backendRes = await fetch('/api/sync/all-state');
         if (backendRes.ok) {
           const backendData = await backendRes.json();
           if (backendData.success && Array.isArray(backendData.users) && backendData.users.length > 0) {
-            const localUsers = loadFromStorage<User[]>(STORAGE_KEY_USERS, INITIAL_USERS);
             const userMap = new Map<string, User>();
-            INITIAL_USERS.forEach(u => userMap.set(u.id, u));
-            localUsers.forEach(u => userMap.set(u.id, u));
-            backendData.users.forEach((u: User) => userMap.set(u.id, u));
-            const mergedUsers = Array.from(userMap.values());
-            saveToStorage(STORAGE_KEY_USERS, mergedUsers);
+            // Remote backend data takes precedence
+            backendData.users.forEach((u: User) => {
+              if (u && (u.email || u.id)) {
+                userMap.set(u.email ? u.email.toLowerCase() : u.id, u);
+              }
+            });
+            const localUsers = loadFromStorage<User[]>(STORAGE_KEY_USERS, INITIAL_USERS);
+            localUsers.forEach(u => {
+              const key = u.email ? u.email.toLowerCase() : u.id;
+              if (!userMap.has(key)) userMap.set(key, u);
+            });
+            saveToStorage(STORAGE_KEY_USERS, Array.from(userMap.values()));
             notifyStoreChanged();
-            console.log(`[Store] Restored ${backendData.users.length} users from MySQL persistent cache!`);
           }
         }
       } catch (err) {
         console.warn('[Store] MySQL backend sync note:', err);
       }
 
-      // 2. Fetch persistent state from Cloud Firestore
+      // 3. Fetch persistent state from Cloud Firestore (Top Authoritative Source)
       const cloudData = await CloudSyncService.loadCloudState();
-      if (cloudData && cloudData.users && cloudData.users.length > 0) {
-        const currentUsers = loadFromStorage<User[]>(STORAGE_KEY_USERS, INITIAL_USERS);
-        const mergedUsersMap = new Map<string, User>();
-        INITIAL_USERS.forEach(u => mergedUsersMap.set(u.id, u));
-        currentUsers.forEach(u => mergedUsersMap.set(u.id, u));
-        cloudData.users.forEach(u => mergedUsersMap.set(u.id, u));
-        const mergedUsers = Array.from(mergedUsersMap.values());
-        saveToStorage(STORAGE_KEY_USERS, mergedUsers);
+      if (cloudData) {
+        if (cloudData.users && cloudData.users.length > 0) {
+          const currentUsers = loadFromStorage<User[]>(STORAGE_KEY_USERS, INITIAL_USERS);
+          const authoritativeMap = new Map<string, User>();
+          // Cloud Firestore is authoritative
+          cloudData.users.forEach(u => {
+            if (u && (u.email || u.id)) {
+              authoritativeMap.set(u.email ? u.email.toLowerCase() : u.id, u);
+            }
+          });
+          currentUsers.forEach(u => {
+            const key = u.email ? u.email.toLowerCase() : u.id;
+            if (!authoritativeMap.has(key)) authoritativeMap.set(key, u);
+          });
+          const mergedUsers = Array.from(authoritativeMap.values());
+          saveToStorage(STORAGE_KEY_USERS, mergedUsers);
+        }
 
         if (cloudData.orders && cloudData.orders.length > 0) {
-          const localOrders = loadFromStorage<Order[]>(STORAGE_KEY_ORDERS, INITIAL_ORDERS);
-          const mergedOrdersMap = new Map<string, Order>();
-          localOrders.forEach(o => mergedOrdersMap.set(o.id, o));
-          cloudData.orders.forEach(o => mergedOrdersMap.set(o.id, o));
-          saveToStorage(STORAGE_KEY_ORDERS, Array.from(mergedOrdersMap.values()));
+          saveToStorage(STORAGE_KEY_ORDERS, cloudData.orders);
         }
 
         if (cloudData.settings) {
           saveToStorage(STORAGE_KEY_SETTINGS, cloudData.settings);
         }
 
+        if (cloudData.services && cloudData.services.length > 0) {
+          saveToStorage(STORAGE_KEY_SERVICES, cloudData.services);
+        }
+
+        if (cloudData.vehicles && cloudData.vehicles.length > 0) {
+          saveToStorage(STORAGE_KEY_VEHICLES, cloudData.vehicles);
+        }
+
         notifyStoreChanged();
       }
 
-      // 3. Guarantee zero data loss: batch sync all current local users to BOTH MySQL and Cloud Firestore
-      const finalUsers = Store.getUsers();
-      Store.syncAllUsersToBackend(finalUsers);
-      await CloudSyncService.uploadFullBackup({
-        users: finalUsers,
-        orders: Store.getOrders(),
-        settings: Store.getSettings()
-      });
-
-      // 4. Live subscription to Cloud Firestore changes
+      // 4. Live subscription to Cloud Firestore changes (Users, Orders & Settings)
       CloudSyncService.subscribeToCloudChanges({
         onUsersChange: (newUsers) => {
           if (newUsers.length > 0) {
             const currentUsers = Store.getUsers();
             const map = new Map<string, User>();
-            currentUsers.forEach(u => map.set(u.id, u));
-            newUsers.forEach(u => map.set(u.id, u));
+            currentUsers.forEach(u => map.set(u.email ? u.email.toLowerCase() : u.id, u));
+            newUsers.forEach(u => map.set(u.email ? u.email.toLowerCase() : u.id, u));
             const merged = Array.from(map.values());
             saveToStorage(STORAGE_KEY_USERS, merged);
-            Store.syncAllUsersToBackend(merged);
             notifyStoreChanged();
           }
         },
@@ -359,6 +403,12 @@ export const Store = {
             currentOrders.forEach(o => map.set(o.id, o));
             newOrders.forEach(o => map.set(o.id, o));
             saveToStorage(STORAGE_KEY_ORDERS, Array.from(map.values()));
+            notifyStoreChanged();
+          }
+        },
+        onSettingsChange: (newSettings) => {
+          if (newSettings) {
+            saveToStorage(STORAGE_KEY_SETTINGS, newSettings);
             notifyStoreChanged();
           }
         }
@@ -661,6 +711,9 @@ export const Store = {
         notifyStoreChanged();
         CloudSyncService.saveUser(serverUser);
         return { success: true, user: serverUser };
+      } else if (data && data.error && (resp.status === 401 || resp.status === 403)) {
+        // Authoritative server rejection: incorrect password or blocked account
+        return { success: false, error: data.error };
       }
     } catch (err) {
       console.warn('[Store Auth] Backend auth endpoint check note:', err);
@@ -917,13 +970,15 @@ export const Store = {
     saveToStorage(STORAGE_KEY_SETTINGS, updated);
     notifyStoreChanged();
 
-    // Zero-Loss Cloud Firestore Persistence & Backup
+    // 1. Live persistence directly to MySQL and Server persistent storage
+    fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated)
+    }).catch(err => console.warn('[Store] Server settings sync note:', err));
+
+    // 2. Live persistence directly to Cloud Firestore
     CloudSyncService.saveSettings(updated);
-    CloudSyncService.uploadFullBackup({
-      users: Store.getUsers(),
-      orders: Store.getOrders(),
-      settings: updated
-    });
 
     return updated;
   },
@@ -1490,6 +1545,12 @@ export const Store = {
   updateServicesCatalog: (services: HomeServiceItem[]) => {
     saveToStorage(STORAGE_KEY_SERVICES, services);
     notifyStoreChanged();
+    CloudSyncService.saveCatalog({ services });
+    fetch('/api/catalog', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ services, vehicles: Store.getVehiclesCatalog() })
+    }).catch(() => {});
   },
 
   getVehiclesCatalog: (): TransportVehicleItem[] => {
@@ -1499,6 +1560,12 @@ export const Store = {
   updateVehiclesCatalog: (vehicles: TransportVehicleItem[]) => {
     saveToStorage(STORAGE_KEY_VEHICLES, vehicles);
     notifyStoreChanged();
+    CloudSyncService.saveCatalog({ vehicles });
+    fetch('/api/catalog', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ services: Store.getServicesCatalog(), vehicles })
+    }).catch(() => {});
   },
 
   // Dynamic Admin Visibility & Catalog Controls (Live Hide/Show & Rates)

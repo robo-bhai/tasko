@@ -8,7 +8,7 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { User, Order, SystemSettings, OrderReview } from '../types';
+import { User, Order, SystemSettings, OrderReview, HomeServiceItem, TransportVehicleItem } from '../types';
 
 export interface SystemCloudBackup {
   users: User[];
@@ -46,15 +46,44 @@ export const CloudSyncService = {
     }
   },
 
-  // Save system settings to Cloud Firestore
+  // Save system settings to Cloud Firestore (Direct into global_config and system docs)
   async saveSettings(settings: SystemSettings): Promise<void> {
     try {
-      await setDoc(doc(db, 'settings', 'system'), {
+      const payload = {
         ...settings,
-        cloudUpdatedAt: serverTimestamp()
-      }, { merge: true });
+        cloudUpdatedAt: serverTimestamp(),
+        updatedAtIso: new Date().toISOString()
+      };
+      await Promise.all([
+        setDoc(doc(db, 'settings', 'global_config'), payload, { merge: true }),
+        setDoc(doc(db, 'settings', 'system'), payload, { merge: true })
+      ]);
     } catch (err) {
       console.warn('[CloudSync] Failed to persist settings to Firestore:', err);
+    }
+  },
+
+  // Save catalog (services & vehicles) to Cloud Firestore
+  async saveCatalog(data: { services?: HomeServiceItem[]; vehicles?: TransportVehicleItem[] }): Promise<void> {
+    try {
+      const promises: Promise<any>[] = [];
+      if (Array.isArray(data.services)) {
+        promises.push(setDoc(doc(db, 'catalog', 'services'), {
+          items: data.services,
+          cloudUpdatedAt: serverTimestamp(),
+          updatedAt: new Date().toISOString()
+        }, { merge: true }));
+      }
+      if (Array.isArray(data.vehicles)) {
+        promises.push(setDoc(doc(db, 'catalog', 'vehicles'), {
+          items: data.vehicles,
+          cloudUpdatedAt: serverTimestamp(),
+          updatedAt: new Date().toISOString()
+        }, { merge: true }));
+      }
+      await Promise.all(promises);
+    } catch (err) {
+      console.warn('[CloudSync] Failed to persist catalog to Firestore:', err);
     }
   },
 
@@ -88,15 +117,7 @@ export const CloudSyncService = {
       await setDoc(doc(db, 'system_backups', BACKUP_DOC_ID), {
         ...backupPayload,
         serverTime: serverTimestamp()
-      });
-
-      // Also ensure all individual users and orders are up-to-date in their collections
-      for (const u of state.users) {
-        setDoc(doc(db, 'users', u.id), u, { merge: true }).catch(() => {});
-      }
-      for (const o of state.orders) {
-        setDoc(doc(db, 'orders', o.id), o, { merge: true }).catch(() => {});
-      }
+      }, { merge: true });
     } catch (err) {
       console.warn('[CloudSync] Failed to upload full system backup:', err);
     }
@@ -107,32 +128,30 @@ export const CloudSyncService = {
     users: User[];
     orders: Order[];
     settings: SystemSettings | null;
+    services?: HomeServiceItem[];
+    vehicles?: TransportVehicleItem[];
   } | null> {
     try {
-      // 1. Try reading the system_backups document
-      const backupSnap = await getDoc(doc(db, 'system_backups', BACKUP_DOC_ID));
-      if (backupSnap.exists()) {
-        const data = backupSnap.data() as SystemCloudBackup;
-        if (data && Array.isArray(data.users) && data.users.length > 0) {
-          return {
-            users: data.users,
-            orders: Array.isArray(data.orders) ? data.orders : [],
-            settings: data.settings || null
-          };
-        }
-      }
-
-      // 2. Alternatively, query users and orders collections directly
-      const [usersSnap, ordersSnap, settingsSnap] = await Promise.all([
+      // Query authoritative collections directly in parallel
+      const [usersSnap, ordersSnap, settingsGlobalSnap, settingsSysSnap, servicesSnap, vehiclesSnap] = await Promise.all([
         getDocs(collection(db, 'users')),
         getDocs(collection(db, 'orders')),
-        getDoc(doc(db, 'settings', 'system'))
+        getDoc(doc(db, 'settings', 'global_config')),
+        getDoc(doc(db, 'settings', 'system')),
+        getDoc(doc(db, 'catalog', 'services')),
+        getDoc(doc(db, 'catalog', 'vehicles'))
       ]);
 
-      const cloudUsers: User[] = [];
+      const userMap = new Map<string, User>();
       usersSnap.forEach(d => {
         const u = d.data() as User;
-        if (u && u.id) cloudUsers.push(u);
+        if (u && (u.id || u.email)) {
+          const key = u.email ? u.email.toLowerCase() : u.id;
+          const existing = userMap.get(key);
+          if (!existing || (u.cloudUpdatedAt && !(existing as any).cloudUpdatedAt)) {
+            userMap.set(key, { ...u, id: u.id || d.id });
+          }
+        }
       });
 
       const cloudOrders: Order[] = [];
@@ -141,14 +160,48 @@ export const CloudSyncService = {
         if (o && o.id) cloudOrders.push(o);
       });
 
-      const cloudSettings = settingsSnap.exists() ? (settingsSnap.data() as SystemSettings) : null;
+      let cloudSettings: SystemSettings | null = null;
+      if (settingsGlobalSnap.exists()) {
+        cloudSettings = settingsGlobalSnap.data() as SystemSettings;
+      } else if (settingsSysSnap.exists()) {
+        cloudSettings = settingsSysSnap.data() as SystemSettings;
+      }
 
-      if (cloudUsers.length > 0 || cloudOrders.length > 0) {
+      let services: HomeServiceItem[] | undefined;
+      if (servicesSnap.exists()) {
+        const d = servicesSnap.data();
+        if (Array.isArray(d.items)) services = d.items;
+      }
+
+      let vehicles: TransportVehicleItem[] | undefined;
+      if (vehiclesSnap.exists()) {
+        const d = vehiclesSnap.data();
+        if (Array.isArray(d.items)) vehicles = d.items;
+      }
+
+      const usersList = Array.from(userMap.values());
+
+      if (usersList.length > 0 || cloudOrders.length > 0 || cloudSettings) {
         return {
-          users: cloudUsers,
+          users: usersList,
           orders: cloudOrders,
-          settings: cloudSettings
+          settings: cloudSettings,
+          services,
+          vehicles
         };
+      }
+
+      // Check system_backups if individual collections were empty
+      const backupSnap = await getDoc(doc(db, 'system_backups', BACKUP_DOC_ID));
+      if (backupSnap.exists()) {
+        const data = backupSnap.data() as SystemCloudBackup;
+        if (data && Array.isArray(data.users)) {
+          return {
+            users: data.users,
+            orders: Array.isArray(data.orders) ? data.orders : [],
+            settings: data.settings || null
+          };
+        }
       }
 
       return null;
@@ -158,10 +211,11 @@ export const CloudSyncService = {
     }
   },
 
-  // Live Real-Time Listener on users & orders
+  // Live Real-Time Listener on users, orders & settings
   subscribeToCloudChanges(callbacks: {
     onUsersChange?: (users: User[]) => void;
     onOrdersChange?: (orders: Order[]) => void;
+    onSettingsChange?: (settings: SystemSettings) => void;
   }): () => void {
     const unsubscribes: (() => void)[] = [];
 
@@ -169,11 +223,15 @@ export const CloudSyncService = {
       if (callbacks.onUsersChange) {
         const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
           if (!snap.empty) {
-            const list: User[] = [];
+            const userMap = new Map<string, User>();
             snap.forEach(d => {
               const u = d.data() as User;
-              if (u && u.id) list.push(u);
+              if (u && (u.id || u.email)) {
+                const key = u.email ? u.email.toLowerCase() : u.id;
+                userMap.set(key, { ...u, id: u.id || d.id });
+              }
             });
+            const list = Array.from(userMap.values());
             if (list.length > 0) {
               callbacks.onUsersChange!(list);
             }
@@ -199,6 +257,18 @@ export const CloudSyncService = {
         });
         unsubscribes.push(unsubOrders);
       }
+
+      if (callbacks.onSettingsChange) {
+        const unsubSettings = onSnapshot(doc(db, 'settings', 'global_config'), (snap) => {
+          if (snap.exists()) {
+            const s = snap.data() as SystemSettings;
+            callbacks.onSettingsChange!(s);
+          }
+        }, (err) => {
+          console.warn('[CloudSync] Settings live listener notice:', err);
+        });
+        unsubscribes.push(unsubSettings);
+      }
     } catch (err) {
       console.warn('[CloudSync] Live subscription init error:', err);
     }
@@ -208,13 +278,34 @@ export const CloudSyncService = {
     };
   },
 
-  // Lookup user directly from Cloud Firestore by email or phone (critical for Incognito Mode)
+  // Lookup user directly from Cloud Firestore by email or phone (Authoritative collection check first)
   async getUserByEmailOrPhone(identifier: string): Promise<User | null> {
     const clean = identifier.trim().toLowerCase();
     const cleanPhone = identifier.trim().replace(/\s+/g, '');
 
     try {
-      // 1. Check system_backups/latest_state first
+      // 1. Check individual 'users' collection FIRST
+      const snap = await getDocs(collection(db, 'users'));
+      const matching: any[] = [];
+      snap.forEach(d => {
+        const u = d.data() as User;
+        const matchesEmail = u.email && u.email.toLowerCase() === clean;
+        const matchesPhone = u.phone && u.phone.replace(/\s+/g, '') === cleanPhone;
+        if (matchesEmail || matchesPhone) {
+          matching.push({ ...u, id: u.id || d.id });
+        }
+      });
+
+      if (matching.length > 0) {
+        matching.sort((a, b) => {
+          const timeA = a.cloudUpdatedAt?.seconds || 0;
+          const timeB = b.cloudUpdatedAt?.seconds || 0;
+          return timeB - timeA;
+        });
+        return matching[0];
+      }
+
+      // 2. Check system_backups fallback
       const backupSnap = await getDoc(doc(db, 'system_backups', BACKUP_DOC_ID));
       if (backupSnap.exists()) {
         const data = backupSnap.data() as SystemCloudBackup;
@@ -227,82 +318,53 @@ export const CloudSyncService = {
         }
       }
 
-      // 2. Check individual users collection
-      const snap = await getDocs(collection(db, 'users'));
-      let foundUser: User | null = null;
-      snap.forEach(d => {
-        if (foundUser) return;
-        const u = d.data() as User;
-        if (
-          (u.email && u.email.toLowerCase() === clean) ||
-          (u.phone && u.phone.replace(/\s+/g, '') === cleanPhone)
-        ) {
-          foundUser = u;
-        }
-      });
-
-      return foundUser;
+      return null;
     } catch (err) {
       console.warn('[CloudSync] getUserByEmailOrPhone error:', err);
       return null;
     }
   },
 
-  // Update user password directly in Cloud Firestore
+  // Update user password across ALL matching documents in Cloud Firestore
   async updateUserPassword(emailOrPhone: string, newPassword: string): Promise<User | null> {
     const clean = emailOrPhone.trim().toLowerCase();
     const cleanPhone = emailOrPhone.trim().replace(/\s+/g, '');
 
     try {
       let targetUser: User | null = null;
+      const nowIso = new Date().toISOString();
 
-      // 1. Read & update system backup
+      // 1. Search and update ALL matching documents in 'users' collection
+      const snap = await getDocs(collection(db, 'users'));
+      for (const d of snap.docs) {
+        const u = d.data() as User;
+        const matchesEmail = u.email && u.email.toLowerCase() === clean;
+        const matchesPhone = u.phone && u.phone.replace(/\s+/g, '') === cleanPhone;
+        if (matchesEmail || matchesPhone) {
+          targetUser = { ...u, id: u.id || d.id, password: newPassword };
+          await setDoc(doc(db, 'users', d.id), {
+            password: newPassword,
+            passwordUpdatedAt: nowIso,
+            cloudUpdatedAt: serverTimestamp()
+          }, { merge: true });
+        }
+      }
+
+      // 2. Update system backup array
       const backupRef = doc(db, 'system_backups', BACKUP_DOC_ID);
       const backupSnap = await getDoc(backupRef);
       if (backupSnap.exists()) {
         const data = backupSnap.data() as SystemCloudBackup;
         if (data && Array.isArray(data.users)) {
-          const users = [...data.users];
-          const idx = users.findIndex(u => 
-            (u.email && u.email.toLowerCase() === clean) ||
-            (u.phone && u.phone.replace(/\s+/g, '') === cleanPhone)
-          );
-          if (idx >= 0) {
-            users[idx] = {
-              ...users[idx],
-              password: newPassword
-            };
-            targetUser = users[idx];
-            await setDoc(backupRef, {
-              ...data,
-              users,
-              updatedAt: new Date().toISOString()
-            }, { merge: true });
-          }
-        }
-      }
-
-      // 2. Read & update users collection
-      if (targetUser && targetUser.id) {
-        await setDoc(doc(db, 'users', targetUser.id), {
-          password: newPassword,
-          cloudUpdatedAt: serverTimestamp()
-        }, { merge: true });
-      } else {
-        const snap = await getDocs(collection(db, 'users'));
-        for (const d of snap.docs) {
-          const u = d.data() as User;
-          if (
-            (u.email && u.email.toLowerCase() === clean) ||
-            (u.phone && u.phone.replace(/\s+/g, '') === cleanPhone)
-          ) {
-            targetUser = { ...u, password: newPassword };
-            await setDoc(doc(db, 'users', d.id), {
-              password: newPassword,
-              cloudUpdatedAt: serverTimestamp()
-            }, { merge: true });
-            break;
-          }
+          const users = data.users.map(u => {
+            const matchesEmail = u.email && u.email.toLowerCase() === clean;
+            const matchesPhone = u.phone && u.phone.replace(/\s+/g, '') === cleanPhone;
+            if (matchesEmail || matchesPhone) {
+              return { ...u, password: newPassword, passwordUpdatedAt: nowIso };
+            }
+            return u;
+          });
+          await setDoc(backupRef, { users, updatedAt: nowIso }, { merge: true });
         }
       }
 
@@ -313,4 +375,3 @@ export const CloudSyncService = {
     }
   }
 };
-

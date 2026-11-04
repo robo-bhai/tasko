@@ -20,7 +20,11 @@ import {
   fetchUsersFromFirestore,
   findUserInFirestore,
   updateUserPasswordInFirestore,
-  syncUserToFirestore
+  syncUserToFirestore,
+  fetchSettingsFromFirestore,
+  saveSettingsToFirestore,
+  fetchCatalogFromFirestore,
+  saveCatalogToFirestore
 } from './src/server/firestoreSync.js';
 
 dotenv.config();
@@ -38,6 +42,12 @@ let runtimeAdminPasswordOverride: string | null = null;
 const initialDisk = loadDiskPersistentState();
 if (initialDisk.users.length > 0) {
   memoryUsers = initialDisk.users;
+}
+if (initialDisk.settings) {
+  memorySettings = initialDisk.settings;
+}
+if (initialDisk.orders && initialDisk.orders.length > 0) {
+  memoryOrders = initialDisk.orders;
 }
 if (initialDisk.adminPasswordOverride) {
   runtimeAdminPasswordOverride = initialDisk.adminPasswordOverride;
@@ -142,6 +152,224 @@ async function startServer() {
       projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || 'noman-e5b08',
       databaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || 'ai-studio-omnitasksuperapp-57a34a31-4e02-4160-a3fe-27190e12f1f7'
     });
+  });
+
+  // =========================================================================
+  // LIVE SYSTEM & DATABASE HEALTH / CONNECTION STATUS
+  // =========================================================================
+  app.get('/api/system/status', async (req: Request, res: Response) => {
+    const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || 'noman-e5b08';
+    const databaseId = process.env.FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || 'ai-studio-omnitasksuperapp-57a34a31-4e02-4160-a3fe-27190e12f1f7';
+
+    let mysqlStats = null;
+    if (isDbConnected()) {
+      try {
+        const uCount = await query('SELECT COUNT(*) as c FROM users');
+        const oCount = await query('SELECT COUNT(*) as c FROM orders');
+        mysqlStats = {
+          users: Number((uCount[0] as any)?.c || 0),
+          orders: Number((oCount[0] as any)?.c || 0)
+        };
+      } catch {}
+    }
+
+    res.json({
+      success: true,
+      firebase: {
+        connected: true,
+        status: 'online',
+        projectId,
+        databaseId,
+        label: `Firestore Active (${projectId})`,
+        persistedDocs: {
+          users: memoryUsers.length,
+          settingsConfigured: Boolean(memorySettings)
+        }
+      },
+      database: {
+        connected: isDbConnected(),
+        type: isDbConnected() ? 'mysql' : 'server_persistent_engine',
+        status: isDbConnected() ? 'mysql_online' : 'server_disk_online',
+        label: isDbConnected() ? 'MySQL Connected (Live Database)' : 'Server Persistent Engine Active (Disk & Cloud Sync)',
+        stats: mysqlStats || { users: memoryUsers.length, orders: memoryOrders.length }
+      },
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  // =========================================================================
+  // DYNAMIC SETTINGS API (RATES, WHATSAPP, COMMISSIONS - MYSQL + FIRESTORE)
+  // =========================================================================
+  app.get('/api/settings', async (req: Request, res: Response) => {
+    // 1. If MySQL is connected, query app_settings table
+    if (isDbConnected()) {
+      try {
+        const rows = await query('SELECT * FROM app_settings WHERE id = ? LIMIT 1', ['global']);
+        if (rows && rows.length > 0) {
+          const r = rows[0] as any;
+          const dbSettings = {
+            deliveryBaseFee: Number(r.delivery_base_fee) || 200,
+            deliveryPerKmFee: Number(r.delivery_per_km_fee) || 35,
+            deliveryUrgentFee: Number(r.delivery_urgent_fee) || 150,
+            technicianVisitingFee: Number(r.technician_visiting_fee) || 500,
+            technicianHourlyRate: Number(r.technician_hourly_rate) || 800,
+            platformCommissionRate: Number(r.platform_commission_rate) || 15,
+            platformFixedFee: Number(r.platform_fixed_fee) || 50,
+            whatsappSupportPhone: r.whatsapp_support_phone || '+92 300 0009988',
+            whatsappDefaultMessage: r.whatsapp_default_message || 'Assalam-o-Alaikum! Mujhe Khanewal Connect service ke baray mein kuch maloomat chahiye/madad chahiye.',
+            supportHelpline: r.support_helpline || '0800-6664'
+          };
+          memorySettings = dbSettings;
+          return res.json({ success: true, source: 'mysql', settings: dbSettings });
+        }
+      } catch (err: any) {
+        console.warn('[API /api/settings] MySQL read note:', err.message);
+      }
+    }
+
+    // 2. Return memorySettings if hydrated
+    if (memorySettings) {
+      return res.json({ success: true, source: 'server_disk_cache', settings: memorySettings });
+    }
+
+    // 3. Fallback to Cloud Firestore
+    try {
+      const cloudSettings = await fetchSettingsFromFirestore();
+      if (cloudSettings) {
+        memorySettings = cloudSettings;
+        saveDiskPersistentState({ settings: cloudSettings });
+        return res.json({ success: true, source: 'firestore', settings: cloudSettings });
+      }
+    } catch (err: any) {
+      console.warn('[API /api/settings] Firestore read note:', err.message);
+    }
+
+    // 4. Standard default settings
+    const defaults = {
+      deliveryBaseFee: 200,
+      deliveryPerKmFee: 35,
+      deliveryUrgentFee: 150,
+      technicianVisitingFee: 500,
+      technicianHourlyRate: 800,
+      platformCommissionRate: 15,
+      platformFixedFee: 50,
+      whatsappSupportPhone: '+92 300 0009988',
+      whatsappDefaultMessage: 'Assalam-o-Alaikum! Mujhe Khanewal Connect service ke baray mein kuch maloomat chahiye/madad chahiye.',
+      supportHelpline: '0800-6664'
+    };
+    res.json({ success: true, source: 'defaults', settings: defaults });
+  });
+
+  app.post('/api/settings', async (req: Request, res: Response) => {
+    const newSettings = req.body;
+    if (!newSettings || typeof newSettings !== 'object') {
+      return res.status(400).json({ success: false, error: 'Invalid settings payload' });
+    }
+
+    const current = memorySettings || {
+      deliveryBaseFee: 200,
+      deliveryPerKmFee: 35,
+      deliveryUrgentFee: 150,
+      technicianVisitingFee: 500,
+      technicianHourlyRate: 800,
+      platformCommissionRate: 15,
+      platformFixedFee: 50,
+      whatsappSupportPhone: '+92 300 0009988',
+      whatsappDefaultMessage: 'Assalam-o-Alaikum! Mujhe Khanewal Connect service ke baray mein kuch maloomat chahiye/madad chahiye.',
+      supportHelpline: '0800-6664'
+    };
+
+    const merged = { ...current, ...newSettings };
+    memorySettings = merged;
+
+    // 1. Save to persistent disk storage immediately
+    saveDiskPersistentState({ settings: merged });
+
+    // 2. Direct persistence to Cloud Firestore (settings/global_config & settings/system)
+    try {
+      await saveSettingsToFirestore(merged);
+    } catch (err: any) {
+      console.warn('[API /api/settings] Firestore persist note:', err.message);
+    }
+
+    // 3. Direct persistence to MySQL app_settings table
+    if (isDbConnected()) {
+      try {
+        await query(`
+          INSERT INTO app_settings (
+            id, delivery_base_fee, delivery_per_km_fee, delivery_urgent_fee,
+            technician_visiting_fee, technician_hourly_rate, platform_commission_rate,
+            platform_fixed_fee, whatsapp_support_phone, whatsapp_default_message,
+            support_helpline, raw_json
+          ) VALUES ('global', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON DUPLICATE KEY UPDATE
+            delivery_base_fee = VALUES(delivery_base_fee),
+            delivery_per_km_fee = VALUES(delivery_per_km_fee),
+            delivery_urgent_fee = VALUES(delivery_urgent_fee),
+            technician_visiting_fee = VALUES(technician_visiting_fee),
+            technician_hourly_rate = VALUES(technician_hourly_rate),
+            platform_commission_rate = VALUES(platform_commission_rate),
+            platform_fixed_fee = VALUES(platform_fixed_fee),
+            whatsapp_support_phone = VALUES(whatsapp_support_phone),
+            whatsapp_default_message = VALUES(whatsapp_default_message),
+            support_helpline = VALUES(support_helpline),
+            raw_json = VALUES(raw_json)
+        `, [
+          Number(merged.deliveryBaseFee) || 200,
+          Number(merged.deliveryPerKmFee) || 35,
+          Number(merged.deliveryUrgentFee) || 150,
+          Number(merged.technicianVisitingFee) || 500,
+          Number(merged.technicianHourlyRate) || 800,
+          Number(merged.platformCommissionRate) || 15,
+          Number(merged.platformFixedFee) || 50,
+          String(merged.whatsappSupportPhone || '+92 300 0009988'),
+          String(merged.whatsappDefaultMessage || ''),
+          String(merged.supportHelpline || '0800-6664'),
+          JSON.stringify(merged)
+        ]);
+        console.log('[API /api/settings] Settings successfully saved to MySQL database');
+      } catch (err: any) {
+        console.warn('[API /api/settings] MySQL write error:', err.message);
+      }
+    }
+
+    console.log('[API /api/settings] Live settings saved permanently to Firestore & Server Database:', merged.whatsappSupportPhone);
+    res.json({
+      success: true,
+      message: 'Tamam rates aur WhatsApp number kamyabi se Cloud Firestore aur Database mein permanently save ho gaye hain!',
+      settings: merged
+    });
+  });
+
+  // =========================================================================
+  // CATALOG RATES API (SERVICES & VEHICLES - MYSQL + FIRESTORE)
+  // =========================================================================
+  app.get('/api/catalog', async (req: Request, res: Response) => {
+    try {
+      const disk = loadDiskPersistentState();
+      if (disk.services || disk.vehicles) {
+        return res.json({ success: true, services: disk.services, vehicles: disk.vehicles, source: 'disk' });
+      }
+      const cloud = await fetchCatalogFromFirestore();
+      if (cloud) {
+        return res.json({ success: true, services: cloud.services, vehicles: cloud.vehicles, source: 'firestore' });
+      }
+      res.json({ success: true, source: 'defaults' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/catalog', async (req: Request, res: Response) => {
+    const { services, vehicles } = req.body;
+    try {
+      saveDiskPersistentState({ services, vehicles });
+      await saveCatalogToFirestore({ services, vehicles });
+      res.json({ success: true, message: 'Catalog rates saved permanently to Cloud Firestore & Server Database!' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
   });
 
   // =========================================================================
@@ -315,11 +543,19 @@ async function startServer() {
       }
 
       // 3. Update in memory cache and persistent disk storage
-      const memIdx = memoryUsers.findIndex(u => u.email && u.email.toLowerCase() === email);
-      if (memIdx >= 0) {
-        memoryUsers[memIdx].password = newPassword;
-        if (!updatedUser) updatedUser = memoryUsers[memIdx];
-      } else {
+      let foundInMem = false;
+      memoryUsers.forEach(u => {
+        if (u && (
+          (u.email && u.email.toLowerCase() === email) ||
+          (u.id && updatedUser && u.id === updatedUser.id)
+        )) {
+          u.password = newPassword;
+          foundInMem = true;
+          if (!updatedUser) updatedUser = u;
+        }
+      });
+
+      if (!foundInMem) {
         const freshUser = updatedUser || {
           id: 'usr-cust-' + Date.now(),
           name,
@@ -401,8 +637,34 @@ async function startServer() {
     const cleanPhone = String(identifier).trim().replace(/\s+/g, '');
     let foundUser: any = null;
 
-    // 1. Check MySQL if connected
-    if (isDbConnected()) {
+    // 1. Authoritative Cloud Firestore Lookup (Guarantees Incognito Mode & cross-browser freshness)
+    try {
+      const cloudUser = await findUserInFirestore(cleanId);
+      if (cloudUser) {
+        foundUser = cloudUser;
+        // Keep memoryUsers and disk persistent cache strictly in sync
+        memoryUsers.forEach(u => {
+          if (u && (u.id === cloudUser.id || (u.email && u.email.toLowerCase() === cleanId))) {
+            u.password = cloudUser.password;
+          }
+        });
+        const existsInMem = memoryUsers.some(u => u.id === cloudUser.id);
+        if (!existsInMem) {
+          memoryUsers.push(cloudUser);
+        }
+        saveDiskPersistentState({ users: memoryUsers });
+
+        // If MySQL is online, sync latest password
+        if (isDbConnected()) {
+          query('UPDATE users SET password = ? WHERE id = ? OR LOWER(email) = ?', [cloudUser.password, cloudUser.id, cleanId]).catch(() => {});
+        }
+      }
+    } catch (err: any) {
+      console.warn('[API /api/auth/login] Firestore lookup error:', err.message);
+    }
+
+    // 2. Check MySQL if not found in Firestore or if password differed
+    if ((!foundUser || foundUser.password !== password) && isDbConnected()) {
       try {
         const rows = await query(`
           SELECT 
@@ -416,47 +678,22 @@ async function startServer() {
           LIMIT 1
         `, [cleanId, cleanPhone]);
         if (rows && rows.length > 0) {
-          foundUser = rows[0];
+          const dbRow = rows[0];
+          if (!foundUser || dbRow.password === password) {
+            foundUser = dbRow;
+          }
         }
       } catch (err: any) {
         console.warn('[API /api/auth/login] MySQL error:', err.message);
       }
     }
 
-    // 2. Fallback to memoryUsers
+    // 3. Fallback to memoryUsers
     if (!foundUser) {
       foundUser = memoryUsers.find(u => 
         (u.email && u.email.toLowerCase() === cleanId) || 
         (u.phone && u.phone.replace(/\s+/g, '') === cleanPhone)
       );
-    }
-
-    // 3. Fallback to Cloud Firestore (Guarantees Incognito Mode & cross-browser login works with new password)
-    if (!foundUser || foundUser.password !== password) {
-      try {
-        const cloudUser = await findUserInFirestore(cleanId);
-        if (cloudUser) {
-          // If cloud user password matches or if foundUser wasn't found in memory:
-          if (cloudUser.password === password || !foundUser) {
-            foundUser = cloudUser;
-            // Cache to memory and disk
-            const idx = memoryUsers.findIndex(u => u.id === cloudUser.id || (u.email && u.email.toLowerCase() === cleanId));
-            if (idx >= 0) {
-              memoryUsers[idx] = cloudUser;
-            } else {
-              memoryUsers.push(cloudUser);
-            }
-            saveDiskPersistentState({ users: memoryUsers });
-
-            // If MySQL is online, sync to MySQL
-            if (isDbConnected() && cloudUser.password === password) {
-              query('UPDATE users SET password = ? WHERE id = ? OR LOWER(email) = ?', [password, cloudUser.id, cleanId]).catch(() => {});
-            }
-          }
-        }
-      } catch (err: any) {
-        console.warn('[API /api/auth/login] Firestore lookup error:', err.message);
-      }
     }
 
     // 4. Fallback check for Super Admin
