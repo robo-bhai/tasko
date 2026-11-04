@@ -221,6 +221,7 @@ export default function App() {
   };
 
   const handleAuthSuccess = (user: User) => {
+    Store.setCurrentUser(user);
     setCurrentUser(user);
     if (user.role === 'admin') {
       setActivePortal('admin');

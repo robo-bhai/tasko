@@ -328,14 +328,29 @@ export const Store = {
             // Remote backend data takes precedence
             backendData.users.forEach((u: User) => {
               if (u && (u.email || u.id)) {
-                userMap.set(u.email ? u.email.toLowerCase() : u.id, u);
+                userMap.set(u.email ? u.email.toLowerCase().trim() : u.id, u);
               }
             });
             const localUsers = loadFromStorage<User[]>(STORAGE_KEY_USERS, INITIAL_USERS);
             localUsers.forEach(u => {
-              const key = u.email ? u.email.toLowerCase() : u.id;
+              const key = u.email ? u.email.toLowerCase().trim() : u.id;
               if (!userMap.has(key)) userMap.set(key, u);
             });
+
+            // CRITICAL: Ensure currently logged-in user is preserved and never dropped
+            const activeUser = loadFromStorage<User | null>(STORAGE_KEY_CURRENT_USER, null);
+            if (activeUser) {
+              const activeKey = activeUser.email ? activeUser.email.toLowerCase().trim() : activeUser.id;
+              const matched = userMap.get(activeKey);
+              if (matched) {
+                const refreshed = { ...activeUser, ...matched };
+                saveToStorage(STORAGE_KEY_CURRENT_USER, refreshed);
+                userMap.set(activeKey, refreshed);
+              } else {
+                userMap.set(activeKey, activeUser);
+              }
+            }
+
             saveToStorage(STORAGE_KEY_USERS, Array.from(userMap.values()));
             notifyStoreChanged();
           }
@@ -353,13 +368,28 @@ export const Store = {
           // Cloud Firestore is authoritative
           cloudData.users.forEach(u => {
             if (u && (u.email || u.id)) {
-              authoritativeMap.set(u.email ? u.email.toLowerCase() : u.id, u);
+              authoritativeMap.set(u.email ? u.email.toLowerCase().trim() : u.id, u);
             }
           });
           currentUsers.forEach(u => {
-            const key = u.email ? u.email.toLowerCase() : u.id;
+            const key = u.email ? u.email.toLowerCase().trim() : u.id;
             if (!authoritativeMap.has(key)) authoritativeMap.set(key, u);
           });
+
+          // CRITICAL: Ensure currently logged-in user is preserved and never dropped
+          const activeUser = loadFromStorage<User | null>(STORAGE_KEY_CURRENT_USER, null);
+          if (activeUser) {
+            const activeKey = activeUser.email ? activeUser.email.toLowerCase().trim() : activeUser.id;
+            const matched = authoritativeMap.get(activeKey);
+            if (matched) {
+              const refreshed = { ...activeUser, ...matched };
+              saveToStorage(STORAGE_KEY_CURRENT_USER, refreshed);
+              authoritativeMap.set(activeKey, refreshed);
+            } else {
+              authoritativeMap.set(activeKey, activeUser);
+            }
+          }
+
           const mergedUsers = Array.from(authoritativeMap.values());
           saveToStorage(STORAGE_KEY_USERS, mergedUsers);
         }
@@ -389,8 +419,23 @@ export const Store = {
           if (newUsers.length > 0) {
             const currentUsers = Store.getUsers();
             const map = new Map<string, User>();
-            currentUsers.forEach(u => map.set(u.email ? u.email.toLowerCase() : u.id, u));
-            newUsers.forEach(u => map.set(u.email ? u.email.toLowerCase() : u.id, u));
+            currentUsers.forEach(u => map.set(u.email ? u.email.toLowerCase().trim() : u.id, u));
+            newUsers.forEach(u => map.set(u.email ? u.email.toLowerCase().trim() : u.id, u));
+
+            // CRITICAL: Preserve and refresh currently logged-in session
+            const activeUser = loadFromStorage<User | null>(STORAGE_KEY_CURRENT_USER, null);
+            if (activeUser) {
+              const activeKey = activeUser.email ? activeUser.email.toLowerCase().trim() : activeUser.id;
+              const matched = map.get(activeKey);
+              if (matched) {
+                const refreshed = { ...activeUser, ...matched };
+                saveToStorage(STORAGE_KEY_CURRENT_USER, refreshed);
+                map.set(activeKey, refreshed);
+              } else {
+                map.set(activeKey, activeUser);
+              }
+            }
+
             const merged = Array.from(map.values());
             saveToStorage(STORAGE_KEY_USERS, merged);
             notifyStoreChanged();
@@ -470,12 +515,54 @@ export const Store = {
   getCurrentUser: (): User | null => {
     const user = loadFromStorage<User | null>(STORAGE_KEY_CURRENT_USER, null);
     if (!user) return null;
-    const freshUser = Store.getUsers().find(u => u.id === user.id);
-    if (!freshUser || freshUser.status === 'blocked' || freshUser.status === 'suspended' || freshUser.isDeleted) {
+
+    const users = Store.getUsers();
+    const cleanEmail = user.email ? user.email.toLowerCase().trim() : '';
+    const cleanPhone = user.phone ? user.phone.trim().replace(/\s+/g, '') : '';
+
+    // Search by ID, email, or phone
+    const freshUser = users.find(u => 
+      u.id === user.id || 
+      (cleanEmail && u.email && u.email.toLowerCase().trim() === cleanEmail) ||
+      (cleanPhone && u.phone && u.phone.trim().replace(/\s+/g, '') === cleanPhone)
+    );
+
+    // ONLY terminate session if user has been explicitly blocked or suspended by administrator
+    if (freshUser && (freshUser.status === 'blocked' || freshUser.status === 'suspended' || (freshUser as any).isDeleted)) {
       localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
       return null;
     }
-    return freshUser;
+    if (user.status === 'blocked' || user.status === 'suspended' || (user as any).isDeleted) {
+      localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
+      return null;
+    }
+
+    if (freshUser) {
+      // If user ID or attributes updated in authoritative list, keep local storage in sync
+      const merged = { ...user, ...freshUser };
+      if (freshUser.id !== user.id || freshUser.password !== user.password || freshUser.walletBalance !== user.walletBalance) {
+        saveToStorage(STORAGE_KEY_CURRENT_USER, merged);
+      }
+      return merged;
+    }
+
+    // CRITICAL: NEVER log out or clear session if background sync hasn't added user to list yet.
+    // The user successfully logged in. Preserve active session!
+    try {
+      const currentList = loadFromStorage<User[]>(STORAGE_KEY_USERS, INITIAL_USERS);
+      const exists = currentList.some(u => 
+        u.id === user.id || 
+        (cleanEmail && u.email && u.email.toLowerCase().trim() === cleanEmail)
+      );
+      if (!exists) {
+        currentList.push(user);
+        saveToStorage(STORAGE_KEY_USERS, currentList);
+      }
+    } catch {
+      // safe fallback
+    }
+
+    return user;
   },
 
   setCurrentUser: (user: User | null) => {
@@ -485,9 +572,13 @@ export const Store = {
       saveToStorage(STORAGE_KEY_CURRENT_USER, user);
       // Also sync in users list
       const users = Store.getUsers();
-      const idx = users.findIndex(u => u.id === user.id);
+      const cleanEmail = user.email ? user.email.toLowerCase().trim() : '';
+      const idx = users.findIndex(u => 
+        u.id === user.id || 
+        (cleanEmail && u.email && u.email.toLowerCase().trim() === cleanEmail)
+      );
       if (idx >= 0) {
-        users[idx] = user;
+        users[idx] = { ...users[idx], ...user };
       } else {
         users.push(user);
       }

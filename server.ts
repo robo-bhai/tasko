@@ -38,10 +38,26 @@ let memoryOrders: any[] = [];
 let memorySettings: any = null;
 let runtimeAdminPasswordOverride: string | null = null;
 
+// Deduplication helper to merge multiple records with the same email
+function deduplicateUsersList(users: any[]): any[] {
+  const map = new Map<string, any>();
+  users.forEach(u => {
+    if (!u) return;
+    const key = u.email ? u.email.toLowerCase().trim() : u.id;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, u);
+    } else {
+      map.set(key, { ...existing, ...u });
+    }
+  });
+  return Array.from(map.values());
+}
+
 // Initialize disk persistent cache immediately
 const initialDisk = loadDiskPersistentState();
 if (initialDisk.users.length > 0) {
-  memoryUsers = initialDisk.users;
+  memoryUsers = deduplicateUsersList(initialDisk.users);
 }
 if (initialDisk.settings) {
   memorySettings = initialDisk.settings;
@@ -91,8 +107,19 @@ async function startServer() {
   fetchUsersFromFirestore().then((cloudUsers) => {
     if (cloudUsers && cloudUsers.length > 0) {
       const userMap = new Map<string, any>();
-      memoryUsers.forEach(u => { if (u && (u.id || u.email)) userMap.set(u.id || u.email, u); });
-      cloudUsers.forEach(u => { if (u && (u.id || u.email)) userMap.set(u.id || u.email, u); });
+      memoryUsers.forEach(u => { 
+        if (u && (u.id || u.email)) {
+          const key = u.email ? u.email.toLowerCase().trim() : u.id;
+          userMap.set(key, u); 
+        }
+      });
+      cloudUsers.forEach(u => { 
+        if (u && (u.id || u.email)) {
+          const key = u.email ? u.email.toLowerCase().trim() : u.id;
+          const existing = userMap.get(key);
+          userMap.set(key, existing ? { ...existing, ...u } : u); 
+        }
+      });
       memoryUsers = Array.from(userMap.values());
       saveDiskPersistentState({ users: memoryUsers });
       console.log(`[Server Auth] Synced ${cloudUsers.length} users from Cloud Firestore into server cache.`);
@@ -1110,7 +1137,7 @@ async function startServer() {
 
   app.post('/api/sync/all-state', async (req: Request, res: Response) => {
     const { users, orders, settings } = req.body;
-    if (Array.isArray(users)) memoryUsers = users;
+    if (Array.isArray(users)) memoryUsers = deduplicateUsersList(users);
     if (Array.isArray(orders)) memoryOrders = orders;
     if (settings) memorySettings = settings;
 
