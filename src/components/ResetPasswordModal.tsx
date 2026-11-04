@@ -168,6 +168,9 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
       if (targetEmail) {
         Store.updateUserPassword(targetEmail, newPassword);
       }
+      if (data.user) {
+        Store.saveOrUpdateUser(data.user);
+      }
 
       setTimeout(() => {
         // Clean URL query param

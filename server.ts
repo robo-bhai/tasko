@@ -14,6 +14,14 @@ import {
   getPasswordResetSuccessEmailHtml, 
   getOrderNotificationEmailHtml 
 } from './src/server/brevo.js';
+import {
+  loadDiskPersistentState,
+  saveDiskPersistentState,
+  fetchUsersFromFirestore,
+  findUserInFirestore,
+  updateUserPasswordInFirestore,
+  syncUserToFirestore
+} from './src/server/firestoreSync.js';
 
 dotenv.config();
 
@@ -25,6 +33,15 @@ let memoryUsers: any[] = [];
 let memoryOrders: any[] = [];
 let memorySettings: any = null;
 let runtimeAdminPasswordOverride: string | null = null;
+
+// Initialize disk persistent cache immediately
+const initialDisk = loadDiskPersistentState();
+if (initialDisk.users.length > 0) {
+  memoryUsers = initialDisk.users;
+}
+if (initialDisk.adminPasswordOverride) {
+  runtimeAdminPasswordOverride = initialDisk.adminPasswordOverride;
+}
 
 async function syncSuperAdminFromEnv() {
   if (!isDbConnected()) return;
@@ -59,6 +76,20 @@ async function startServer() {
   await initDbPool();
   await syncSuperAdminFromEnv();
   await initPasswordResetsTable();
+
+  // Asynchronously hydrate server cache with latest users from Cloud Firestore
+  fetchUsersFromFirestore().then((cloudUsers) => {
+    if (cloudUsers && cloudUsers.length > 0) {
+      const userMap = new Map<string, any>();
+      memoryUsers.forEach(u => { if (u && (u.id || u.email)) userMap.set(u.id || u.email, u); });
+      cloudUsers.forEach(u => { if (u && (u.id || u.email)) userMap.set(u.id || u.email, u); });
+      memoryUsers = Array.from(userMap.values());
+      saveDiskPersistentState({ users: memoryUsers });
+      console.log(`[Server Auth] Synced ${cloudUsers.length} users from Cloud Firestore into server cache.`);
+    }
+  }).catch(err => {
+    console.warn('[Server Auth] Note syncing Firestore on boot:', err.message);
+  });
 
   // API Routes
   app.get('/api/health', (req: Request, res: Response) => {
@@ -148,7 +179,22 @@ async function startServer() {
       }
     }
 
-    // 3. Check Super Admin
+    // 3. Search in Cloud Firestore
+    if (!userFound) {
+      try {
+        const cloudUser = await findUserInFirestore(cleanEmail);
+        if (cloudUser) {
+          userFound = true;
+          userName = cloudUser.name || 'Valued User';
+          memoryUsers.push(cloudUser);
+          saveDiskPersistentState({ users: memoryUsers });
+        }
+      } catch (err: any) {
+        console.warn('[Forgot Password] Firestore search note:', err.message);
+      }
+    }
+
+    // 4. Check Super Admin
     const adminEmail = (process.env.ADMIN_USERNAME || process.env.VITE_ADMIN_USERNAME || 'admin@omniserve.com').toLowerCase();
     if (!userFound && cleanEmail === adminEmail) {
       userFound = true;
@@ -232,33 +278,63 @@ async function startServer() {
 
       // 1. Update in MySQL
       if (isDbConnected()) {
-        await query('UPDATE users SET password = ? WHERE LOWER(email) = ?', [newPassword, email]);
-        if (email === adminEmail) {
-          await query('UPDATE users SET password = ? WHERE id = ? OR LOWER(email) = ?', [newPassword, 'usr-admin-1', adminEmail]);
-        }
-        console.log(`[Password Reset] Password updated in MySQL database for user: ${email}`);
+        try {
+          await query('UPDATE users SET password = ? WHERE LOWER(email) = ?', [newPassword, email]);
+          if (email === adminEmail) {
+            await query('UPDATE users SET password = ? WHERE id = ? OR LOWER(email) = ?', [newPassword, 'usr-admin-1', adminEmail]);
+          }
+          console.log(`[Password Reset] Password updated in MySQL database for user: ${email}`);
 
-        // Fetch refreshed user record
-        const rows = await query(`
-          SELECT 
-            id, name, email, phone, password, role, avatar, address, 
-            wallet_balance as walletBalance, status, provider_category as providerCategory, 
-            service_skill as serviceSkill, vehicle_type as vehicleType, rating, 
-            completed_jobs_count as completedJobsCount, is_online as isOnline, 
-            DATE_FORMAT(created_at, '%Y-%m-%d') as joinedDate
-          FROM users WHERE LOWER(email) = ? LIMIT 1
-        `, [email]);
-        if (rows && rows.length > 0) {
-          updatedUser = rows[0];
+          // Fetch refreshed user record
+          const rows = await query(`
+            SELECT 
+              id, name, email, phone, password, role, avatar, address, 
+              wallet_balance as walletBalance, status, provider_category as providerCategory, 
+              service_skill as serviceSkill, vehicle_type as vehicleType, rating, 
+              completed_jobs_count as completedJobsCount, is_online as isOnline, 
+              DATE_FORMAT(created_at, '%Y-%m-%d') as joinedDate
+            FROM users WHERE LOWER(email) = ? LIMIT 1
+          `, [email]);
+          if (rows && rows.length > 0) {
+            updatedUser = rows[0];
+          }
+        } catch (err: any) {
+          console.warn('[Password Reset] MySQL update note:', err.message);
         }
       }
 
-      // 2. Update in memory cache
+      // 2. Update in Cloud Firestore (Primary source of truth for cross-browser & Incognito mode)
+      try {
+        const firestoreUser = await updateUserPasswordInFirestore(email, newPassword);
+        if (firestoreUser) {
+          updatedUser = firestoreUser;
+          console.log(`[Password Reset] Synced updated password to Cloud Firestore for: ${email}`);
+        }
+      } catch (err: any) {
+        console.warn('[Password Reset] Firestore sync note:', err.message);
+      }
+
+      // 3. Update in memory cache and persistent disk storage
       const memIdx = memoryUsers.findIndex(u => u.email && u.email.toLowerCase() === email);
       if (memIdx >= 0) {
         memoryUsers[memIdx].password = newPassword;
         if (!updatedUser) updatedUser = memoryUsers[memIdx];
+      } else {
+        const freshUser = updatedUser || {
+          id: 'usr-cust-' + Date.now(),
+          name,
+          email,
+          phone: '',
+          password: newPassword,
+          role: email === adminEmail ? 'admin' : 'customer',
+          status: 'active',
+          walletBalance: 3000,
+          joinedDate: new Date().toISOString().split('T')[0]
+        };
+        memoryUsers.push(freshUser);
+        if (!updatedUser) updatedUser = freshUser;
       }
+
       if (email === adminEmail) {
         runtimeAdminPasswordOverride = newPassword;
         const adm = memoryUsers.find(u => u.id === 'usr-admin-1' || (u.email && u.email.toLowerCase() === adminEmail));
@@ -284,10 +360,16 @@ async function startServer() {
         }
       }
 
-      // 3. Mark token as used
+      // Save to disk persistent cache immediately
+      saveDiskPersistentState({ 
+        users: memoryUsers, 
+        adminPasswordOverride: runtimeAdminPasswordOverride 
+      });
+
+      // 4. Mark token as used
       await markTokenAsUsed(token);
 
-      // 4. Send success email via Brevo
+      // 5. Send success email via Brevo
       sendBrevoEmail({
         toEmail: email,
         toName: name,
@@ -349,7 +431,35 @@ async function startServer() {
       );
     }
 
-    // 3. Fallback check for Super Admin
+    // 3. Fallback to Cloud Firestore (Guarantees Incognito Mode & cross-browser login works with new password)
+    if (!foundUser || foundUser.password !== password) {
+      try {
+        const cloudUser = await findUserInFirestore(cleanId);
+        if (cloudUser) {
+          // If cloud user password matches or if foundUser wasn't found in memory:
+          if (cloudUser.password === password || !foundUser) {
+            foundUser = cloudUser;
+            // Cache to memory and disk
+            const idx = memoryUsers.findIndex(u => u.id === cloudUser.id || (u.email && u.email.toLowerCase() === cleanId));
+            if (idx >= 0) {
+              memoryUsers[idx] = cloudUser;
+            } else {
+              memoryUsers.push(cloudUser);
+            }
+            saveDiskPersistentState({ users: memoryUsers });
+
+            // If MySQL is online, sync to MySQL
+            if (isDbConnected() && cloudUser.password === password) {
+              query('UPDATE users SET password = ? WHERE id = ? OR LOWER(email) = ?', [password, cloudUser.id, cleanId]).catch(() => {});
+            }
+          }
+        }
+      } catch (err: any) {
+        console.warn('[API /api/auth/login] Firestore lookup error:', err.message);
+      }
+    }
+
+    // 4. Fallback check for Super Admin
     const adminEmail = (process.env.ADMIN_USERNAME || process.env.VITE_ADMIN_USERNAME || 'admin@omniserve.com').toLowerCase();
     if (!foundUser && cleanId === adminEmail) {
       const adminPassword = runtimeAdminPasswordOverride || process.env.ADMIN_PASSWORD || process.env.VITE_ADMIN_PASSWORD || 'Admin@12345';
@@ -484,16 +594,18 @@ async function startServer() {
       return res.status(400).json({ success: false, error: 'Invalid user payload' });
     }
 
-    // Always update in memory cache
+    // Always update in memory cache & disk cache
     const existingIdx = memoryUsers.findIndex(u => u.id === user.id);
     if (existingIdx >= 0) {
       memoryUsers[existingIdx] = user;
     } else {
       memoryUsers.push(user);
     }
+    saveDiskPersistentState({ users: memoryUsers });
+    syncUserToFirestore(user).catch(() => {});
 
     if (!isDbConnected()) {
-      return res.json({ success: true, savedTo: 'memory', user });
+      return res.json({ success: true, savedTo: 'memory_and_firestore', user });
     }
 
     try {
@@ -554,9 +666,10 @@ async function startServer() {
     }
 
     memoryUsers = users;
+    saveDiskPersistentState({ users: memoryUsers });
 
     if (!isDbConnected()) {
-      return res.json({ success: true, savedTo: 'memory', count: users.length });
+      return res.json({ success: true, savedTo: 'memory_and_disk', count: users.length });
     }
 
     let savedCount = 0;

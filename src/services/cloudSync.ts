@@ -206,5 +206,111 @@ export const CloudSyncService = {
     return () => {
       unsubscribes.forEach(unsub => unsub());
     };
+  },
+
+  // Lookup user directly from Cloud Firestore by email or phone (critical for Incognito Mode)
+  async getUserByEmailOrPhone(identifier: string): Promise<User | null> {
+    const clean = identifier.trim().toLowerCase();
+    const cleanPhone = identifier.trim().replace(/\s+/g, '');
+
+    try {
+      // 1. Check system_backups/latest_state first
+      const backupSnap = await getDoc(doc(db, 'system_backups', BACKUP_DOC_ID));
+      if (backupSnap.exists()) {
+        const data = backupSnap.data() as SystemCloudBackup;
+        if (data && Array.isArray(data.users)) {
+          const found = data.users.find(u => 
+            (u.email && u.email.toLowerCase() === clean) ||
+            (u.phone && u.phone.replace(/\s+/g, '') === cleanPhone)
+          );
+          if (found) return found;
+        }
+      }
+
+      // 2. Check individual users collection
+      const snap = await getDocs(collection(db, 'users'));
+      let foundUser: User | null = null;
+      snap.forEach(d => {
+        if (foundUser) return;
+        const u = d.data() as User;
+        if (
+          (u.email && u.email.toLowerCase() === clean) ||
+          (u.phone && u.phone.replace(/\s+/g, '') === cleanPhone)
+        ) {
+          foundUser = u;
+        }
+      });
+
+      return foundUser;
+    } catch (err) {
+      console.warn('[CloudSync] getUserByEmailOrPhone error:', err);
+      return null;
+    }
+  },
+
+  // Update user password directly in Cloud Firestore
+  async updateUserPassword(emailOrPhone: string, newPassword: string): Promise<User | null> {
+    const clean = emailOrPhone.trim().toLowerCase();
+    const cleanPhone = emailOrPhone.trim().replace(/\s+/g, '');
+
+    try {
+      let targetUser: User | null = null;
+
+      // 1. Read & update system backup
+      const backupRef = doc(db, 'system_backups', BACKUP_DOC_ID);
+      const backupSnap = await getDoc(backupRef);
+      if (backupSnap.exists()) {
+        const data = backupSnap.data() as SystemCloudBackup;
+        if (data && Array.isArray(data.users)) {
+          const users = [...data.users];
+          const idx = users.findIndex(u => 
+            (u.email && u.email.toLowerCase() === clean) ||
+            (u.phone && u.phone.replace(/\s+/g, '') === cleanPhone)
+          );
+          if (idx >= 0) {
+            users[idx] = {
+              ...users[idx],
+              password: newPassword
+            };
+            targetUser = users[idx];
+            await setDoc(backupRef, {
+              ...data,
+              users,
+              updatedAt: new Date().toISOString()
+            }, { merge: true });
+          }
+        }
+      }
+
+      // 2. Read & update users collection
+      if (targetUser && targetUser.id) {
+        await setDoc(doc(db, 'users', targetUser.id), {
+          password: newPassword,
+          cloudUpdatedAt: serverTimestamp()
+        }, { merge: true });
+      } else {
+        const snap = await getDocs(collection(db, 'users'));
+        for (const d of snap.docs) {
+          const u = d.data() as User;
+          if (
+            (u.email && u.email.toLowerCase() === clean) ||
+            (u.phone && u.phone.replace(/\s+/g, '') === cleanPhone)
+          ) {
+            targetUser = { ...u, password: newPassword };
+            await setDoc(doc(db, 'users', d.id), {
+              password: newPassword,
+              cloudUpdatedAt: serverTimestamp()
+            }, { merge: true });
+            break;
+          }
+        }
+      }
+
+      return targetUser;
+    } catch (err) {
+      console.warn('[CloudSync] updateUserPassword error:', err);
+      return null;
+    }
   }
 };
+

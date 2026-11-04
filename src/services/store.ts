@@ -410,9 +410,8 @@ export const Store = {
       };
       loaded.push(admin);
       saveToStorage(STORAGE_KEY_USERS, loaded);
-    } else if (admin.email !== DEFAULT_ADMIN_USERNAME || admin.password !== DEFAULT_ADMIN_PASSWORD) {
+    } else if (admin.email !== DEFAULT_ADMIN_USERNAME) {
       admin.email = DEFAULT_ADMIN_USERNAME;
-      admin.password = DEFAULT_ADMIN_PASSWORD;
       saveToStorage(STORAGE_KEY_USERS, loaded);
     }
     return loaded;
@@ -568,43 +567,76 @@ export const Store = {
     return newProvider;
   },
 
+  saveOrUpdateUser: (user: User) => {
+    const users = Store.getUsers();
+    const idx = users.findIndex(u => u.id === user.id || (u.email && u.email.toLowerCase() === user.email.toLowerCase()));
+    if (idx >= 0) {
+      users[idx] = { ...users[idx], ...user };
+    } else {
+      users.push(user);
+    }
+    saveToStorage(STORAGE_KEY_USERS, users);
+    notifyStoreChanged();
+    CloudSyncService.saveUser(user);
+    Store.syncUserToBackend(user);
+  },
+
   updateUserPassword: (emailOrPhone: string, newPassword: string): User | null => {
     const users = Store.getUsers();
     const clean = emailOrPhone.trim().toLowerCase();
     const cleanPhone = emailOrPhone.trim().replace(/\s+/g, '');
-    const idx = users.findIndex(u => 
+    let idx = users.findIndex(u => 
       (u.email && u.email.toLowerCase() === clean) || 
       (u.phone && u.phone.replace(/\s+/g, '') === cleanPhone)
     );
 
+    let targetUser: User;
     if (idx >= 0) {
       users[idx].password = newPassword;
-      saveToStorage(STORAGE_KEY_USERS, users);
-
-      const cur = Store.getCurrentUser();
-      if (cur && (cur.id === users[idx].id || cur.email.toLowerCase() === clean)) {
-        cur.password = newPassword;
-        saveToStorage(STORAGE_KEY_CURRENT_USER, cur);
-      }
-
-      notifyStoreChanged();
-      CloudSyncService.saveUser(users[idx]);
-      CloudSyncService.uploadFullBackup({
-        users,
-        orders: Store.getOrders(),
-        settings: Store.getSettings()
-      });
-      Store.syncUserToBackend(users[idx]);
-      console.log(`[Store] Updated password in local storage & synced to cloud for: ${users[idx].email}`);
-      return users[idx];
+      targetUser = users[idx];
+    } else {
+      targetUser = {
+        id: 'usr-cust-' + Date.now(),
+        name: 'Valued User',
+        email: clean.includes('@') ? clean : '',
+        phone: clean.includes('@') ? '' : cleanPhone,
+        password: newPassword,
+        role: 'customer',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        address: 'Khanewal',
+        walletBalance: 3000,
+        status: 'active',
+        joinedDate: new Date().toISOString().split('T')[0]
+      };
+      users.push(targetUser);
     }
-    return null;
+
+    saveToStorage(STORAGE_KEY_USERS, users);
+
+    const cur = Store.getCurrentUser();
+    if (cur && (cur.id === targetUser.id || (cur.email && cur.email.toLowerCase() === clean))) {
+      cur.password = newPassword;
+      saveToStorage(STORAGE_KEY_CURRENT_USER, cur);
+    }
+
+    notifyStoreChanged();
+    CloudSyncService.saveUser(targetUser);
+    CloudSyncService.updateUserPassword(emailOrPhone, newPassword);
+    CloudSyncService.uploadFullBackup({
+      users,
+      orders: Store.getOrders(),
+      settings: Store.getSettings()
+    });
+    Store.syncUserToBackend(targetUser);
+    console.log(`[Store] Updated password in local storage & synced to cloud for: ${targetUser.email}`);
+    return targetUser;
   },
 
   authenticateUserAsync: async (identifier: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> => {
     const cleanId = identifier.trim().toLowerCase();
+    const cleanPhone = identifier.trim().replace(/\s+/g, '');
 
-    // 1. Authenticate against Backend API (Live MySQL & Validated DB Password)
+    // 1. Authenticate against Backend API (Live MySQL + Server Memory/Disk + Firestore Sync)
     try {
       const resp = await fetch('/api/auth/login', {
         method: 'POST',
@@ -616,7 +648,7 @@ export const Store = {
       if (resp.ok && data.success && data.user) {
         const serverUser = data.user as User;
         const users = Store.getUsers();
-        const existingIdx = users.findIndex(u => u.id === serverUser.id || u.email.toLowerCase() === serverUser.email.toLowerCase());
+        const existingIdx = users.findIndex(u => u.id === serverUser.id || (u.email && u.email.toLowerCase() === serverUser.email.toLowerCase()));
         
         if (existingIdx >= 0) {
           users[existingIdx] = { ...users[existingIdx], ...serverUser, password: password.trim() };
@@ -629,14 +661,42 @@ export const Store = {
         notifyStoreChanged();
         CloudSyncService.saveUser(serverUser);
         return { success: true, user: serverUser };
-      } else if (resp.status === 401 || resp.status === 403 || resp.status === 404) {
-        return { success: false, error: data.error || 'Ghalat password ya account mojood nahi hai.' };
       }
     } catch (err) {
-      console.warn('[Store Auth] Backend auth endpoint unreachable, checking local store:', err);
+      console.warn('[Store Auth] Backend auth endpoint check note:', err);
     }
 
-    // 2. Local Fallback Authentication
+    // 2. Direct Cloud Firestore Lookup (CRITICAL FOR INCOGNITO MODE)
+    // When browser localStorage is completely empty, query Cloud Firestore authoritative DB
+    try {
+      const cloudUser = await CloudSyncService.getUserByEmailOrPhone(cleanId);
+      if (cloudUser) {
+        if (cloudUser.status === 'blocked' || cloudUser.status === 'suspended') {
+          return { success: false, error: 'Aapka account administrator ki taraf se block ya suspend kiya gaya hai.' };
+        }
+        if (cloudUser.password === password.trim()) {
+          const users = Store.getUsers();
+          const existingIdx = users.findIndex(u => u.id === cloudUser.id || (u.email && u.email.toLowerCase() === cloudUser.email.toLowerCase()));
+          if (existingIdx >= 0) {
+            users[existingIdx] = cloudUser;
+          } else {
+            users.push(cloudUser);
+          }
+          saveToStorage(STORAGE_KEY_USERS, users);
+          Store.setCurrentUser(cloudUser);
+          notifyStoreChanged();
+          Store.syncUserToBackend(cloudUser);
+          console.log(`[Store Auth] Successfully authenticated against Cloud Firestore for: ${cloudUser.email}`);
+          return { success: true, user: cloudUser };
+        } else {
+          return { success: false, error: 'Ghalat password (Incorrect password). Baraye meherbani durust password darj karein.' };
+        }
+      }
+    } catch (err) {
+      console.warn('[Store Auth] Cloud Firestore check note:', err);
+    }
+
+    // 3. Local Fallback Authentication
     return Store.authenticateUser(cleanId, password.trim());
   },
 
