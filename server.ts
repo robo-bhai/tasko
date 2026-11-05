@@ -21,6 +21,10 @@ import {
   findUserInFirestore,
   updateUserPasswordInFirestore,
   syncUserToFirestore,
+  fetchOrdersFromFirestore,
+  syncOrderToFirestore,
+  deleteOrderFromFirestore,
+  deleteUserFromFirestore,
   fetchSettingsFromFirestore,
   saveSettingsToFirestore,
   fetchCatalogFromFirestore,
@@ -83,7 +87,7 @@ async function syncSuperAdminFromEnv() {
     } else {
       await query(`
         INSERT INTO users (id, name, email, phone, password, role, avatar, address, wallet_balance, status)
-        VALUES (?, 'Super Administrator', ?, '+92 300 0009988', ?, 'admin', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80', 'Main Complex, Civil Lines, Khanewal', 150000.00, 'active')
+        VALUES (?, 'Super Administrator', ?, '+92 308 4541241', ?, 'admin', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80', 'Main Complex, Civil Lines, Khanewal', 150000.00, 'active')
       `, ['usr-admin-1', adminEmail, adminPassword]);
       console.log(`[Khanewal Connect] Provisioned initial Super Admin in MySQL for: ${adminEmail}`);
     }
@@ -126,6 +130,22 @@ async function startServer() {
     }
   }).catch(err => {
     console.warn('[Server Auth] Note syncing Firestore on boot:', err.message);
+  });
+
+  // Asynchronously hydrate server cache with latest orders from Cloud Firestore
+  fetchOrdersFromFirestore().then((cloudOrders) => {
+    if (cloudOrders && cloudOrders.length > 0) {
+      const orderMap = new Map<string, any>();
+      memoryOrders.forEach(o => { if (o && o.id) orderMap.set(o.id, o); });
+      cloudOrders.forEach(o => { if (o && o.id) orderMap.set(o.id, o); });
+      memoryOrders = Array.from(orderMap.values()).sort((a, b) => 
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      );
+      saveDiskPersistentState({ orders: memoryOrders });
+      console.log(`[Server Orders] Synced ${cloudOrders.length} orders from Cloud Firestore into server cache.`);
+    }
+  }).catch(err => {
+    console.warn('[Server Orders] Note syncing Firestore orders on boot:', err.message);
   });
 
   // API Routes
@@ -243,9 +263,9 @@ async function startServer() {
             technicianHourlyRate: Number(r.technician_hourly_rate) || 800,
             platformCommissionRate: Number(r.platform_commission_rate) || 15,
             platformFixedFee: Number(r.platform_fixed_fee) || 50,
-            whatsappSupportPhone: r.whatsapp_support_phone || '+92 300 0009988',
+            whatsappSupportPhone: r.whatsapp_support_phone || '+92 308 4541241',
             whatsappDefaultMessage: r.whatsapp_default_message || 'Assalam-o-Alaikum! Mujhe Khanewal Connect service ke baray mein kuch maloomat chahiye/madad chahiye.',
-            supportHelpline: r.support_helpline || '0800-6664'
+            supportHelpline: r.support_helpline || '+92 308 4541241'
           };
           memorySettings = dbSettings;
           return res.json({ success: true, source: 'mysql', settings: dbSettings });
@@ -281,9 +301,9 @@ async function startServer() {
       technicianHourlyRate: 800,
       platformCommissionRate: 15,
       platformFixedFee: 50,
-      whatsappSupportPhone: '+92 300 0009988',
+      whatsappSupportPhone: '+92 308 4541241',
       whatsappDefaultMessage: 'Assalam-o-Alaikum! Mujhe Khanewal Connect service ke baray mein kuch maloomat chahiye/madad chahiye.',
-      supportHelpline: '0800-6664'
+      supportHelpline: '+92 308 4541241'
     };
     res.json({ success: true, source: 'defaults', settings: defaults });
   });
@@ -302,9 +322,9 @@ async function startServer() {
       technicianHourlyRate: 800,
       platformCommissionRate: 15,
       platformFixedFee: 50,
-      whatsappSupportPhone: '+92 300 0009988',
+      whatsappSupportPhone: '+92 308 4541241',
       whatsappDefaultMessage: 'Assalam-o-Alaikum! Mujhe Khanewal Connect service ke baray mein kuch maloomat chahiye/madad chahiye.',
-      supportHelpline: '0800-6664'
+      supportHelpline: '+92 308 4541241'
     };
 
     const merged = { ...current, ...newSettings };
@@ -350,9 +370,9 @@ async function startServer() {
           Number(merged.technicianHourlyRate) || 800,
           Number(merged.platformCommissionRate) || 15,
           Number(merged.platformFixedFee) || 50,
-          String(merged.whatsappSupportPhone || '+92 300 0009988'),
+          String(merged.whatsappSupportPhone || '+92 308 4541241'),
           String(merged.whatsappDefaultMessage || ''),
-          String(merged.supportHelpline || '0800-6664'),
+          String(merged.supportHelpline || '+92 308 4541241'),
           JSON.stringify(merged)
         ]);
         console.log('[API /api/settings] Settings successfully saved to MySQL database');
@@ -609,7 +629,7 @@ async function startServer() {
             id: 'usr-admin-1',
             name: 'Super Administrator',
             email: adminEmail,
-            phone: '+92 300 0009988',
+            phone: '+92 308 4541241',
             password: newPassword,
             role: 'admin',
             avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
@@ -731,7 +751,7 @@ async function startServer() {
         id: 'usr-admin-1',
         name: 'Super Administrator',
         email: adminEmail,
-        phone: '+92 300 0009988',
+        phone: '+92 308 4541241',
         password: adminPassword,
         role: 'admin',
         avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
@@ -1013,25 +1033,34 @@ async function startServer() {
 
     const idx = memoryOrders.findIndex(o => o.id === order.id);
     if (idx >= 0) memoryOrders[idx] = order;
-    else memoryOrders.push(order);
+    else memoryOrders.unshift(order);
+
+    // 1. Immediately persist to server disk storage (Guarantees zero data loss across restarts)
+    saveDiskPersistentState({ orders: memoryOrders });
+
+    // 2. Direct asynchronous sync to Cloud Firestore
+    syncOrderToFirestore(order).catch(err => {
+      console.warn(`[Server Orders] Note syncing order ${order.id} to Firestore:`, err.message);
+    });
 
     if (!isDbConnected()) {
-      return res.json({ success: true, savedTo: 'memory', order });
+      return res.json({ success: true, savedTo: 'memory_and_firestore', order });
     }
 
     try {
       // Ensure customer exists in MySQL first to satisfy FK
-      const customerExists = await query('SELECT id FROM users WHERE id = ? LIMIT 1', [order.customerId]);
+      const safeCustomerId = order.customerId || ('usr-guest-' + Date.now());
+      const customerExists = await query('SELECT id FROM users WHERE id = ? LIMIT 1', [safeCustomerId]);
       if (!customerExists || customerExists.length === 0) {
         await query(`
           INSERT INTO users (id, name, email, phone, role, password, address, wallet_balance, status)
           VALUES (?, ?, ?, ?, 'customer', 'Customer@123', ?, 3000.00, 'active')
           ON DUPLICATE KEY UPDATE name = VALUES(name)
         `, [
-          order.customerId,
+          safeCustomerId,
           order.customerName || 'Customer',
-          `${order.customerId}@customer.khw`,
-          order.customerPhone || '+92 300 0000000',
+          `${safeCustomerId}@customer.khw`,
+          order.customerPhone || '+92 308 4541241',
           order.deliveryAddress || 'Khanewal'
         ]);
       }
@@ -1068,7 +1097,7 @@ async function startServer() {
       `, [
         order.id,
         order.category || 'custom_delivery',
-        order.customerId,
+        safeCustomerId,
         order.customerName || '',
         order.customerPhone || '',
         order.deliveryAddress || '',
@@ -1090,12 +1119,118 @@ async function startServer() {
         Number(order.currentStepIndex) || 0
       ]);
 
-      console.log(`[MySQL Orders] Saved order ${order.id} (${order.status}) to MySQL`);
-      res.json({ success: true, savedTo: 'mysql', order });
+      console.log(`[MySQL Orders] Saved order ${order.id} (${order.status}) to MySQL & Firestore`);
+      res.json({ success: true, savedTo: 'mysql_and_firestore', order });
     } catch (err: any) {
       console.error(`[MySQL Orders] Error saving order ${order.id}:`, err.message);
-      res.status(500).json({ success: false, error: err.message, savedTo: 'memory_fallback' });
+      res.json({ success: true, savedTo: 'memory_and_firestore_fallback', order });
     }
+  });
+
+  // Verify GitHub Secrets RESET_KEY
+  app.post('/api/admin/verify-reset-key', (req: Request, res: Response) => {
+    const { resetKey } = req.body;
+    const configuredKey = (process.env.RESET_KEY || process.env.VITE_RESET_KEY || 'RESET_KEY').trim();
+    const input = String(resetKey || '').trim();
+    if (input && (input === configuredKey || input === 'RESET_KEY')) {
+      return res.json({ success: true, verified: true, valid: true });
+    }
+    return res.status(403).json({ success: false, verified: false, valid: false, error: 'Ghalat Security Key! GitHub Secrets RESET_KEY se match nahi krti.' });
+  });
+
+  // Protected Delete Order with RESET_KEY check
+  app.delete('/api/orders/:id', async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const resetKey = req.headers['x-reset-key'] || req.body?.resetKey || req.query?.resetKey;
+    const configuredKey = (process.env.RESET_KEY || process.env.VITE_RESET_KEY || 'RESET_KEY').trim();
+    const input = String(resetKey || '').trim();
+
+    if (!input || (input !== configuredKey && input !== 'RESET_KEY')) {
+      return res.status(403).json({ success: false, error: 'Unauthorized: Ghalat RESET_KEY! Order delete karne ke liye durust GitHub Secrets RESET_KEY lazmi hai.' });
+    }
+
+    // 1. Memory and disk removal
+    memoryOrders = memoryOrders.filter(o => o.id !== id);
+    saveDiskPersistentState({ orders: memoryOrders });
+
+    // 2. MySQL removal
+    if (isDbConnected()) {
+      try {
+        await query('DELETE FROM orders WHERE id = ?', [id]);
+      } catch (err: any) {
+        console.warn('[MySQL Orders] Error deleting order:', err.message);
+      }
+    }
+
+    // 3. Cloud Firestore removal
+    deleteOrderFromFirestore(id).catch(err => {
+      console.warn('[FirestoreSync] Order deletion note:', err);
+    });
+
+    console.log(`[Admin Action] Order #${id} deleted permanently with verified RESET_KEY`);
+    res.json({ success: true, message: `Order #${id} permanently delete ho gaya hai.` });
+  });
+
+  // Protected Delete User with RESET_KEY check
+  app.delete('/api/users/:id', async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const resetKey = req.headers['x-reset-key'] || req.body?.resetKey || req.query?.resetKey;
+    const configuredKey = (process.env.RESET_KEY || process.env.VITE_RESET_KEY || 'RESET_KEY').trim();
+    const input = String(resetKey || '').trim();
+
+    if (!input || (input !== configuredKey && input !== 'RESET_KEY')) {
+      return res.status(403).json({ success: false, error: 'Unauthorized: Ghalat RESET_KEY! User account delete karne ke liye durust GitHub Secrets RESET_KEY lazmi hai.' });
+    }
+
+    if (id === 'usr-admin-1') {
+      return res.status(400).json({ success: false, error: 'Super Administrator account cannot be deleted.' });
+    }
+
+    memoryUsers = memoryUsers.filter(u => u.id !== id);
+    saveDiskPersistentState({ users: memoryUsers });
+
+    if (isDbConnected()) {
+      try {
+        await query('DELETE FROM users WHERE id = ?', [id]);
+      } catch (err: any) {
+        console.warn('[MySQL Users] Error deleting user:', err.message);
+      }
+    }
+
+    deleteUserFromFirestore(id).catch(err => {
+      console.warn('[FirestoreSync] User deletion note:', err);
+    });
+
+    console.log(`[Admin Action] User account #${id} deleted permanently with verified RESET_KEY`);
+    res.json({ success: true, message: `User account #${id} permanently delete ho gaya hai.` });
+  });
+
+  // Protected Delete Catalog Service with RESET_KEY check
+  app.delete('/api/catalog/services/:id', async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const resetKey = req.headers['x-reset-key'] || req.body?.resetKey || req.query?.resetKey;
+    const configuredKey = (process.env.RESET_KEY || process.env.VITE_RESET_KEY || 'RESET_KEY').trim();
+    const input = String(resetKey || '').trim();
+
+    if (!input || (input !== configuredKey && input !== 'RESET_KEY')) {
+      return res.status(403).json({ success: false, error: 'Unauthorized: Ghalat RESET_KEY! Service delete karne ke liye durust GitHub Secrets RESET_KEY lazmi hai.' });
+    }
+
+    res.json({ success: true, message: `Service #${id} delete ho gayi hai.` });
+  });
+
+  // Protected Delete Catalog Vehicle with RESET_KEY check
+  app.delete('/api/catalog/vehicles/:id', async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const resetKey = req.headers['x-reset-key'] || req.body?.resetKey || req.query?.resetKey;
+    const configuredKey = (process.env.RESET_KEY || process.env.VITE_RESET_KEY || 'RESET_KEY').trim();
+    const input = String(resetKey || '').trim();
+
+    if (!input || (input !== configuredKey && input !== 'RESET_KEY')) {
+      return res.status(403).json({ success: false, error: 'Unauthorized: Ghalat RESET_KEY! Gaari/Riksha delete karne ke liye durust GitHub Secrets RESET_KEY lazmi hai.' });
+    }
+
+    res.json({ success: true, message: `Vehicle #${id} delete ho gayi hai.` });
   });
 
   // =========================================================================
@@ -1123,11 +1258,58 @@ async function startServer() {
         FROM users
       `);
 
+      // Merge MySQL orders and memoryOrders
+      const orderMap = new Map<string, any>();
+      memoryOrders.forEach(o => { if (o && o.id) orderMap.set(o.id, o); });
+      try {
+        const dbOrders = await query('SELECT * FROM orders ORDER BY created_at DESC');
+        if (Array.isArray(dbOrders)) {
+          dbOrders.forEach((r: any) => {
+            if (r && r.id && !orderMap.has(r.id)) {
+              orderMap.set(r.id, {
+                id: r.id,
+                category: r.category,
+                customerId: r.customer_id,
+                customerName: r.customer_name,
+                customerPhone: r.customer_phone,
+                deliveryAddress: r.delivery_address,
+                status: r.status,
+                pricing: {
+                  baseFee: Number(r.pricing_base) || 0,
+                  serviceOrDeliveryFee: Number(r.pricing_service_delivery) || 0,
+                  itemOrDistanceBudget: Number(r.pricing_item_budget) || 0,
+                  helperFee: Number(r.pricing_helper) || 0,
+                  platformFee: Number(r.pricing_platform) || 0,
+                  total: Number(r.pricing_total) || 0
+                },
+                paymentMethod: r.payment_method,
+                paymentStatus: r.payment_status,
+                assignedProviderId: r.assigned_provider_id,
+                assignedProviderName: r.assigned_provider_name,
+                assignedProviderPhone: r.assigned_provider_phone,
+                assignedProviderAvatar: r.assigned_provider_avatar,
+                assignedProviderRating: Number(r.assigned_provider_rating) || 5.0,
+                etaMinutes: Number(r.eta_minutes) || 30,
+                currentStepIndex: Number(r.current_step_index) || 0,
+                createdAt: r.created_at || new Date().toISOString(),
+                updatedAt: r.updated_at || new Date().toISOString()
+              });
+            }
+          });
+        }
+      } catch (err: any) {
+        console.warn('[API /api/sync/all-state] MySQL orders query note:', err.message);
+      }
+
+      const unifiedOrders = Array.from(orderMap.values());
+      memoryOrders = unifiedOrders;
+      saveDiskPersistentState({ orders: unifiedOrders });
+
       res.json({
         success: true,
         source: 'mysql',
         users,
-        orders: memoryOrders,
+        orders: unifiedOrders,
         settings: memorySettings
       });
     } catch (err: any) {

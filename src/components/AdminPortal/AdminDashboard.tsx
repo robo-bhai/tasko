@@ -178,6 +178,60 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  // Protected Entity Deletion State (Requires GitHub Secrets RESET_KEY)
+  interface ProtectedDeleteTarget {
+    type: 'order' | 'user' | 'service' | 'vehicle';
+    id: string;
+    title: string;
+    subtitle?: string;
+  }
+  const [deleteTarget, setDeleteTarget] = useState<ProtectedDeleteTarget | null>(null);
+  const [deleteResetKeyInput, setDeleteResetKeyInput] = useState('');
+  const [showDeleteResetKey, setShowDeleteResetKey] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteSuccessNotice, setDeleteSuccessNotice] = useState('');
+
+  const handleConfirmProtectedDelete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deleteTarget) return;
+    if (!deleteResetKeyInput.trim()) {
+      setDeleteError('Baraye meherbani GitHub Secrets wali RESET_KEY darj karein.');
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError('');
+
+    try {
+      let res: { success: boolean; message: string };
+      if (deleteTarget.type === 'order') {
+        res = await Store.deleteOrder(deleteTarget.id, deleteResetKeyInput);
+      } else if (deleteTarget.type === 'user') {
+        res = await Store.deleteUserPermanently(deleteTarget.id, deleteResetKeyInput);
+      } else if (deleteTarget.type === 'service') {
+        res = await Store.deleteServiceWithKey(deleteTarget.id, deleteResetKeyInput);
+        setEditingServices([...Store.getServicesCatalog()]);
+      } else {
+        res = await Store.deleteVehicleWithKey(deleteTarget.id, deleteResetKeyInput);
+        setEditingVehicles([...Store.getVehiclesCatalog()]);
+      }
+
+      if (res.success) {
+        setDeleteSuccessNotice(res.message);
+        setDeleteTarget(null);
+        setDeleteResetKeyInput('');
+        setTimeout(() => setDeleteSuccessNotice(''), 5000);
+      } else {
+        setDeleteError(res.message || 'Ghalat Security Key! GitHub Secrets RESET_KEY match nahi hui.');
+      }
+    } catch (err: any) {
+      setDeleteError(err.message || 'Error occurred during deletion.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleVerifyAndResetDatabase = (e: React.FormEvent) => {
     e.preventDefault();
     setResetError('');
@@ -676,6 +730,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
+      {deleteSuccessNotice && (
+        <div className="bg-emerald-950/80 border border-emerald-500/50 rounded-2xl p-4 flex items-center gap-3 text-emerald-200 text-xs shadow-md animate-fadeIn">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          <div className="flex-1 font-semibold">{deleteSuccessNotice}</div>
+          <button
+            onClick={() => setDeleteSuccessNotice('')}
+            className="text-emerald-400 hover:text-white p-1 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* KPI Stats Strip */}
       <section className="grid grid-cols-2 lg:grid-cols-6 gap-3.5">
         <div className="bg-[#0e111a] rounded-2xl border border-slate-800 p-4 shadow-sm text-slate-100">
@@ -1066,16 +1133,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </div>
                         </td>
 
-                        {/* 6. Inspect Full Details & PDF Receipt */}
+                        {/* 6. Inspect Full Details & Delete */}
                         <td className="py-3.5 px-3 text-center align-top">
-                          <button
-                            onClick={() => setSelectedOrderDetails(order)}
-                            className="px-2.5 py-1.5 hover:bg-amber-400/20 text-amber-300 border border-amber-500/40 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 mx-auto font-bold shadow-xs hover:scale-105"
-                            title="Inspect Order Details & Print PDF Receipt"
-                          >
-                            <Eye className="w-4 h-4 text-amber-400" />
-                            <span className="text-[10px] hidden sm:inline">Receipt / Details</span>
-                          </button>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => setSelectedOrderDetails(order)}
+                              className="px-2.5 py-1.5 hover:bg-amber-400/20 text-amber-300 border border-amber-500/40 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 font-bold shadow-xs hover:scale-105"
+                              title="Inspect Order Details & Print PDF Receipt"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-amber-400" />
+                              <span className="text-[10px] hidden sm:inline">Receipt</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDeleteError('');
+                                setDeleteResetKeyInput('');
+                                setDeleteTarget({
+                                  type: 'order',
+                                  id: order.id,
+                                  title: `Order #${order.id}`,
+                                  subtitle: `${order.customerName || 'Customer'} • PKR ${order.pricing?.total || 0}`
+                                });
+                              }}
+                              className="p-1.5 hover:bg-rose-950/80 text-rose-400 hover:text-white border border-rose-800/50 rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-xs hover:scale-105"
+                              title="Delete Order (Protected by GitHub Secrets RESET_KEY)"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1302,24 +1389,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </button>
                           )}
 
-                          {/* Soft Delete or Restore */}
-                          {user.isDeleted ? (
-                            <button
-                              onClick={() => handleRestoreUser(user.id)}
-                              className="p-1.5 hover:bg-emerald-950 text-emerald-400 border border-emerald-700 rounded-lg transition-colors cursor-pointer"
-                              title="Restore Deleted Account"
-                            >
-                              <RotateCcw className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleDeleteUser(user.id)}
-                              className="p-1.5 hover:bg-red-950 text-slate-500 hover:text-red-400 border border-slate-700 rounded-lg transition-colors cursor-pointer"
-                              title="Remove / Soft-Delete Account"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
+                          {/* Protected Delete with RESET_KEY */}
+                          <button
+                            onClick={() => {
+                              setDeleteError('');
+                              setDeleteResetKeyInput('');
+                              setDeleteTarget({
+                                type: 'user',
+                                id: user.id,
+                                title: `User: ${user.name}`,
+                                subtitle: `${user.email} (${user.role})`
+                              });
+                            }}
+                            className="p-1.5 hover:bg-rose-950/80 text-rose-400 hover:text-white border border-rose-800/50 rounded-lg transition-colors cursor-pointer"
+                            title="Permanent Delete User (Requires GitHub Secrets RESET_KEY)"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1899,9 +1985,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                         <button
                           type="button"
-                          onClick={() => handleDeleteService(srv.id)}
+                          onClick={() => {
+                            setDeleteError('');
+                            setDeleteResetKeyInput('');
+                            setDeleteTarget({
+                              type: 'service',
+                              id: srv.id,
+                              title: `Service: ${srv.name}`,
+                              subtitle: `Category: ${srv.category} • Base Price: PKR ${srv.basePrice}`
+                            });
+                          }}
                           className="text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 p-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors mt-3.5 cursor-pointer"
-                          title="Delete service permanently from catalog"
+                          title="Delete service permanently from catalog (Requires RESET_KEY)"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           <span>Delete</span>
@@ -2040,9 +2135,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <div className="pt-2 border-t border-slate-800 flex justify-end">
                         <button
                           type="button"
-                          onClick={() => handleDeleteVehicle(veh.id)}
+                          onClick={() => {
+                            setDeleteError('');
+                            setDeleteResetKeyInput('');
+                            setDeleteTarget({
+                              type: 'vehicle',
+                              id: veh.id,
+                              title: `Vehicle: ${veh.name}`,
+                              subtitle: `Base Fare: PKR ${veh.baseFare} • Rate: PKR ${veh.perKmRate}/km`
+                            });
+                          }}
                           className="text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                          title="Delete vehicle permanently from catalog"
+                          title="Delete vehicle permanently from catalog (Requires RESET_KEY)"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           <span>Gaari Delete Karein</span>
@@ -2099,7 +2203,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div>
                   <h3 className="font-black text-amber-400 text-base">KHANEWAL CONNECT SERVICES</h3>
                   <p className="text-[11px] text-slate-300">Khanewal City o mulhaqa ilaqajaat on-demand network</p>
-                  <p className="text-[10px] text-slate-400 font-mono">Helpline: 0800-6664 | 0304-0975351 | 0304-7705212</p>
+                  <p className="text-[10px] text-slate-400 font-mono">Toll-Free & Support Helpline: +92 308 4541241</p>
                 </div>
                 <div className="text-right">
                   <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${
@@ -3029,6 +3133,113 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 >
                   <span>Mehfooz o Customer ko Live Nashar Karein</span>
                   <span>✓</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Protected Item Deletion Modal (Requires GitHub Secrets RESET_KEY) */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#0e111a] border border-rose-600/40 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl">
+                  <ShieldAlert className="w-6 h-6 text-rose-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-rose-300">
+                    Protected Deletion (RESET_KEY)
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Permanent deletion authorization
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setDeleteError('');
+                  setDeleteResetKeyInput('');
+                }}
+                className="text-slate-500 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400 block">
+                Target: {deleteTarget.type.toUpperCase()}
+              </span>
+              <p className="text-sm font-bold text-white font-mono">{deleteTarget.title}</p>
+              {deleteTarget.subtitle && (
+                <p className="text-xs text-slate-400">{deleteTarget.subtitle}</p>
+              )}
+            </div>
+
+            <div className="bg-rose-950/40 border border-rose-900/60 rounded-xl p-3 text-xs text-rose-200 leading-relaxed">
+              ⚠️ <strong>Hifazati Tanbih:</strong> Ye record live database (MySQL & Cloud Firestore) aur local storage se hamesha ke liye delete ho jaye ga. Tasdeeq ke liye GitHub Secrets mein mojood <code className="text-amber-300 font-mono font-bold">RESET_KEY</code> darj karein:
+            </div>
+
+            <form onSubmit={handleConfirmProtectedDelete} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                  Enter Security Key (RESET_KEY) *
+                </label>
+                <div className="relative">
+                  <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  <input
+                    type={showDeleteResetKey ? 'text' : 'password'}
+                    required
+                    value={deleteResetKeyInput}
+                    onChange={(e) => {
+                      setDeleteResetKeyInput(e.target.value);
+                      setDeleteError('');
+                    }}
+                    placeholder="GitHub Secrets RESET_KEY enter karein..."
+                    className="w-full text-xs rounded-xl border border-slate-700 bg-slate-950 pl-9 pr-10 py-2.5 font-mono text-white placeholder:text-slate-600 focus:border-rose-400 focus:outline-hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteResetKey(!showDeleteResetKey)}
+                    className="absolute right-3 top-2.5 text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    {showDeleteResetKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {deleteError && (
+                <div className="p-3 bg-red-950/80 border border-red-500/50 rounded-xl text-xs text-red-200 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                  <span>{deleteError}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => {
+                    setDeleteTarget(null);
+                    setDeleteError('');
+                    setDeleteResetKeyInput('');
+                  }}
+                  className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isDeleting || !deleteResetKeyInput.trim()}
+                  className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-black rounded-xl shadow-lg shadow-rose-900/30 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>{isDeleting ? 'Verifying & Deleting...' : 'Confirm Delete'}</span>
                 </button>
               </div>
             </form>

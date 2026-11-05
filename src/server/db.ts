@@ -128,9 +128,9 @@ export async function initAllTables() {
         \`technician_hourly_rate\` DECIMAL(10,2) NOT NULL DEFAULT 800.00,
         \`platform_commission_rate\` DECIMAL(5,2) NOT NULL DEFAULT 15.00,
         \`platform_fixed_fee\` DECIMAL(10,2) NOT NULL DEFAULT 50.00,
-        \`whatsapp_support_phone\` VARCHAR(50) NOT NULL DEFAULT '+92 300 0009988',
+        \`whatsapp_support_phone\` VARCHAR(50) NOT NULL DEFAULT '+92 308 4541241',
         \`whatsapp_default_message\` TEXT NULL,
-        \`support_helpline\` VARCHAR(50) NOT NULL DEFAULT '0800-6664',
+        \`support_helpline\` VARCHAR(50) NOT NULL DEFAULT '+92 308 4541241',
         \`raw_json\` LONGTEXT NULL,
         \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -93,7 +93,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <span className="hidden sm:inline text-slate-700">|</span>
             <span className="hidden sm:inline text-amber-400 font-mono text-[11px] font-bold">
-              {isUrdu ? 'Helpline: 0800-6664' : 'Khanewal: 0800-6664'}
+              {isUrdu ? 'Helpline: +92 308 4541241' : 'Toll-Free: +92 308 4541241'}
             </span>
           </div>
         </div>

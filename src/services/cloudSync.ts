@@ -4,6 +4,7 @@ import {
   setDoc, 
   getDoc, 
   getDocs, 
+  deleteDoc,
   onSnapshot, 
   serverTimestamp 
 } from 'firebase/firestore';
@@ -21,28 +22,57 @@ export interface SystemCloudBackup {
 
 const BACKUP_DOC_ID = 'latest_state';
 
+// Helper to remove any undefined fields that cause Firestore setDoc() to fail
+function sanitizeData<T>(data: T): T {
+  if (data === undefined) return null as any;
+  return JSON.parse(JSON.stringify(data, (_k, v) => (v === undefined ? null : v)));
+}
+
 export const CloudSyncService = {
   // Save an individual user to Cloud Firestore (zero-loss persistence)
   async saveUser(user: User): Promise<void> {
     try {
-      await setDoc(doc(db, 'users', user.id), {
+      const cleanUser = sanitizeData({
         ...user,
         cloudUpdatedAt: serverTimestamp()
-      }, { merge: true });
+      });
+      await setDoc(doc(db, 'users', user.id), cleanUser, { merge: true });
     } catch (err) {
       console.warn(`[CloudSync] Failed to persist user ${user.id} to Firestore:`, err);
     }
   },
 
-  // Save an individual order to Cloud Firestore
+  // Save an individual order to Cloud Firestore (guaranteed zero undefined field errors)
   async saveOrder(order: Order): Promise<void> {
     try {
-      await setDoc(doc(db, 'orders', order.id), {
+      const cleanOrder = sanitizeData({
         ...order,
         cloudUpdatedAt: serverTimestamp()
-      }, { merge: true });
+      });
+      await setDoc(doc(db, 'orders', order.id), cleanOrder, { merge: true });
+      console.log(`[CloudSync] Successfully persisted order ${order.id} to Firestore!`);
     } catch (err) {
       console.warn(`[CloudSync] Failed to persist order ${order.id} to Firestore:`, err);
+    }
+  },
+
+  // Delete an individual order permanently from Cloud Firestore
+  async deleteOrder(orderId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'orders', orderId));
+      console.log(`[CloudSync] Deleted order ${orderId} from Firestore`);
+    } catch (err) {
+      console.warn(`[CloudSync] Failed to delete order ${orderId} from Firestore:`, err);
+    }
+  },
+
+  // Delete an individual user permanently from Cloud Firestore
+  async deleteUser(userId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+      console.log(`[CloudSync] Deleted user ${userId} from Firestore`);
+    } catch (err) {
+      console.warn(`[CloudSync] Failed to delete user ${userId} from Firestore:`, err);
     }
   },
 
@@ -90,10 +120,11 @@ export const CloudSyncService = {
   // Save review to Cloud Firestore
   async saveReview(review: OrderReview & { id: string; serviceName?: string }): Promise<void> {
     try {
-      await setDoc(doc(db, 'reviews', review.id), {
+      const cleanReview = sanitizeData({
         ...review,
         cloudUpdatedAt: serverTimestamp()
-      }, { merge: true });
+      });
+      await setDoc(doc(db, 'reviews', review.id), cleanReview, { merge: true });
     } catch (err) {
       console.warn(`[CloudSync] Failed to persist review ${review.id} to Firestore:`, err);
     }
@@ -106,13 +137,13 @@ export const CloudSyncService = {
     settings: SystemSettings;
   }): Promise<void> {
     try {
-      const backupPayload: SystemCloudBackup = {
+      const backupPayload: SystemCloudBackup = sanitizeData({
         users: state.users,
         orders: state.orders,
         settings: state.settings,
         updatedAt: new Date().toISOString(),
         source: 'khanewal_connect_app'
-      };
+      });
 
       await setDoc(doc(db, 'system_backups', BACKUP_DOC_ID), {
         ...backupPayload,

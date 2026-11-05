@@ -26,9 +26,9 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   technicianHourlyRate: 800,
   platformCommissionRate: 15,
   platformFixedFee: 50,
-  whatsappSupportPhone: '+92 300 0009988',
+  whatsappSupportPhone: '+92 308 4541241',
   whatsappDefaultMessage: 'Assalam-o-Alaikum! Mujhe Khanewal Connect service ke baray mein kuch maloomat chahiye/madad chahiye.',
-  supportHelpline: '0800-6664'
+  supportHelpline: '+92 308 4541241'
 };
 
 export interface KhanewalArea {
@@ -70,7 +70,7 @@ export const INITIAL_USERS: User[] = [
     id: 'usr-admin-1',
     name: 'Super Administrator',
     email: DEFAULT_ADMIN_USERNAME,
-    phone: '+92 300 0009988',
+    phone: '+92 308 4541241',
     password: DEFAULT_ADMIN_PASSWORD,
     role: 'admin',
     avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
@@ -323,35 +323,49 @@ export const Store = {
         const backendRes = await fetch('/api/sync/all-state');
         if (backendRes.ok) {
           const backendData = await backendRes.json();
-          if (backendData.success && Array.isArray(backendData.users) && backendData.users.length > 0) {
-            const userMap = new Map<string, User>();
-            // Remote backend data takes precedence
-            backendData.users.forEach((u: User) => {
-              if (u && (u.email || u.id)) {
-                userMap.set(u.email ? u.email.toLowerCase().trim() : u.id, u);
-              }
-            });
-            const localUsers = loadFromStorage<User[]>(STORAGE_KEY_USERS, INITIAL_USERS);
-            localUsers.forEach(u => {
-              const key = u.email ? u.email.toLowerCase().trim() : u.id;
-              if (!userMap.has(key)) userMap.set(key, u);
-            });
+          if (backendData.success) {
+            if (Array.isArray(backendData.users) && backendData.users.length > 0) {
+              const userMap = new Map<string, User>();
+              backendData.users.forEach((u: User) => {
+                if (u && (u.email || u.id)) {
+                  userMap.set(u.email ? u.email.toLowerCase().trim() : u.id, u);
+                }
+              });
+              const localUsers = loadFromStorage<User[]>(STORAGE_KEY_USERS, INITIAL_USERS);
+              localUsers.forEach(u => {
+                const key = u.email ? u.email.toLowerCase().trim() : u.id;
+                if (!userMap.has(key)) userMap.set(key, u);
+              });
 
-            // CRITICAL: Ensure currently logged-in user is preserved and never dropped
-            const activeUser = loadFromStorage<User | null>(STORAGE_KEY_CURRENT_USER, null);
-            if (activeUser) {
-              const activeKey = activeUser.email ? activeUser.email.toLowerCase().trim() : activeUser.id;
-              const matched = userMap.get(activeKey);
-              if (matched) {
-                const refreshed = { ...activeUser, ...matched };
-                saveToStorage(STORAGE_KEY_CURRENT_USER, refreshed);
-                userMap.set(activeKey, refreshed);
-              } else {
-                userMap.set(activeKey, activeUser);
+              // CRITICAL: Ensure currently logged-in user is preserved and never dropped
+              const activeUser = loadFromStorage<User | null>(STORAGE_KEY_CURRENT_USER, null);
+              if (activeUser) {
+                const activeKey = activeUser.email ? activeUser.email.toLowerCase().trim() : activeUser.id;
+                const matched = userMap.get(activeKey);
+                if (matched) {
+                  const refreshed = { ...activeUser, ...matched };
+                  saveToStorage(STORAGE_KEY_CURRENT_USER, refreshed);
+                  userMap.set(activeKey, refreshed);
+                } else {
+                  userMap.set(activeKey, activeUser);
+                }
               }
+
+              saveToStorage(STORAGE_KEY_USERS, Array.from(userMap.values()));
             }
 
-            saveToStorage(STORAGE_KEY_USERS, Array.from(userMap.values()));
+            // ZERO-LOSS ORDER MERGING: Merge MySQL orders with existing local orders
+            if (Array.isArray(backendData.orders) && backendData.orders.length > 0) {
+              const currentOrders = loadFromStorage<Order[]>(STORAGE_KEY_ORDERS, INITIAL_ORDERS);
+              const orderMap = new Map<string, Order>();
+              currentOrders.forEach(o => { if (o && o.id) orderMap.set(o.id, o); });
+              backendData.orders.forEach((o: Order) => { if (o && o.id) orderMap.set(o.id, o); });
+              const merged = Array.from(orderMap.values()).sort(
+                (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+              );
+              saveToStorage(STORAGE_KEY_ORDERS, merged);
+            }
+
             notifyStoreChanged();
           }
         }
@@ -394,8 +408,24 @@ export const Store = {
           saveToStorage(STORAGE_KEY_USERS, mergedUsers);
         }
 
+        // CRITICAL ZERO-LOSS: Non-destructively merge cloud orders with local orders
         if (cloudData.orders && cloudData.orders.length > 0) {
-          saveToStorage(STORAGE_KEY_ORDERS, cloudData.orders);
+          const currentOrders = loadFromStorage<Order[]>(STORAGE_KEY_ORDERS, INITIAL_ORDERS);
+          const orderMap = new Map<string, Order>();
+          // Authoritative cloud orders
+          cloudData.orders.forEach(o => { if (o && o.id) orderMap.set(o.id, o); });
+          // Ensure any local order not yet in Cloud is PRESERVED and immediately re-synced!
+          currentOrders.forEach(o => {
+            if (o && o.id && !orderMap.has(o.id)) {
+              orderMap.set(o.id, o);
+              CloudSyncService.saveOrder(o);
+              Store.syncOrderToBackend(o);
+            }
+          });
+          const merged = Array.from(orderMap.values()).sort(
+            (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+          );
+          saveToStorage(STORAGE_KEY_ORDERS, merged);
         }
 
         if (cloudData.settings) {
@@ -445,9 +475,13 @@ export const Store = {
           if (newOrders.length > 0) {
             const currentOrders = Store.getOrders();
             const map = new Map<string, Order>();
-            currentOrders.forEach(o => map.set(o.id, o));
-            newOrders.forEach(o => map.set(o.id, o));
-            saveToStorage(STORAGE_KEY_ORDERS, Array.from(map.values()));
+            // Keep local orders so freshly placed orders aren't wiped before snapshot registers them
+            currentOrders.forEach(o => { if (o && o.id) map.set(o.id, o); });
+            newOrders.forEach(o => { if (o && o.id) map.set(o.id, o); });
+            const sorted = Array.from(map.values()).sort(
+              (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+            );
+            saveToStorage(STORAGE_KEY_ORDERS, sorted);
             notifyStoreChanged();
           }
         },
@@ -494,7 +528,7 @@ export const Store = {
         id: 'usr-admin-1',
         name: 'Super Administrator',
         email: DEFAULT_ADMIN_USERNAME,
-        phone: '+92 300 0009988',
+        phone: '+92 308 4541241',
         password: DEFAULT_ADMIN_PASSWORD,
         role: 'admin',
         avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
@@ -1746,6 +1780,192 @@ export const Store = {
     return true;
   },
 
+  // Verify RESET_KEY with server & client secrets
+  verifyResetKey: async (inputKey: string): Promise<boolean> => {
+    const cleanKey = (inputKey || '').trim();
+    if (!cleanKey) return false;
+
+    try {
+      const resp = await fetch('/api/admin/verify-reset-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resetKey: cleanKey })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.valid === true || data.verified === true) return true;
+      }
+    } catch (err) {
+      console.warn('[Store] Server RESET_KEY check error, trying local check:', err);
+    }
+
+    // Client-side fallback check
+    const configuredResetKey = (typeof process !== 'undefined' && process.env?.RESET_KEY) 
+      || (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_RESET_KEY) 
+      || 'RESET_KEY';
+
+    return cleanKey === configuredResetKey.trim();
+  },
+
+  // RESET_KEY Protected Order Deletion
+  deleteOrder: async (orderId: string, resetKey: string): Promise<{ success: boolean; message: string }> => {
+    const isAuthorized = await Store.verifyResetKey(resetKey);
+    if (!isAuthorized) {
+      return {
+        success: false,
+        message: 'Ghalat Security Key! (RESET_KEY Mismatch). Order delete krne ke liye GitHub Secrets wali durust RESET_KEY darj karein.'
+      };
+    }
+
+    // 1. Delete on Backend / MySQL / Server Disk
+    try {
+      await fetch(`/api/orders/${orderId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-reset-key': resetKey.trim()
+        },
+        body: JSON.stringify({ resetKey: resetKey.trim() })
+      });
+    } catch (err) {
+      console.warn('[Store] Server order delete call error:', err);
+    }
+
+    // 2. Delete on Cloud Firestore
+    try {
+      await CloudSyncService.deleteOrder(orderId);
+    } catch (err) {
+      console.warn('[Store] Cloud Firestore order delete error:', err);
+    }
+
+    // 3. Remove locally
+    const orders = Store.getOrders();
+    const updated = orders.filter(o => o.id !== orderId);
+    saveToStorage(STORAGE_KEY_ORDERS, updated);
+    notifyStoreChanged();
+
+    return {
+      success: true,
+      message: `Order #${orderId} kamyabi se permanent delete kar diya gaya hai.`
+    };
+  },
+
+  // RESET_KEY Protected User Deletion
+  deleteUserPermanently: async (userId: string, resetKey: string): Promise<{ success: boolean; message: string }> => {
+    const isAuthorized = await Store.verifyResetKey(resetKey);
+    if (!isAuthorized) {
+      return {
+        success: false,
+        message: 'Ghalat Security Key! (RESET_KEY Mismatch). User delete krne ke liye GitHub Secrets wali durust RESET_KEY darj karein.'
+      };
+    }
+
+    // 1. Delete on Backend / MySQL / Server Disk
+    try {
+      await fetch(`/api/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-reset-key': resetKey.trim()
+        },
+        body: JSON.stringify({ resetKey: resetKey.trim() })
+      });
+    } catch (err) {
+      console.warn('[Store] Server user delete call error:', err);
+    }
+
+    // 2. Delete on Cloud Firestore
+    try {
+      await CloudSyncService.deleteUser(userId);
+    } catch (err) {
+      console.warn('[Store] Cloud Firestore user delete error:', err);
+    }
+
+    // 3. Remove locally
+    const users = Store.getUsers();
+    const target = users.find(u => u.id === userId);
+    const updated = users.filter(u => u.id !== userId);
+    saveToStorage(STORAGE_KEY_USERS, updated);
+
+    // If currently logged-in user was deleted, log out
+    const cur = Store.getCurrentUser();
+    if (cur && cur.id === userId) {
+      Store.logout();
+    }
+    notifyStoreChanged();
+
+    return {
+      success: true,
+      message: `User '${target?.name || userId}' kamyabi se permanent delete ho gaya.`
+    };
+  },
+
+  // RESET_KEY Protected Service Deletion
+  deleteServiceWithKey: async (serviceId: string, resetKey: string): Promise<{ success: boolean; message: string }> => {
+    const isAuthorized = await Store.verifyResetKey(resetKey);
+    if (!isAuthorized) {
+      return {
+        success: false,
+        message: 'Ghalat Security Key! (RESET_KEY Mismatch). Service delete krne ke liye GitHub Secrets wali durust RESET_KEY darj karein.'
+      };
+    }
+
+    try {
+      await fetch(`/api/catalog/services/${serviceId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-reset-key': resetKey.trim()
+        },
+        body: JSON.stringify({ resetKey: resetKey.trim() })
+      });
+    } catch (err) {
+      console.warn('[Store] Server service delete call error:', err);
+    }
+
+    const services = Store.getServicesCatalog();
+    const updated = services.filter(s => s.id !== serviceId);
+    Store.updateServicesCatalog(updated);
+
+    return {
+      success: true,
+      message: `Service kamyabi se catalog se delete ho gayi.`
+    };
+  },
+
+  // RESET_KEY Protected Vehicle Deletion
+  deleteVehicleWithKey: async (vehicleId: string, resetKey: string): Promise<{ success: boolean; message: string }> => {
+    const isAuthorized = await Store.verifyResetKey(resetKey);
+    if (!isAuthorized) {
+      return {
+        success: false,
+        message: 'Ghalat Security Key! (RESET_KEY Mismatch). Vehicle delete krne ke liye GitHub Secrets wali durust RESET_KEY darj karein.'
+      };
+    }
+
+    try {
+      await fetch(`/api/catalog/vehicles/${vehicleId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-reset-key': resetKey.trim()
+        },
+        body: JSON.stringify({ resetKey: resetKey.trim() })
+      });
+    } catch (err) {
+      console.warn('[Store] Server vehicle delete call error:', err);
+    }
+
+    const vehicles = Store.getVehiclesCatalog();
+    const updated = vehicles.filter(v => v.id !== vehicleId);
+    Store.updateVehiclesCatalog(updated);
+
+    return {
+      success: true,
+      message: `Vehicle kamyabi se catalog se delete ho gaya.`
+    };
+  },
+
   deleteServiceFromCatalog: (serviceId: string): boolean => {
     const services = Store.getServicesCatalog();
     const updated = services.filter(s => s.id !== serviceId);
@@ -1790,7 +2010,7 @@ export const Store = {
   verifyAndResetDatabase: (inputKey: string): { success: boolean; message: string } => {
     // Expected key from GitHub Secrets 'RESET_KEY' (via Vite env or fallback)
     const configuredResetKey = (typeof process !== 'undefined' && process.env?.RESET_KEY) 
-      || (import.meta as any).env?.VITE_RESET_KEY 
+      || (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_RESET_KEY) 
       || 'RESET_KEY';
 
     const cleanInput = (inputKey || '').trim();

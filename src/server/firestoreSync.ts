@@ -4,6 +4,7 @@ import {
   doc, 
   getDoc, 
   setDoc, 
+  deleteDoc,
   collection, 
   getDocs,
   serverTimestamp 
@@ -464,3 +465,132 @@ export async function saveCatalogToFirestore(data: { services?: any[]; vehicles?
     return false;
   }
 }
+
+// Sanitize helper to remove undefined fields before Firestore setDoc
+function sanitizeData(obj: any): any {
+  if (obj === undefined) return null;
+  return JSON.parse(JSON.stringify(obj, (_k, v) => (v === undefined ? null : v)));
+}
+
+// Fetch all orders from Cloud Firestore with zero-loss fallback to system_backups
+export async function fetchOrdersFromFirestore(): Promise<any[]> {
+  const db = getServerDb();
+  if (!db) return [];
+
+  try {
+    const orderMap = new Map<string, any>();
+    const snap = await getDocs(collection(db, 'orders'));
+    snap.forEach((d) => {
+      const o = d.data();
+      if (o && (o.id || d.id)) {
+        orderMap.set(o.id || d.id, { ...o, id: o.id || d.id });
+      }
+    });
+
+    if (orderMap.size === 0) {
+      const backupSnap = await getDoc(doc(db, 'system_backups', 'latest_state'));
+      if (backupSnap.exists()) {
+        const data = backupSnap.data();
+        if (data && Array.isArray(data.orders)) {
+          data.orders.forEach((o: any) => {
+            if (o && o.id) orderMap.set(o.id, o);
+          });
+        }
+      }
+    }
+
+    return Array.from(orderMap.values());
+  } catch (err: any) {
+    console.warn('[FirestoreSync] Error fetching orders from Firestore:', err.message);
+    return [];
+  }
+}
+
+// Persist individual order to Firestore with sanitized payload (No undefined errors)
+export async function syncOrderToFirestore(order: any): Promise<boolean> {
+  const db = getServerDb();
+  if (!db || !order || !order.id) return false;
+
+  try {
+    const cleanPayload = sanitizeData({
+      ...order,
+      cloudUpdatedAt: serverTimestamp(),
+      updatedAtIso: new Date().toISOString()
+    });
+
+    await setDoc(doc(db, 'orders', String(order.id)), cleanPayload, { merge: true });
+
+    // Also update system_backups array
+    const backupRef = doc(db, 'system_backups', 'latest_state');
+    const backupSnap = await getDoc(backupRef);
+    if (backupSnap.exists()) {
+      const data = backupSnap.data();
+      const orders = Array.isArray(data.orders) ? [...data.orders] : [];
+      const idx = orders.findIndex((o: any) => o.id === order.id);
+      if (idx >= 0) orders[idx] = cleanPayload;
+      else orders.unshift(cleanPayload);
+      await setDoc(backupRef, { orders, updatedAt: new Date().toISOString() }, { merge: true });
+    }
+
+    console.log(`[FirestoreSync] Synced order ${order.id} to Cloud Firestore!`);
+    return true;
+  } catch (err: any) {
+    console.warn(`[FirestoreSync] Failed to persist order ${order.id} to Firestore:`, err.message);
+    return false;
+  }
+}
+
+// Delete order permanently from Cloud Firestore and system_backups
+export async function deleteOrderFromFirestore(orderId: string): Promise<boolean> {
+  const db = getServerDb();
+  if (!db || !orderId) return false;
+
+  try {
+    await deleteDoc(doc(db, 'orders', String(orderId)));
+
+    // Also remove from system_backups
+    const backupRef = doc(db, 'system_backups', 'latest_state');
+    const backupSnap = await getDoc(backupRef);
+    if (backupSnap.exists()) {
+      const data = backupSnap.data();
+      if (data && Array.isArray(data.orders)) {
+        const filtered = data.orders.filter((o: any) => o.id !== orderId);
+        await setDoc(backupRef, { orders: filtered, updatedAt: new Date().toISOString() }, { merge: true });
+      }
+    }
+
+    console.log(`[FirestoreSync] Deleted order ${orderId} permanently from Cloud Firestore`);
+    return true;
+  } catch (err: any) {
+    console.warn(`[FirestoreSync] Error deleting order ${orderId} from Firestore:`, err.message);
+    return false;
+  }
+}
+
+// Delete user permanently from Cloud Firestore and system_backups
+export async function deleteUserFromFirestore(userId: string): Promise<boolean> {
+  const db = getServerDb();
+  if (!db || !userId) return false;
+
+  try {
+    await deleteDoc(doc(db, 'users', String(userId)));
+
+    // Also remove from system_backups
+    const backupRef = doc(db, 'system_backups', 'latest_state');
+    const backupSnap = await getDoc(backupRef);
+    if (backupSnap.exists()) {
+      const data = backupSnap.data();
+      if (data && Array.isArray(data.users)) {
+        const filtered = data.users.filter((u: any) => u.id !== userId);
+        await setDoc(backupRef, { users: filtered, updatedAt: new Date().toISOString() }, { merge: true });
+      }
+    }
+
+    console.log(`[FirestoreSync] Deleted user ${userId} permanently from Cloud Firestore`);
+    return true;
+  } catch (err: any) {
+    console.warn(`[FirestoreSync] Error deleting user ${userId} from Firestore:`, err.message);
+    return false;
+  }
+}
+

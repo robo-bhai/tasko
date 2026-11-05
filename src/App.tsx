@@ -286,7 +286,7 @@ export default function App() {
     ? orders.filter(o => o.assignedProviderId === currentUser.id)
     : customerOrders;
 
-  const whatsappAdminNumber = (Store.getSettings().whatsappSupportPhone || '+923000009988').replace(/[^0-9]/g, '');
+  const whatsappAdminNumber = (Store.getSettings().whatsappSupportPhone || '+923084541241').replace(/[^0-9]/g, '');
   const partnerOnboardUrl = `https://wa.me/${whatsappAdminNumber}?text=${encodeURIComponent(
     isUrdu 
       ? 'Assalam-o-Alaikum! Main Khanewal Connect par bataur service partner / karigar / driver onboard hona chahta hoon. Baraye meherbani mujhe register karein.'
@@ -437,7 +437,7 @@ export default function App() {
                     : 'Khanewal City and surrounding tehsils unified on-demand super app for store deliveries, certified home repairs, and cargo transport.'}
                 </p>
                 <div className="text-[11px] text-slate-300 font-medium space-y-1">
-                  <div>📞 {isUrdu ? 'Khanewal Helpline: 0800-6664' : 'Khanewal Helpline: 0800-6664'}</div>
+                  <div>📞 {isUrdu ? 'Khanewal Helpline: +92 308 4541241' : 'Toll-Free Helpline: +92 308 4541241'}</div>
                   <div>✉️ support@khanewalconnect.pk</div>
                 </div>
               </div>
