@@ -3,18 +3,18 @@ import {
   Home, 
   ShoppingBag, 
   Plus, 
-  Wallet, 
+  Store as StoreIcon, 
   User as UserIcon,
   Sparkles,
   ShieldCheck,
-  CreditCard,
-  Phone,
   X,
   LogOut,
   CheckCircle2
 } from 'lucide-react';
 import { User, Order } from '../types';
 import { Store } from '../services/store';
+
+const STORE_URL = 'https://uqn88.store/shop';
 
 interface BottomNavigationProps {
   currentUser: User | null;
@@ -37,15 +37,14 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   onLogout,
   isUrdu
 }) => {
-  const [activeTab, setActiveTab] = useState<'home' | 'orders' | 'wallet' | 'profile'>('home');
-  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'home' | 'orders' | 'profile'>('home');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   const pendingActiveCount = activeOrders.filter(
     o => o.status !== 'completed' && o.status !== 'cancelled'
   ).length;
 
-  const handleTabClick = (tab: 'home' | 'orders' | 'wallet' | 'profile') => {
+  const handleTabClick = (tab: 'home' | 'orders' | 'profile') => {
     setActiveTab(tab);
     if (tab === 'home') {
       onNavigateHome();
@@ -56,8 +55,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       } else {
         onOpenOrders();
       }
-    } else if (tab === 'wallet') {
-      setIsWalletModalOpen(true);
     } else if (tab === 'profile') {
       if (!currentUser) {
         onOpenAuth('login', isUrdu ? 'Profile dekhne ke liye login karein' : 'Please sign in to view your profile');
@@ -65,6 +62,10 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         setIsProfileModalOpen(true);
       }
     }
+  };
+
+  const handleOpenStore = () => {
+    window.open(STORE_URL, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -122,15 +123,14 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             </span>
           </div>
 
-          {/* 4. Wallet */}
+          {/* 4. Store (external shop link) */}
           <button
-            onClick={() => handleTabClick('wallet')}
-            className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer touch-manipulation ${
-              activeTab === 'wallet' ? 'text-amber-400 font-bold' : 'text-slate-400 hover:text-slate-200'
-            }`}
+            onClick={handleOpenStore}
+            aria-label="Shop"
+            className="flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all cursor-pointer touch-manipulation text-slate-400 hover:text-slate-200"
           >
-            <Wallet className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px] tracking-tight">{isUrdu ? 'Wallet' : 'Wallet'}</span>
+            <StoreIcon className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px] tracking-tight">{isUrdu ? 'Store' : 'Store'}</span>
           </button>
 
           {/* 5. Profile */}
@@ -148,93 +148,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
         </div>
       </nav>
-
-      {/* Wallet Modal */}
-      {isWalletModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-[#0e1017] rounded-3xl max-w-sm w-full border border-amber-500/40 p-5 shadow-2xl text-white space-y-4 max-h-[94vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400">
-                  <Wallet className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-white">
-                    {isUrdu ? 'Khanewal SafePay Wallet' : 'Khanewal SafePay Wallet'}
-                  </h3>
-                  <p className="text-[10px] text-amber-400/80">
-                    {isUrdu ? '100% Shafaf aur mehfooz adaigiyan' : '100% Protected Escrow'}
-                  </p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setIsWalletModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Current Balance & COD Card */}
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-[#1a1712] to-[#12131b] border border-amber-500/30 space-y-2">
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">
-                {isUrdu ? 'Dastiyab Sahoolat' : 'Available Payment Method'}
-              </span>
-              <div className="flex items-baseline justify-between">
-                <span className="text-xl font-black text-amber-400 font-mono">
-                  {isUrdu ? 'Cash on Delivery (COD)' : 'Cash on Delivery (COD)'}
-                </span>
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold">
-                  {isUrdu ? 'Active' : 'Active'}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-300 leading-relaxed">
-                {isUrdu 
-                  ? 'Kaam mukammal hone aur aap ke mutmain hone ke baad raqam karigar ya rider ko ada karein. Koi chhupe charges nahi.' 
-                  : 'Pay directly after job completion and your complete satisfaction.'}
-              </p>
-            </div>
-
-            {/* Supported digital channels */}
-            <div className="space-y-2 text-xs">
-              <span className="text-[11px] font-bold text-slate-300">
-                {isUrdu ? 'Digital Adaigiyan Bazariya:' : 'Digital Payment Options:'}
-              </span>
-              <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
-                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-200">
-                  <CreditCard className="w-4 h-4 mx-auto mb-1 text-amber-400" />
-                  <span className="font-bold block">JazzCash</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-200">
-                  <CreditCard className="w-4 h-4 mx-auto mb-1 text-emerald-400" />
-                  <span className="font-bold block">EasyPaisa</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-200">
-                  <ShieldCheck className="w-4 h-4 mx-auto mb-1 text-sky-400" />
-                  <span className="font-bold block">Raast Bank</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Trust note */}
-            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2 text-[11px] text-amber-300">
-              <ShieldCheck className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
-              <span>
-                {isUrdu
-                  ? 'Aap ka aitemad hi hamari pehchan hai. Kisi bhi issue ke liye Admin WhatsApp 24/7 dastiyab hai.'
-                  : 'Your trust is our reputation. 24/7 Admin dispute protection guarantee.'}
-              </span>
-            </div>
-
-            <button
-              onClick={() => setIsWalletModalOpen(false)}
-              className="w-full py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-md cursor-pointer"
-            >
-              {isUrdu ? 'Theek Hai' : 'Got It'}
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Profile Modal */}
       {isProfileModalOpen && currentUser && (
