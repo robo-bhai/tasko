@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { User, Order } from '../types';
 import { Store } from '../services/store';
+import { StoreViewer } from './StoreViewer';
 
 const STORE_URL = 'https://uqn88.store/shop';
 
@@ -39,6 +40,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'home' | 'orders' | 'profile'>('home');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isStoreOpen, setIsStoreOpen] = useState(false);
 
   const pendingActiveCount = activeOrders.filter(
     o => o.status !== 'completed' && o.status !== 'cancelled'
@@ -65,7 +67,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   };
 
   const handleOpenStore = () => {
-    window.open(STORE_URL, '_blank', 'noopener,noreferrer');
+    setIsStoreOpen(true);
   };
 
   return (
@@ -148,6 +150,15 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
         </div>
       </nav>
+
+      {/* In-app store with branded loading animation */}
+      {isStoreOpen && (
+        <StoreViewer
+          url={STORE_URL}
+          isUrdu={isUrdu}
+          onClose={() => setIsStoreOpen(false)}
+        />
+      )}
 
       {/* Profile Modal */}
       {isProfileModalOpen && currentUser && (

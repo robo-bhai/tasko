@@ -8,6 +8,52 @@
   --android-bottom-inset: 0px;
 }
 
+/* Root shell = exact visible height (see src/utils/viewport.ts).
+   100dvh is only the fallback before JS runs. Never use 100vh here. */
+.app-shell {
+  height: var(--app-height, 100dvh);
+  max-height: var(--app-height, 100dvh);
+}
+
+@keyframes kc-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes kc-bar {
+  0%   { left: -40%; }
+  100% { left: 100%; }
+}
+@keyframes kc-bag {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50%      { transform: translateY(-8px) rotate(4deg); }
+}
+@keyframes kc-glow {
+  0%, 100% { opacity: .35; transform: scale(1); }
+  50%      { opacity: .75; transform: scale(1.15); }
+}
+.kc-skel {
+  position: relative;
+  overflow: hidden;
+  background: rgba(148, 163, 184, 0.12);
+  border-radius: 6px;
+}
+.kc-skel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.22), transparent);
+  animation: kc-shimmer 1.4s ease-in-out infinite;
+}
+.kc-bar {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 40%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, #fbbf24, transparent);
+  animation: kc-bar 1.2s ease-in-out infinite;
+}
+
 @layer base {
   html, body, #root {
     direction: ltr !important;

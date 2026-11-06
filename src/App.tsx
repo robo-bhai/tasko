@@ -300,7 +300,7 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen max-h-screen h-[100dvh] max-h-[100dvh] w-full flex flex-col overflow-hidden bg-[#07080c] text-slate-100 font-sans selection:bg-amber-400 selection:text-slate-950 ltr" dir="ltr">
+    <div className="app-shell w-full flex flex-col overflow-hidden bg-[#07080c] text-slate-100 font-sans selection:bg-amber-400 selection:text-slate-950 ltr" dir="ltr">
       {/* 1. 100% Static Top Bar Navigation */}
       <div className="shrink-0 z-30 w-full sticky top-0 bg-[#090a0f] border-b border-amber-500/20">
         <Navbar
