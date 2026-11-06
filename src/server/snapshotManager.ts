@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { isDbConnected, query } from './db.js';
+import { isDbConnected, query, rowToOrder } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,6 +38,8 @@ export interface SystemSnapshotPayload {
     vehicles: any[];
   };
 }
+
+const num = (v: any, d: number) => (v === '' || v == null || isNaN(Number(v)) ? d : Number(v));
 
 export interface DiskState {
   users: any[];
@@ -136,48 +138,21 @@ export async function createFullSnapshot(
       // 2. Fetch Orders
       const orderRows = await query('SELECT * FROM orders ORDER BY created_at DESC');
       if (Array.isArray(orderRows) && orderRows.length > 0) {
-        orders = orderRows.map(r => ({
-          id: r.id,
-          category: r.category,
-          customerId: r.customer_id,
-          customerName: r.customer_name,
-          customerPhone: r.customer_phone,
-          deliveryAddress: r.delivery_address,
-          status: r.status,
-          pricing: {
-            baseFee: Number(r.pricing_base) || 0,
-            serviceOrDeliveryFee: Number(r.pricing_service_delivery) || 0,
-            itemOrDistanceBudget: Number(r.pricing_item_budget) || 0,
-            helperFee: Number(r.pricing_helper) || 0,
-            platformFee: Number(r.pricing_platform) || 0,
-            total: Number(r.pricing_total) || 0
-          },
-          paymentMethod: r.payment_method,
-          paymentStatus: r.payment_status,
-          assignedProviderId: r.assigned_provider_id,
-          assignedProviderName: r.assigned_provider_name,
-          assignedProviderPhone: r.assigned_provider_phone,
-          assignedProviderAvatar: r.assigned_provider_avatar,
-          assignedProviderRating: Number(r.assigned_provider_rating) || 5.0,
-          etaMinutes: Number(r.eta_minutes) || 25,
-          currentStepIndex: Number(r.current_step_index) || 0,
-          createdAt: r.created_at,
-          updatedAt: r.updated_at
-        }));
+        orders = orderRows.map((r: any) => rowToOrder(r));
       }
 
       // 3. Fetch Settings
-      const settingRows = await query('SELECT * FROM app_settings WHERE id = "default_config" LIMIT 1');
+      const settingRows = await query('SELECT * FROM app_settings WHERE id = "global" LIMIT 1');
       if (Array.isArray(settingRows) && settingRows.length > 0) {
         const s = settingRows[0];
         settings = {
-          deliveryBaseFee: Number(s.delivery_base_fee) || 200,
-          deliveryPerKmFee: Number(s.delivery_per_km_fee) || 35,
-          deliveryUrgentFee: Number(s.delivery_urgent_fee) || 150,
-          technicianVisitingFee: Number(s.technician_visiting_fee) || 500,
-          technicianHourlyRate: Number(s.technician_hourly_rate) || 800,
-          platformCommissionRate: Number(s.platform_commission_rate) || 15,
-          platformFixedFee: Number(s.platform_fixed_fee) || 50,
+          deliveryBaseFee: num(s.delivery_base_fee, 200),
+          deliveryPerKmFee: num(s.delivery_per_km_fee, 35),
+          deliveryUrgentFee: num(s.delivery_urgent_fee, 150),
+          technicianVisitingFee: num(s.technician_visiting_fee, 500),
+          technicianHourlyRate: num(s.technician_hourly_rate, 800),
+          platformCommissionRate: num(s.platform_commission_rate, 15),
+          platformFixedFee: num(s.platform_fixed_fee, 50),
           whatsappSupportPhone: s.whatsapp_support_phone || '+92 308 4541241',
           whatsappDefaultMessage: s.whatsapp_default_message || '',
           supportHelpline: s.support_helpline || '+92 308 4541241'
@@ -413,8 +388,8 @@ export async function restoreFromSnapshot(snapshotPayload: any): Promise<{
             status, pricing_base, pricing_service_delivery, pricing_item_budget,
             pricing_helper, pricing_platform, pricing_total, payment_method, payment_status,
             assigned_provider_id, assigned_provider_name, assigned_provider_phone,
-            assigned_provider_avatar, assigned_provider_rating, eta_minutes, current_step_index
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            assigned_provider_avatar, assigned_provider_rating, eta_minutes, current_step_index, raw_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON DUPLICATE KEY UPDATE
             category = VALUES(category),
             customer_name = VALUES(customer_name),
@@ -435,7 +410,8 @@ export async function restoreFromSnapshot(snapshotPayload: any): Promise<{
             assigned_provider_avatar = VALUES(assigned_provider_avatar),
             assigned_provider_rating = VALUES(assigned_provider_rating),
             eta_minutes = VALUES(eta_minutes),
-            current_step_index = VALUES(current_step_index)
+            current_step_index = VALUES(current_step_index),
+            raw_json = VALUES(raw_json)
         `, [
           o.id,
           o.category || 'custom_delivery',
@@ -458,7 +434,8 @@ export async function restoreFromSnapshot(snapshotPayload: any): Promise<{
           o.assignedProviderAvatar || o.assigned_provider_avatar || null,
           Number(o.assignedProviderRating ?? o.assigned_provider_rating) || 5.0,
           Number(o.etaMinutes ?? o.eta_minutes) || 25,
-          Number(o.currentStepIndex ?? o.current_step_index) || 0
+          Number(o.currentStepIndex ?? o.current_step_index) || 0,
+          JSON.stringify(o)
         ]);
         ordersRestored++;
       }
@@ -470,7 +447,7 @@ export async function restoreFromSnapshot(snapshotPayload: any): Promise<{
             id, delivery_base_fee, delivery_per_km_fee, delivery_urgent_fee,
             technician_visiting_fee, technician_hourly_rate, platform_commission_rate,
             platform_fixed_fee, whatsapp_support_phone, whatsapp_default_message, support_helpline, raw_json
-          ) VALUES ("default_config", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES ("global", ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON DUPLICATE KEY UPDATE
             delivery_base_fee = VALUES(delivery_base_fee),
             delivery_per_km_fee = VALUES(delivery_per_km_fee),
@@ -484,13 +461,13 @@ export async function restoreFromSnapshot(snapshotPayload: any): Promise<{
             support_helpline = VALUES(support_helpline),
             raw_json = VALUES(raw_json)
         `, [
-          Number(settings.deliveryBaseFee) || 200.0,
-          Number(settings.deliveryPerKmFee) || 35.0,
-          Number(settings.deliveryUrgentFee) || 150.0,
-          Number(settings.technicianVisitingFee) || 500.0,
-          Number(settings.technicianHourlyRate) || 800.0,
-          Number(settings.platformCommissionRate) || 15.0,
-          Number(settings.platformFixedFee) || 50.0,
+          num(settings.deliveryBaseFee, 200),
+          num(settings.deliveryPerKmFee, 35),
+          num(settings.deliveryUrgentFee, 150),
+          num(settings.technicianVisitingFee, 500),
+          num(settings.technicianHourlyRate, 800),
+          num(settings.platformCommissionRate, 15),
+          num(settings.platformFixedFee, 50),
           settings.whatsappSupportPhone || '+92 308 4541241',
           settings.whatsappDefaultMessage || '',
           settings.supportHelpline || '+92 308 4541241',

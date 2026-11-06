@@ -163,6 +163,9 @@ export interface Order {
   
   // Feedback
   review?: OrderReview;
+
+  // Set once the provider wallet has been credited (prevents double credit if admin re-completes)
+  walletCredited?: boolean;
 }
 
 export interface HomeServiceItem {

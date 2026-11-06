@@ -3,7 +3,7 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { initDbPool, isDbConnected, query } from './src/server/db.js';
+import { initDbPool, isDbConnected, query, rowToOrder } from './src/server/db.js';
 import { 
   initPasswordResetsTable, 
   createPasswordResetToken, 
@@ -26,6 +26,8 @@ dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const num = (v: any, d: number) => (v === '' || v == null || isNaN(Number(v)) ? d : Number(v));
 
 // In-memory fallback cache if MySQL is temporarily offline
 let memoryUsers: any[] = [];
@@ -116,7 +118,7 @@ async function startServer() {
         const [users, orders, settings] = await Promise.all([
           query('SELECT * FROM users ORDER BY created_at ASC'),
           query('SELECT * FROM orders ORDER BY created_at DESC'),
-          query('SELECT * FROM app_settings WHERE id = "default_config" LIMIT 1')
+          query('SELECT * FROM app_settings WHERE id = "global" LIMIT 1')
         ]);
 
         if (Array.isArray(users) && users.length > 0) {
@@ -145,34 +147,7 @@ async function startServer() {
         }
 
         if (Array.isArray(orders) && orders.length > 0) {
-          memoryOrders = orders.map(r => ({
-            id: r.id,
-            category: r.category,
-            customerId: r.customer_id,
-            customerName: r.customer_name,
-            customerPhone: r.customer_phone,
-            deliveryAddress: r.delivery_address,
-            status: r.status,
-            pricing: {
-              baseFee: Number(r.pricing_base) || 0,
-              serviceOrDeliveryFee: Number(r.pricing_service_delivery) || 0,
-              itemOrDistanceBudget: Number(r.pricing_item_budget) || 0,
-              helperFee: Number(r.pricing_helper) || 0,
-              platformFee: Number(r.pricing_platform) || 0,
-              total: Number(r.pricing_total) || 0
-            },
-            paymentMethod: r.payment_method,
-            paymentStatus: r.payment_status,
-            assignedProviderId: r.assigned_provider_id,
-            assignedProviderName: r.assigned_provider_name,
-            assignedProviderPhone: r.assigned_provider_phone,
-            assignedProviderAvatar: r.assigned_provider_avatar,
-            assignedProviderRating: Number(r.assigned_provider_rating) || 5.0,
-            etaMinutes: Number(r.eta_minutes) || 25,
-            currentStepIndex: Number(r.current_step_index) || 0,
-            createdAt: r.created_at,
-            updatedAt: r.updated_at
-          }));
+          memoryOrders = orders.map((r: any) => rowToOrder(r));
           saveDiskPersistentState({ orders: memoryOrders });
           console.log(`[MySQL Boot] Loaded ${memoryOrders.length} orders from MySQL.`);
         }
@@ -180,13 +155,13 @@ async function startServer() {
         if (Array.isArray(settings) && settings.length > 0) {
           const s = settings[0];
           memorySettings = {
-            deliveryBaseFee: Number(s.delivery_base_fee) || 200,
-            deliveryPerKmFee: Number(s.delivery_per_km_fee) || 35,
-            deliveryUrgentFee: Number(s.delivery_urgent_fee) || 150,
-            technicianVisitingFee: Number(s.technician_visiting_fee) || 500,
-            technicianHourlyRate: Number(s.technician_hourly_rate) || 800,
-            platformCommissionRate: Number(s.platform_commission_rate) || 15,
-            platformFixedFee: Number(s.platform_fixed_fee) || 50,
+            deliveryBaseFee: num(s.delivery_base_fee, 200),
+            deliveryPerKmFee: num(s.delivery_per_km_fee, 35),
+            deliveryUrgentFee: num(s.delivery_urgent_fee, 150),
+            technicianVisitingFee: num(s.technician_visiting_fee, 500),
+            technicianHourlyRate: num(s.technician_hourly_rate, 800),
+            platformCommissionRate: num(s.platform_commission_rate, 15),
+            platformFixedFee: num(s.platform_fixed_fee, 50),
             whatsappSupportPhone: s.whatsapp_support_phone || '+92 308 4541241',
             whatsappDefaultMessage: s.whatsapp_default_message || '',
             supportHelpline: s.support_helpline || '+92 308 4541241'
@@ -317,13 +292,13 @@ async function startServer() {
         if (rows && rows.length > 0) {
           const r = rows[0] as any;
           const dbSettings = {
-            deliveryBaseFee: Number(r.delivery_base_fee) || 200,
-            deliveryPerKmFee: Number(r.delivery_per_km_fee) || 35,
-            deliveryUrgentFee: Number(r.delivery_urgent_fee) || 150,
-            technicianVisitingFee: Number(r.technician_visiting_fee) || 500,
-            technicianHourlyRate: Number(r.technician_hourly_rate) || 800,
-            platformCommissionRate: Number(r.platform_commission_rate) || 15,
-            platformFixedFee: Number(r.platform_fixed_fee) || 50,
+            deliveryBaseFee: num(r.delivery_base_fee, 200),
+            deliveryPerKmFee: num(r.delivery_per_km_fee, 35),
+            deliveryUrgentFee: num(r.delivery_urgent_fee, 150),
+            technicianVisitingFee: num(r.technician_visiting_fee, 500),
+            technicianHourlyRate: num(r.technician_hourly_rate, 800),
+            platformCommissionRate: num(r.platform_commission_rate, 15),
+            platformFixedFee: num(r.platform_fixed_fee, 50),
             whatsappSupportPhone: r.whatsapp_support_phone || '+92 308 4541241',
             whatsappDefaultMessage: r.whatsapp_default_message || 'Assalam-o-Alaikum! Mujhe Khanewal Connect service ke baray mein kuch maloomat chahiye/madad chahiye.',
             supportHelpline: r.support_helpline || '+92 308 4541241'
@@ -405,13 +380,13 @@ async function startServer() {
             support_helpline = VALUES(support_helpline),
             raw_json = VALUES(raw_json)
         `, [
-          Number(merged.deliveryBaseFee) || 200,
-          Number(merged.deliveryPerKmFee) || 35,
-          Number(merged.deliveryUrgentFee) || 150,
-          Number(merged.technicianVisitingFee) || 500,
-          Number(merged.technicianHourlyRate) || 800,
-          Number(merged.platformCommissionRate) || 15,
-          Number(merged.platformFixedFee) || 50,
+          num(merged.deliveryBaseFee, 200),
+          num(merged.deliveryPerKmFee, 35),
+          num(merged.deliveryUrgentFee, 150),
+          num(merged.technicianVisitingFee, 500),
+          num(merged.technicianHourlyRate, 800),
+          num(merged.platformCommissionRate, 15),
+          num(merged.platformFixedFee, 50),
           String(merged.whatsappSupportPhone || '+92 308 4541241'),
           String(merged.whatsappDefaultMessage || ''),
           String(merged.supportHelpline || '+92 308 4541241'),
@@ -439,6 +414,30 @@ async function startServer() {
   // =========================================================================
   app.get('/api/catalog', async (req: Request, res: Response) => {
     try {
+      // 1. MySQL is the source of truth (survives server restarts / new runners)
+      if (isDbConnected()) {
+        try {
+          const parseRow = (r: any) => {
+            try { return JSON.parse(r.raw_json || '{}'); } catch { return null; }
+          };
+          const sRows = await query('SELECT * FROM catalog_services');
+          const vRows = await query('SELECT * FROM catalog_vehicles');
+          const dbServices = sRows.map(parseRow).filter((x: any) => x && x.id);
+          const dbVehicles = vRows.map(parseRow).filter((x: any) => x && x.id);
+          if (dbServices.length > 0 || dbVehicles.length > 0) {
+            return res.json({
+              success: true,
+              source: 'mysql',
+              services: dbServices.length > 0 ? dbServices : undefined,
+              vehicles: dbVehicles.length > 0 ? dbVehicles : undefined
+            });
+          }
+        } catch (err: any) {
+          console.warn('[API /api/catalog] MySQL read note:', err.message);
+        }
+      }
+
+      // 2. Disk fallback
       const disk = loadDiskPersistentState();
       if (disk.services || disk.vehicles) {
         return res.json({ success: true, services: disk.services, vehicles: disk.vehicles, source: 'disk' });
@@ -458,8 +457,8 @@ async function startServer() {
           for (const s of services) {
             if (!s.id || !s.name) continue;
             await query(`
-              INSERT INTO catalog_services (id, name, category, base_price, estimated_duration, description, is_published, raw_json)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              INSERT INTO catalog_services (id, name, category, base_price, estimated_duration, description, is_published, assigned_provider_id, assigned_provider_name, raw_json)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
               ON DUPLICATE KEY UPDATE
                 name = VALUES(name),
                 category = VALUES(category),
@@ -467,6 +466,8 @@ async function startServer() {
                 estimated_duration = VALUES(estimated_duration),
                 description = VALUES(description),
                 is_published = VALUES(is_published),
+                assigned_provider_id = VALUES(assigned_provider_id),
+                assigned_provider_name = VALUES(assigned_provider_name),
                 raw_json = VALUES(raw_json)
             `, [
               s.id,
@@ -476,6 +477,8 @@ async function startServer() {
               s.estimatedDuration || s.estimated_duration || '60 mins',
               s.description || '',
               s.isPublished === false ? 0 : 1,
+              s.assignedProviderId || null,
+              s.assignedProviderName || null,
               JSON.stringify(s)
             ]);
           }
@@ -484,8 +487,8 @@ async function startServer() {
           for (const v of vehicles) {
             if (!v.id || !v.name) continue;
             await query(`
-              INSERT INTO catalog_vehicles (id, name, capacity_kg, dimensions, base_fare, per_km_rate, helper_rate, is_published, raw_json)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+              INSERT INTO catalog_vehicles (id, name, capacity_kg, dimensions, base_fare, per_km_rate, helper_rate, is_published, assigned_provider_id, assigned_provider_name, raw_json)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
               ON DUPLICATE KEY UPDATE
                 name = VALUES(name),
                 capacity_kg = VALUES(capacity_kg),
@@ -494,6 +497,8 @@ async function startServer() {
                 per_km_rate = VALUES(per_km_rate),
                 helper_rate = VALUES(helper_rate),
                 is_published = VALUES(is_published),
+                assigned_provider_id = VALUES(assigned_provider_id),
+                assigned_provider_name = VALUES(assigned_provider_name),
                 raw_json = VALUES(raw_json)
             `, [
               v.id,
@@ -504,6 +509,8 @@ async function startServer() {
               Number(v.perKmRate || v.per_km_rate) || 0,
               Number(v.helperRate || v.helper_rate) || 400,
               v.isPublished === false ? 0 : 1,
+              v.assignedProviderId || null,
+              v.assignedProviderName || null,
               JSON.stringify(v)
             ]);
           }
@@ -1096,22 +1103,44 @@ async function startServer() {
       return res.json({ success: true, source: 'memory', orders: memoryOrders });
     }
     try {
-      const orders = await query(`SELECT * FROM orders ORDER BY created_at DESC`);
-      res.json({ success: true, source: 'mysql', orders });
+      const rows = await query(`SELECT * FROM orders ORDER BY created_at DESC`);
+      res.json({ success: true, source: 'mysql', orders: rows.map((r: any) => rowToOrder(r)) });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message, orders: memoryOrders });
     }
   });
 
   app.post('/api/orders', async (req: Request, res: Response) => {
-    const order = req.body;
+    let order = req.body;
     if (!order || !order.id) {
       return res.status(400).json({ success: false, error: 'Invalid order' });
     }
 
+    // Status / step / provider / timeline of an EXISTING order can only change through
+    // PATCH /api/orders/:id/status. A stale POST (old copy from another device) must never undo them.
     const idx = memoryOrders.findIndex(o => o.id === order.id);
-    if (idx >= 0) memoryOrders[idx] = order;
-    else memoryOrders.unshift(order);
+    let isExisting = idx >= 0;
+    if (isExisting) {
+      const ex = memoryOrders[idx];
+      order = {
+        ...order,
+        status: ex.status,
+        currentStepIndex: ex.currentStepIndex,
+        timeline: ex.timeline ?? order.timeline,
+        assignedProviderId: ex.assignedProviderId,
+        assignedProviderName: ex.assignedProviderName,
+        assignedProviderPhone: ex.assignedProviderPhone,
+        assignedProviderAvatar: ex.assignedProviderAvatar,
+        assignedProviderRating: ex.assignedProviderRating,
+        etaMinutes: ex.etaMinutes,
+        paymentStatus: ex.paymentStatus,
+        walletCredited: !!(ex.walletCredited || order.walletCredited),
+        updatedAt: ex.updatedAt || order.updatedAt
+      };
+      memoryOrders[idx] = order;
+    } else {
+      memoryOrders.unshift(order);
+    }
 
     // 1. Immediately persist to server disk storage (Guarantees zero data loss across restarts)
     saveDiskPersistentState({ orders: memoryOrders });
@@ -1145,14 +1174,13 @@ async function startServer() {
           status, pricing_base, pricing_service_delivery, pricing_item_budget,
           pricing_helper, pricing_platform, pricing_total, payment_method, payment_status,
           assigned_provider_id, assigned_provider_name, assigned_provider_phone,
-          assigned_provider_avatar, assigned_provider_rating, eta_minutes, current_step_index
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          assigned_provider_avatar, assigned_provider_rating, eta_minutes, current_step_index, raw_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           category = VALUES(category),
           customer_name = VALUES(customer_name),
           customer_phone = VALUES(customer_phone),
           delivery_address = VALUES(delivery_address),
-          status = VALUES(status),
           pricing_base = VALUES(pricing_base),
           pricing_service_delivery = VALUES(pricing_service_delivery),
           pricing_item_budget = VALUES(pricing_item_budget),
@@ -1160,14 +1188,7 @@ async function startServer() {
           pricing_platform = VALUES(pricing_platform),
           pricing_total = VALUES(pricing_total),
           payment_method = VALUES(payment_method),
-          payment_status = VALUES(payment_status),
-          assigned_provider_id = VALUES(assigned_provider_id),
-          assigned_provider_name = VALUES(assigned_provider_name),
-          assigned_provider_phone = VALUES(assigned_provider_phone),
-          assigned_provider_avatar = VALUES(assigned_provider_avatar),
-          assigned_provider_rating = VALUES(assigned_provider_rating),
-          eta_minutes = VALUES(eta_minutes),
-          current_step_index = VALUES(current_step_index)
+          raw_json = VALUES(raw_json)
       `, [
         order.id,
         order.category || 'custom_delivery',
@@ -1190,7 +1211,8 @@ async function startServer() {
         order.assignedProviderAvatar || null,
         Number(order.assignedProviderRating) || 5.0,
         Number(order.etaMinutes) || 30,
-        Number(order.currentStepIndex) || 0
+        Number(order.currentStepIndex) || 0,
+        JSON.stringify(order)
       ]);
 
       // Automatically capture snapshot at workflow end
@@ -1208,6 +1230,14 @@ async function startServer() {
   app.patch('/api/orders/:id/status', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { status, stepIndex, assignedProviderId, assignedProviderName, assignedProviderPhone, etaMinutes, note } = req.body;
+    // Provider avatar / rating used to travel inside POST /api/orders. Now they travel with the PATCH.
+    const providerUser = assignedProviderId ? memoryUsers.find((u: any) => u && u.id === assignedProviderId) : null;
+    const assignedProviderAvatar = req.body.assignedProviderAvatar !== undefined
+      ? req.body.assignedProviderAvatar
+      : (providerUser ? providerUser.avatar : undefined);
+    const assignedProviderRating = req.body.assignedProviderRating !== undefined
+      ? Number(req.body.assignedProviderRating)
+      : (providerUser && providerUser.rating ? Number(providerUser.rating) : undefined);
 
     if (!status) {
       return res.status(400).json({ success: false, error: 'Status is required' });
@@ -1219,12 +1249,15 @@ async function startServer() {
       const existing = memoryOrders[oIdx];
       const timeFormatted = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const timeline = Array.isArray(existing.timeline) ? [...existing.timeline] : [];
-      timeline.push({
-        status,
-        label: `Status: ${status}`,
-        timestamp: timeFormatted,
-        note: note || `Status changed to ${status}`
-      });
+      const entry = req.body.timelineEntry;
+      timeline.push(entry && typeof entry === 'object' && entry.status
+        ? entry
+        : {
+            status,
+            label: `Status: ${status}`,
+            timestamp: timeFormatted,
+            note: note || `Status changed to ${status}`
+          });
 
       updatedOrder = {
         ...existing,
@@ -1233,6 +1266,8 @@ async function startServer() {
         assignedProviderId: assignedProviderId !== undefined ? assignedProviderId : existing.assignedProviderId,
         assignedProviderName: assignedProviderName !== undefined ? assignedProviderName : existing.assignedProviderName,
         assignedProviderPhone: assignedProviderPhone !== undefined ? assignedProviderPhone : existing.assignedProviderPhone,
+        assignedProviderAvatar: assignedProviderAvatar !== undefined ? assignedProviderAvatar : existing.assignedProviderAvatar,
+        assignedProviderRating: assignedProviderRating !== undefined ? assignedProviderRating : existing.assignedProviderRating,
         etaMinutes: etaMinutes !== undefined ? Number(etaMinutes) : existing.etaMinutes,
         updatedAt: new Date().toISOString(),
         timeline,
@@ -1251,8 +1286,11 @@ async function startServer() {
               assigned_provider_id = COALESCE(?, assigned_provider_id),
               assigned_provider_name = COALESCE(?, assigned_provider_name),
               assigned_provider_phone = COALESCE(?, assigned_provider_phone),
+              assigned_provider_avatar = COALESCE(?, assigned_provider_avatar),
+              assigned_provider_rating = COALESCE(?, assigned_provider_rating),
               eta_minutes = COALESCE(?, eta_minutes),
               payment_status = CASE WHEN ? = 'completed' THEN 'paid' ELSE payment_status END,
+              raw_json = COALESCE(?, raw_json),
               updated_at = NOW()
           WHERE id = ?
         `, [
@@ -1261,8 +1299,11 @@ async function startServer() {
           assignedProviderId || null,
           assignedProviderName || null,
           assignedProviderPhone || null,
+          assignedProviderAvatar || null,
+          assignedProviderRating !== undefined && !isNaN(assignedProviderRating) ? assignedProviderRating : null,
           etaMinutes !== undefined ? Number(etaMinutes) : null,
           status,
+          updatedOrder ? JSON.stringify(updatedOrder) : null,
           id
         ]);
         console.log(`[MySQL Orders] Status updated on order #${id} -> ${status}`);
@@ -1417,48 +1458,19 @@ async function startServer() {
         FROM users
       `);
 
-      // Merge MySQL orders and memoryOrders
+      // MySQL is authoritative. memoryOrders only fills in orders that are not in MySQL yet.
       const orderMap = new Map<string, any>();
-      memoryOrders.forEach(o => { if (o && o.id) orderMap.set(o.id, o); });
       try {
         const dbOrders = await query('SELECT * FROM orders ORDER BY created_at DESC');
         if (Array.isArray(dbOrders)) {
           dbOrders.forEach((r: any) => {
-            if (r && r.id && !orderMap.has(r.id)) {
-              orderMap.set(r.id, {
-                id: r.id,
-                category: r.category,
-                customerId: r.customer_id,
-                customerName: r.customer_name,
-                customerPhone: r.customer_phone,
-                deliveryAddress: r.delivery_address,
-                status: r.status,
-                pricing: {
-                  baseFee: Number(r.pricing_base) || 0,
-                  serviceOrDeliveryFee: Number(r.pricing_service_delivery) || 0,
-                  itemOrDistanceBudget: Number(r.pricing_item_budget) || 0,
-                  helperFee: Number(r.pricing_helper) || 0,
-                  platformFee: Number(r.pricing_platform) || 0,
-                  total: Number(r.pricing_total) || 0
-                },
-                paymentMethod: r.payment_method,
-                paymentStatus: r.payment_status,
-                assignedProviderId: r.assigned_provider_id,
-                assignedProviderName: r.assigned_provider_name,
-                assignedProviderPhone: r.assigned_provider_phone,
-                assignedProviderAvatar: r.assigned_provider_avatar,
-                assignedProviderRating: Number(r.assigned_provider_rating) || 5.0,
-                etaMinutes: Number(r.eta_minutes) || 30,
-                currentStepIndex: Number(r.current_step_index) || 0,
-                createdAt: r.created_at || new Date().toISOString(),
-                updatedAt: r.updated_at || new Date().toISOString()
-              });
-            }
+            if (r && r.id) orderMap.set(r.id, rowToOrder(r));
           });
         }
       } catch (err: any) {
         console.warn('[API /api/sync/all-state] MySQL orders query note:', err.message);
       }
+      memoryOrders.forEach(o => { if (o && o.id && !orderMap.has(o.id)) orderMap.set(o.id, o); });
 
       const unifiedOrders = Array.from(orderMap.values());
       memoryOrders = unifiedOrders;
@@ -1479,7 +1491,12 @@ async function startServer() {
   app.post('/api/sync/all-state', async (req: Request, res: Response) => {
     const { users, orders, settings } = req.body;
     if (Array.isArray(users)) memoryUsers = deduplicateUsersList(users);
-    if (Array.isArray(orders)) memoryOrders = orders;
+    if (Array.isArray(orders)) {
+      // Only add orders the server does not know yet; never replace newer server copies
+      orders.forEach((o: any) => {
+        if (o && o.id && !memoryOrders.some(m => m.id === o.id)) memoryOrders.unshift(o);
+      });
+    }
     if (settings) memorySettings = settings;
 
     if (!isDbConnected() || !Array.isArray(users)) {

@@ -16,6 +16,14 @@ on:
           - '3'
           - '4'
           - '5'
+      force_fresh_database:
+        description: 'ONLY if the cached backup is corrupt: allow a fresh empty database (old cached data will be ignored)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 concurrency:
   group: mysql-cloudflare-live-${{ github.ref }}
@@ -53,12 +61,28 @@ jobs:
         with:
           node-version: 20
 
+      # Step 8 (permanent fix): if MYSQL_HOST secret is set, the app uses that hosted MySQL.
+      # Data then lives outside the runner and no cache restore / dump is needed.
+      - name: Detect MySQL Mode (hosted MySQL vs runner-local MySQL)
+        id: dbmode
+        env:
+          EXT_HOST: ${{ secrets.MYSQL_HOST }}
+        run: |
+          if [ -n "$EXT_HOST" ]; then
+            echo "external=true" >> "$GITHUB_OUTPUT"
+            echo "Using EXTERNAL hosted MySQL (data is independent of this runner)."
+          else
+            echo "external=false" >> "$GITHUB_OUTPUT"
+            echo "Using runner-local MySQL with GitHub cache backup."
+          fi
+
       - name: Create Snapshot Backup Directory
         run: mkdir -p mysql-backup
 
       # 2. Restore MySQL Snapshot from Previous Workflow Run (Fresh isolated cache key)
       - name: Restore Persistent MySQL Database Cache
         id: restore-mysql-cache
+        if: steps.dbmode.outputs.external != 'true'
         uses: actions/cache/restore@v4
         with:
           path: mysql-backup
@@ -69,8 +93,10 @@ jobs:
 
       # 3. Bulletproof Database Initialization (Safely skips corrupt system dumps)
       - name: Initialize or Restore MySQL Database
+        if: steps.dbmode.outputs.external != 'true'
         env:
           MYSQL_PWD: root_password_123
+          FORCE_FRESH: ${{ github.event.inputs.force_fresh_database || 'false' }}
         run: |
           echo "Waiting for MySQL container readiness..."
           until mysqladmin ping -h 127.0.0.1 -u root --silent; do
@@ -105,7 +131,17 @@ jobs:
             else
               echo "Notice: Snapshot did not contain valid tables or was from an incompatible schema. Error log:"
               cat restore_log.txt || true
-              echo "Proceeding to fresh clean schema initialization..."
+              if [ "$FORCE_FRESH" = "true" ]; then
+                echo "force_fresh_database=true: proceeding to fresh clean schema initialization..."
+              else
+                echo "=========================================================="
+                echo "ERROR: A cached backup exists but restore FAILED."
+                echo "Refusing to start with an empty database (that would wipe your data)."
+                echo "Your old cache and the workflow artifact snapshot are untouched."
+                echo "If you really want a fresh database, re-run with force_fresh_database = true."
+                echo "=========================================================="
+                exit 1
+              fi
             fi
           fi
 
@@ -212,11 +248,14 @@ jobs:
         env:
           NODE_ENV: production
           PORT: 3000
-          MYSQL_HOST: 127.0.0.1
-          MYSQL_PORT: 3306
-          MYSQL_USER: omniserve
-          MYSQL_PASSWORD: omniserve_secure_password
-          MYSQL_DATABASE: omniserve_db
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST || '127.0.0.1' }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || '3306' }}
+          MYSQL_USER: ${{ secrets.MYSQL_USER || 'omniserve' }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD || 'omniserve_secure_password' }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE || 'omniserve_db' }}
+          MYSQL_SSL: ${{ secrets.MYSQL_SSL }}
+          EXTERNAL_DB: ${{ steps.dbmode.outputs.external }}
+          MYSQL_PWD: root_password_123
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME || 'admin@omniserve.com' }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'Admin@12345' }}
           VITE_ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME || 'admin@omniserve.com' }}
@@ -308,19 +347,20 @@ jobs:
             HEALTH_STATUS=$(curl -s http://127.0.0.1:3000/api/health || echo '{"status":"unreachable"}')
             echo "[$(date -u +"%H:%M:%SZ")] Running: ${MINUTES_RUN}m elapsed | ${MINUTES_REMAINING}m remaining | Health: $HEALTH_STATUS"
 
-            # Periodic Zero-Loss MySQL snapshot every 10 minutes (guarantees recent data even on abrupt runner stop)
-            if [ $((ELAPSED % 600)) -eq 0 ]; then
-              if mysqladmin ping -h 127.0.0.1 -u root --silent; then
-                mysqldump -h 127.0.0.1 -u root \
+            # Periodic MySQL snapshot every 10 minutes (runner-local MySQL only).
+            # Dumped to a temp file and only kept if valid, so a failed dump can never overwrite a good backup.
+            if [ "$EXTERNAL_DB" != "true" ] && [ $((ELAPSED % 600)) -eq 0 ]; then
+              if mysqldump -h 127.0.0.1 -u root \
                   --databases omniserve_db \
-                  --single-transaction \
-                  --routines \
-                  --triggers \
-                  --events \
-                  --add-drop-table \
-                  --complete-insert \
-                  | gzip -9 > mysql-backup/snapshot.sql.gz 2>/dev/null || true
-                echo "[$(date -u +"%H:%M:%SZ")] Periodic zero-loss MySQL snapshot refreshed successfully."
+                  --single-transaction --routines --triggers --events \
+                  --add-drop-table --complete-insert 2>/dev/null | gzip -9 > mysql-backup/snapshot.tmp.gz \
+                 && gzip -t mysql-backup/snapshot.tmp.gz \
+                 && [ "$(stat -c%s mysql-backup/snapshot.tmp.gz)" -gt 1000 ]; then
+                mv mysql-backup/snapshot.tmp.gz mysql-backup/snapshot.sql.gz
+                echo "[$(date -u +"%H:%M:%SZ")] Periodic MySQL snapshot refreshed successfully."
+              else
+                rm -f mysql-backup/snapshot.tmp.gz
+                echo "[$(date -u +"%H:%M:%SZ")] WARNING: periodic snapshot failed; previous backup kept."
               fi
             fi
 
@@ -347,7 +387,7 @@ jobs:
       # 8. GUARANTEED ZERO-DATA-LOSS MYSQL SNAPSHOT (Runs on CANCEL, SUCCESS, TIMEOUT)
       # =========================================================================
       - name: Safely Capture MySQL Full Snapshot
-        if: always()
+        if: always() && steps.dbmode.outputs.external != 'true'
         env:
           MYSQL_PWD: root_password_123
         run: |
@@ -360,7 +400,7 @@ jobs:
             echo "Taking clean mysqldump for application database 'omniserve_db' only..."
             
             # Dump ONLY application database 'omniserve_db' to avoid ERROR 3552 system tables
-            mysqldump -h 127.0.0.1 -u root \
+            if mysqldump -h 127.0.0.1 -u root \
               --databases omniserve_db \
               --single-transaction \
               --routines \
@@ -368,7 +408,14 @@ jobs:
               --events \
               --add-drop-table \
               --complete-insert \
-              | gzip -9 > mysql-backup/snapshot.sql.gz
+              | gzip -9 > mysql-backup/snapshot.tmp.gz \
+              && gzip -t mysql-backup/snapshot.tmp.gz \
+              && [ "$(stat -c%s mysql-backup/snapshot.tmp.gz)" -gt 1000 ]; then
+              mv mysql-backup/snapshot.tmp.gz mysql-backup/snapshot.sql.gz
+            else
+              rm -f mysql-backup/snapshot.tmp.gz
+              echo "WARNING: final dump failed validation; previous backup kept."
+            fi
 
             FILESIZE=$(stat -c%s "mysql-backup/snapshot.sql.gz" 2>/dev/null || stat -f%z "mysql-backup/snapshot.sql.gz")
             CHECKSUM=$(sha256sum "mysql-backup/snapshot.sql.gz" | awk '{print $1}')
@@ -396,7 +443,7 @@ jobs:
 
       # 9. Save Persistent Snapshot to GitHub Actions Cache for Next Run
       - name: Save Persistent MySQL Database Cache
-        if: always()
+        if: always() && steps.dbmode.outputs.external != 'true'
         uses: actions/cache/save@v4
         with:
           path: mysql-backup
@@ -404,7 +451,7 @@ jobs:
 
       # 10. Upload Snapshot as Workflow Artifact (90-Day Retention)
       - name: Upload Snapshot as Redundant Workflow Artifact
-        if: always()
+        if: always() && steps.dbmode.outputs.external != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: mysql-persistent-snapshot-${{ github.run_id }}

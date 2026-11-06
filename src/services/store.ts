@@ -247,6 +247,18 @@ export const subscribeToStore = (listener: StoreListener) => {
   };
 };
 
+// Orders whose status change is still travelling to the server.
+// The 10s poll must not overwrite these with an older server copy.
+const pendingOrderSync = new Map<string, number>();
+const PENDING_ORDER_GUARD_MS = 30000;
+// Admin's own just-saved settings / catalog: do not let the 10s poll overwrite them for 30s
+const pendingConfigSync: { settings: number; services: number; vehicles: number } = { settings: 0, services: 0, vehicles: 0 };
+const stableJson = (v: any): string => JSON.stringify(v, (_k, val) =>
+  val && typeof val === 'object' && !Array.isArray(val)
+    ? Object.keys(val).sort().reduce((a: any, k) => { a[k] = val[k]; return a; }, {})
+    : val);
+const configGuardActive = (k: 'settings' | 'services' | 'vehicles') => Date.now() - pendingConfigSync[k] < PENDING_ORDER_GUARD_MS;
+
 // Store API
 export const Store = {
   // Sync individual user to MySQL backend (restored by GitHub Actions on restart)
@@ -297,14 +309,20 @@ export const Store = {
     assignedProviderPhone?: string;
     etaMinutes?: number;
     note?: string;
+    assignedProviderAvatar?: string;
+    assignedProviderRating?: number;
+    timelineEntry?: { status: string; label: string; timestamp: string; note?: string };
   }) => {
+    pendingOrderSync.set(orderId, Date.now());
     try {
       const res = await fetch(`/api/orders/${orderId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      return await res.json();
+      const data = await res.json();
+      if (res.ok) pendingOrderSync.delete(orderId);
+      return data;
     } catch (err) {
       console.warn('[Store] MySQL status sync note:', err);
       return null;
@@ -374,32 +392,45 @@ export const Store = {
   // Pure MySQL Zero-Loss Persistent Sync (GitHub Secrets Configured MySQL)
   initCloudSync: async () => {
     try {
-      // 1. Fetch live system settings & catalog from MySQL backend
-      try {
-        const [settingsRes, catalogRes] = await Promise.all([
-          fetch('/api/settings'),
-          fetch('/api/catalog')
-        ]);
-        if (settingsRes.ok) {
-          const sData = await settingsRes.json();
-          if (sData.success && sData.settings) {
-            saveToStorage(STORAGE_KEY_SETTINGS, sData.settings);
-          }
-        }
-        if (catalogRes.ok) {
-          const cData = await catalogRes.json();
-          if (cData.success) {
-            if (Array.isArray(cData.services) && cData.services.length > 0) {
-              saveToStorage(STORAGE_KEY_SERVICES, cData.services);
-            }
-            if (Array.isArray(cData.vehicles) && cData.vehicles.length > 0) {
-              saveToStorage(STORAGE_KEY_VEHICLES, cData.vehicles);
+      // 1. Fetch live system settings & catalog from MySQL backend (also runs in the 10s poll below)
+      const syncSettingsAndCatalog = async () => {
+        try {
+          const [settingsRes, catalogRes] = await Promise.all([
+            fetch('/api/settings'),
+            fetch('/api/catalog')
+          ]);
+          let changed = false;
+          if (settingsRes.ok && !configGuardActive('settings')) {
+            const sData = await settingsRes.json();
+            if (sData.success && sData.settings) {
+              if (stableJson(sData.settings) !== stableJson(loadFromStorage(STORAGE_KEY_SETTINGS, null))) {
+                saveToStorage(STORAGE_KEY_SETTINGS, sData.settings);
+                changed = true;
+              }
             }
           }
+          if (catalogRes.ok) {
+            const cData = await catalogRes.json();
+            if (cData.success) {
+              if (Array.isArray(cData.services) && cData.services.length > 0 && !configGuardActive('services')) {
+                if (stableJson(cData.services) !== stableJson(loadFromStorage(STORAGE_KEY_SERVICES, null))) {
+                  saveToStorage(STORAGE_KEY_SERVICES, cData.services);
+                  changed = true;
+                }
+              }
+              if (Array.isArray(cData.vehicles) && cData.vehicles.length > 0 && !configGuardActive('vehicles')) {
+                if (stableJson(cData.vehicles) !== stableJson(loadFromStorage(STORAGE_KEY_VEHICLES, null))) {
+                  saveToStorage(STORAGE_KEY_VEHICLES, cData.vehicles);
+                  changed = true;
+                }
+              }
+            }
+          }
+          if (changed) notifyStoreChanged();
+        } catch (err) {
+          console.warn('[Store] Server settings/catalog fetch note:', err);
         }
-      } catch (err) {
-        console.warn('[Store] Server settings/catalog fetch note:', err);
-      }
+      };
 
       // 2. Fetch authoritative persistent state from MySQL backend
       const syncFromMySQL = async () => {
@@ -446,17 +477,12 @@ export const Store = {
                 currentOrders.forEach(o => { if (o && o.id) orderMap.set(o.id, o); });
                 backendData.orders.forEach((o: Order) => {
                   if (!o || !o.id) return;
-                  const existing = orderMap.get(o.id);
-                  if (!existing) {
-                    orderMap.set(o.id, o);
-                  } else {
-                    // Retain the one with more recent updatedAt or higher currentStepIndex
-                    const existingTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
-                    const newTime = new Date(o.updatedAt || o.createdAt || 0).getTime();
-                    if (newTime >= existingTime || (o.currentStepIndex || 0) >= (existing.currentStepIndex || 0)) {
-                      orderMap.set(o.id, o);
-                    }
-                  }
+                  // Admin / provider change of this order is still being sent to the server: keep local copy
+                  const pendingSince = pendingOrderSync.get(o.id);
+                  if (pendingSince && Date.now() - pendingSince < PENDING_ORDER_GUARD_MS) return;
+                  // Otherwise the server (MySQL) copy is authoritative (wallet flag is never lost)
+                  const localCopy = orderMap.get(o.id);
+                  orderMap.set(o.id, (localCopy && localCopy.walletCredited && !o.walletCredited) ? { ...o, walletCredited: true } : o);
                 });
                 const merged = Array.from(orderMap.values()).sort(
                   (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
@@ -472,10 +498,11 @@ export const Store = {
         }
       };
 
+      await syncSettingsAndCatalog();
       await syncFromMySQL();
 
       // Recurring MySQL live poll (every 10s) to keep all client sessions in sync without Firebase
-      setInterval(syncFromMySQL, 10000);
+      setInterval(() => { syncSettingsAndCatalog(); syncFromMySQL(); }, 10000);
     } catch (err) {
       console.warn('[Store] initDatabaseSync error:', err);
     }
@@ -1084,6 +1111,7 @@ export const Store = {
   updateSettings: (newSettings: Partial<SystemSettings>): SystemSettings => {
     const current = Store.getSettings();
     const updated: SystemSettings = { ...current, ...newSettings };
+    pendingConfigSync.settings = Date.now();
     saveToStorage(STORAGE_KEY_SETTINGS, updated);
     notifyStoreChanged();
 
@@ -1293,20 +1321,24 @@ export const Store = {
       }
     ];
 
+    // Provider wallet is credited only ONCE per order (admin may move completed -> pending -> completed)
+    const shouldCredit = newStatus === 'completed' && !!currentOrder.assignedProviderId && !currentOrder.walletCredited;
+
     const updatedOrder: Order = {
       ...currentOrder,
       status: newStatus,
       currentStepIndex: stepIndex,
       updatedAt: new Date().toISOString(),
       timeline: updatedTimeline,
-      paymentStatus: newStatus === 'completed' ? 'paid' : currentOrder.paymentStatus
+      paymentStatus: newStatus === 'completed' ? 'paid' : currentOrder.paymentStatus,
+      walletCredited: !!currentOrder.walletCredited || shouldCredit
     };
 
     orders[idx] = updatedOrder;
     saveToStorage(STORAGE_KEY_ORDERS, orders);
 
-    // If completed, credit provider wallet balance
-    if (newStatus === 'completed' && updatedOrder.assignedProviderId) {
+    // If completed (first time only), credit provider wallet balance
+    if (shouldCredit && updatedOrder.assignedProviderId) {
       const users = Store.getUsers();
       const pIdx = users.findIndex(u => u.id === updatedOrder.assignedProviderId);
       if (pIdx >= 0) {
@@ -1402,7 +1434,8 @@ export const Store = {
     Store.syncOrderStatusToBackend(updatedOrder.id, {
       status: newStatus,
       stepIndex,
-      note: providerNote
+      note: providerNote,
+      timelineEntry: updatedOrder.timeline[updatedOrder.timeline.length - 1]
     });
 
     return updatedOrder;
@@ -1470,6 +1503,10 @@ export const Store = {
       }
     ];
 
+    // Provider wallet is credited only ONCE per order
+    const finalProviderId = params.providerId !== undefined ? params.providerId : currentOrder.assignedProviderId;
+    const shouldCredit = params.status === 'completed' && !!finalProviderId && !currentOrder.walletCredited;
+
     const updatedOrder: Order = {
       ...currentOrder,
       status: params.status,
@@ -1480,13 +1517,14 @@ export const Store = {
       etaMinutes: params.etaMinutes !== undefined ? params.etaMinutes : currentOrder.etaMinutes,
       updatedAt: new Date().toISOString(),
       timeline: updatedTimeline,
-      paymentStatus: params.status === 'completed' ? 'paid' : currentOrder.paymentStatus
+      paymentStatus: params.status === 'completed' ? 'paid' : currentOrder.paymentStatus,
+      walletCredited: !!currentOrder.walletCredited || shouldCredit
     };
 
     orders[idx] = updatedOrder;
     saveToStorage(STORAGE_KEY_ORDERS, orders);
 
-    if (params.status === 'completed' && updatedOrder.assignedProviderId) {
+    if (shouldCredit && updatedOrder.assignedProviderId) {
       const users = Store.getUsers();
       const pIdx = users.findIndex(u => u.id === updatedOrder.assignedProviderId);
       if (pIdx >= 0) {
@@ -1562,7 +1600,8 @@ export const Store = {
       assignedProviderName: params.providerName,
       assignedProviderPhone: params.providerPhone,
       etaMinutes: params.etaMinutes,
-      note: params.customNote
+      note: params.customNote,
+      timelineEntry: updatedOrder.timeline[updatedOrder.timeline.length - 1]
     });
 
     return updatedOrder;
@@ -1633,7 +1672,10 @@ export const Store = {
       assignedProviderName: provider.name,
       assignedProviderPhone: provider.phone,
       etaMinutes: 25,
-      note: `Assigned to ${provider.name}`
+      note: `Assigned to ${provider.name}`,
+      assignedProviderAvatar: provider.avatar,
+      assignedProviderRating: provider.rating || 4.9,
+      timelineEntry: updatedOrder.timeline[updatedOrder.timeline.length - 1]
     });
 
     return updatedOrder;
@@ -1647,6 +1689,7 @@ export const Store = {
     orders[idx].review = review;
     saveToStorage(STORAGE_KEY_ORDERS, orders);
     notifyStoreChanged();
+    Store.syncOrderToBackend(orders[idx]);
     return orders[idx];
   },
 
@@ -1659,6 +1702,7 @@ export const Store = {
   },
 
   updateServicesCatalog: (services: HomeServiceItem[]) => {
+    pendingConfigSync.services = Date.now();
     saveToStorage(STORAGE_KEY_SERVICES, services);
     notifyStoreChanged();
     CloudSyncService.saveCatalog({ services });
@@ -1674,6 +1718,7 @@ export const Store = {
   },
 
   updateVehiclesCatalog: (vehicles: TransportVehicleItem[]) => {
+    pendingConfigSync.vehicles = Date.now();
     saveToStorage(STORAGE_KEY_VEHICLES, vehicles);
     notifyStoreChanged();
     CloudSyncService.saveCatalog({ vehicles });
