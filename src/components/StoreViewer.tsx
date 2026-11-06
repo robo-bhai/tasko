@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ExternalLink, RefreshCw, ShoppingBag } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { ExternalLink, X, ShoppingBag } from 'lucide-react';
 
 interface StoreViewerProps {
   url: string;
@@ -8,7 +9,7 @@ interface StoreViewerProps {
   isUrdu?: boolean;
 }
 
-const SLOW_LOAD_MS = 15000;
+const SLOW_LOAD_MS = 12000;
 
 /** Branded loading screen: store-style skeleton cards + lines. */
 const StoreLoader: React.FC<{ isUrdu: boolean; slow: boolean; onOpenExternal: () => void }> = ({
@@ -92,101 +93,66 @@ const StoreLoader: React.FC<{ isUrdu: boolean; slow: boolean; onOpenExternal: ()
   </div>
 );
 
+/**
+ * Opens the store in the same window and keeps the branded loading screen
+ * visible until the browser actually swaps pages (the old page stays on
+ * screen until the new one is ready). No iframe, so the store site needs
+ * no changes. In an installed PWA, Android shows the store in an in-app
+ * browser tab; when the user comes back, the loader closes itself.
+ */
 export const StoreViewer: React.FC<StoreViewerProps> = ({
   url,
   title = 'Khanewal Connect Store',
   onClose,
   isUrdu = true
 }) => {
-  const [loaded, setLoaded] = useState(false);
   const [slow, setSlow] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
-  const closedByPop = useRef(false);
 
-  // Android back button / gesture closes the viewer instead of leaving the app.
   useEffect(() => {
-    window.history.pushState({ kcStore: true }, '');
-    const onPop = () => {
-      closedByPop.current = true;
-      onClose();
+    let leftApp = false;
+
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') leftApp = true;
+      else if (leftApp) onClose(); // returned from the store
     };
-    window.addEventListener('popstate', onPop);
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) onClose(); // back/forward cache restore
+    };
+    document.addEventListener('visibilitychange', onHidden);
+    window.addEventListener('pageshow', onPageShow);
+
+    // Let the loader paint first, then navigate.
+    const go = setTimeout(() => window.location.assign(url), 450);
+    const slowTimer = setTimeout(() => setSlow(true), SLOW_LOAD_MS);
+
     return () => {
-      window.removeEventListener('popstate', onPop);
-      if (!closedByPop.current && window.history.state?.kcStore) {
-        window.history.back();
-      }
+      clearTimeout(go);
+      clearTimeout(slowTimer);
+      document.removeEventListener('visibilitychange', onHidden);
+      window.removeEventListener('pageshow', onPageShow);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Show the "taking long" hint if the page has not finished loading.
-  useEffect(() => {
-    setLoaded(false);
-    setSlow(false);
-    const t = setTimeout(() => setSlow(true), SLOW_LOAD_MS);
-    return () => clearTimeout(t);
-  }, [reloadKey]);
-
   const openExternal = () => window.open(url, '_blank', 'noopener,noreferrer');
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-label={title}
-      className="fixed inset-x-0 top-0 z-[70] flex flex-col bg-[#07080c]"
+      className="fixed inset-x-0 top-0 z-[70] bg-[#07080c]"
       style={{ height: 'var(--app-height, 100dvh)' }}
     >
-      {/* Header */}
-      <header
-        className="shrink-0 flex items-center gap-2 px-2 pb-2 bg-[#090a0f] border-b border-amber-500/20"
-        style={{ paddingTop: 'calc(0.5rem + env(safe-area-inset-top, 0px))' }}
+      <StoreLoader isUrdu={isUrdu} slow={slow} onOpenExternal={openExternal} />
+      <button
+        onClick={onClose}
+        aria-label="Cancel"
+        className="absolute right-3 z-20 p-2 rounded-full bg-slate-800/80 text-slate-200 active:scale-95 cursor-pointer touch-manipulation"
+        style={{ top: 'calc(0.75rem + env(safe-area-inset-top, 0px))' }}
       >
-        <button
-          onClick={onClose}
-          aria-label="Back"
-          className="p-2 rounded-xl text-slate-200 hover:bg-slate-800 active:scale-95 cursor-pointer touch-manipulation"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-black text-white truncate">
-            Khanewal <span className="text-amber-400">Connect</span>
-          </p>
-          <p className="text-[10px] text-slate-400 truncate">{title}</p>
-        </div>
-        <button
-          onClick={() => setReloadKey(k => k + 1)}
-          aria-label="Reload"
-          className="p-2 rounded-xl text-slate-300 hover:bg-slate-800 active:scale-95 cursor-pointer touch-manipulation"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </button>
-        <button
-          onClick={openExternal}
-          aria-label="Open in browser"
-          className="p-2 rounded-xl text-slate-300 hover:bg-slate-800 active:scale-95 cursor-pointer touch-manipulation"
-        >
-          <ExternalLink className="w-4 h-4" />
-        </button>
-      </header>
-
-      {/* Content */}
-      <div
-        className="relative flex-1 min-h-0"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-      >
-        {!loaded && <StoreLoader isUrdu={isUrdu} slow={slow} onOpenExternal={openExternal} />}
-        <iframe
-          key={reloadKey}
-          src={url}
-          title={title}
-          className="w-full h-full border-0 bg-white"
-          allow="payment; geolocation; clipboard-write"
-          referrerPolicy="strict-origin-when-cross-origin"
-          onLoad={() => setLoaded(true)}
-        />
-      </div>
-    </div>
+        <X className="w-5 h-5" />
+      </button>
+    </div>,
+    document.body
   );
 };
