@@ -258,6 +258,19 @@ const stableJson = (v: any): string => JSON.stringify(v, (_k, val) =>
     ? Object.keys(val).sort().reduce((a: any, k) => { a[k] = val[k]; return a; }, {})
     : val);
 const configGuardActive = (k: 'settings' | 'services' | 'vehicles') => Date.now() - pendingConfigSync[k] < PENDING_ORDER_GUARD_MS;
+// Stamp `updatedAt` on catalog items that really changed vs. what is currently stored,
+// so the server can tell a fresh edit from a stale tab's old copy.
+const stampChangedItems = <T extends { id: string; updatedAt?: number }>(next: T[], current: T[]): T[] => {
+  const cur = new Map(current.map(x => [x.id, x]));
+  const now = Date.now();
+  return next.map(item => {
+    const old = cur.get(item.id);
+    const { updatedAt: _a, ...itemNoTs } = item as any;
+    const { updatedAt: _b, ...oldNoTs } = (old || {}) as any;
+    if (old && stableJson(itemNoTs) === stableJson(oldNoTs)) return item;
+    return { ...item, updatedAt: now };
+  });
+};
 
 // Store API
 export const Store = {
@@ -1701,31 +1714,116 @@ export const Store = {
     return loadFromStorage<HomeServiceItem[]>(STORAGE_KEY_SERVICES, INITIAL_SERVICES);
   },
 
-  updateServicesCatalog: (services: HomeServiceItem[]) => {
+  updateServicesCatalog: (servicesIn: HomeServiceItem[]) => {
+    const services = stampChangedItems(servicesIn, Store.getServicesCatalog());
     pendingConfigSync.services = Date.now();
     saveToStorage(STORAGE_KEY_SERVICES, services);
     notifyStoreChanged();
-    CloudSyncService.saveCatalog({ services });
+    // Single catalog route: POST /api/catalog (only this list)
     fetch('/api/catalog', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ services, vehicles: Store.getVehiclesCatalog() })
+      body: JSON.stringify({ services })
     }).catch(() => {});
+  },
+
+  // Admin "Save": ek hi POST, sirf badle hue items, aur asli server result wapas.
+  // Server rejects an item if someone else changed it after this tab last saw it (stale tab).
+  saveCatalogChanges: async (p: { services?: HomeServiceItem[]; vehicles?: TransportVehicleItem[] }): Promise<{
+    ok: boolean;
+    conflicts: { services: string[]; vehicles: string[] };
+  }> => {
+    const result = { ok: false, conflicts: { services: [] as string[], vehicles: [] as string[] } };
+    const mergeById = <T extends { id: string }>(base: T[], changed: T[]): T[] => {
+      const map = new Map<string, T>(base.map(x => [x.id, x]));
+      changed.forEach(c => map.set(c.id, c));
+      return Array.from(map.values());
+    };
+    const now = Date.now();
+    pendingConfigSync.services = now;
+    pendingConfigSync.vehicles = now;
+
+    // The version of each item this tab last saw (before our edit) - the server compares against it
+    const base: { services: Record<string, number>; vehicles: Record<string, number> } = { services: {}, vehicles: {} };
+    const stampedServices = p.services?.map(s => {
+      const old = Store.getServicesCatalog().find(x => x.id === s.id);
+      base.services[s.id] = old?.updatedAt || 0;
+      return { ...s, updatedAt: now };
+    });
+    const stampedVehicles = p.vehicles?.map(v => {
+      const old = Store.getVehiclesCatalog().find(x => x.id === v.id);
+      base.vehicles[v.id] = old?.updatedAt || 0;
+      return { ...v, updatedAt: now };
+    });
+
+    let fullServices: HomeServiceItem[] | undefined;
+    let fullVehicles: TransportVehicleItem[] | undefined;
+    if (stampedServices) {
+      fullServices = mergeById(Store.getServicesCatalog(), stampedServices);
+      saveToStorage(STORAGE_KEY_SERVICES, fullServices);
+    }
+    if (stampedVehicles) {
+      fullVehicles = mergeById(Store.getVehiclesCatalog(), stampedVehicles);
+      saveToStorage(STORAGE_KEY_VEHICLES, fullVehicles);
+    }
+    notifyStoreChanged();
+
+    try {
+      const res = await fetch('/api/catalog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          services: stampedServices,
+          vehicles: stampedVehicles,
+          partial: true,
+          base,
+          full: { services: fullServices, vehicles: fullVehicles }
+        })
+      });
+      if (!res.ok) return result;
+      const data = await res.json().catch(() => ({}));
+      if (data.success !== true) return result;
+      result.ok = true;
+      result.conflicts.services = Array.isArray(data.conflicts?.services) ? data.conflicts.services : [];
+      result.conflicts.vehicles = Array.isArray(data.conflicts?.vehicles) ? data.conflicts.vehicles : [];
+
+      // Stale items were rejected by the server: pull the server's newer copy into local storage
+      if (result.conflicts.services.length || result.conflicts.vehicles.length) {
+        try {
+          const cr = await fetch('/api/catalog');
+          const cd = cr.ok ? await cr.json() : null;
+          if (cd?.success) {
+            if (Array.isArray(cd.services) && result.conflicts.services.length) {
+              const fresh = cd.services.filter((x: HomeServiceItem) => result.conflicts.services.includes(x.id));
+              saveToStorage(STORAGE_KEY_SERVICES, mergeById(Store.getServicesCatalog(), fresh));
+            }
+            if (Array.isArray(cd.vehicles) && result.conflicts.vehicles.length) {
+              const fresh = cd.vehicles.filter((x: TransportVehicleItem) => result.conflicts.vehicles.includes(x.id));
+              saveToStorage(STORAGE_KEY_VEHICLES, mergeById(Store.getVehiclesCatalog(), fresh));
+            }
+            notifyStoreChanged();
+          }
+        } catch { /* poll will fix it */ }
+      }
+      return result;
+    } catch {
+      return result;
+    }
   },
 
   getVehiclesCatalog: (): TransportVehicleItem[] => {
     return loadFromStorage<TransportVehicleItem[]>(STORAGE_KEY_VEHICLES, INITIAL_VEHICLES);
   },
 
-  updateVehiclesCatalog: (vehicles: TransportVehicleItem[]) => {
+  updateVehiclesCatalog: (vehiclesIn: TransportVehicleItem[]) => {
+    const vehicles = stampChangedItems(vehiclesIn, Store.getVehiclesCatalog());
     pendingConfigSync.vehicles = Date.now();
     saveToStorage(STORAGE_KEY_VEHICLES, vehicles);
     notifyStoreChanged();
-    CloudSyncService.saveCatalog({ vehicles });
     fetch('/api/catalog', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ services: Store.getServicesCatalog(), vehicles })
+      body: JSON.stringify({ vehicles })
     }).catch(() => {});
   },
 

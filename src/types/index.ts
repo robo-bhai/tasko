@@ -180,6 +180,8 @@ export interface HomeServiceItem {
   assignedProviderId?: string;
   assignedProviderName?: string;
   isPublished?: boolean;
+  /** ms timestamp of the last admin change; used by the server to reject stale writes */
+  updatedAt?: number;
 }
 
 export interface TransportVehicleItem {
@@ -195,4 +197,6 @@ export interface TransportVehicleItem {
   assignedProviderId?: string;
   assignedProviderName?: string;
   isPublished?: boolean;
+  /** ms timestamp of the last admin change; used by the server to reject stale writes */
+  updatedAt?: number;
 }

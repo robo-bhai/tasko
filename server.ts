@@ -449,12 +449,71 @@ async function startServer() {
   });
 
   app.post('/api/catalog', async (req: Request, res: Response) => {
-    const { services, vehicles } = req.body;
+    const { services, vehicles, partial, full, base } = req.body;
     try {
-      saveDiskPersistentState({ services, vehicles });
+      const mergeById = (baseList: any[], changed: any[]) => {
+        const map = new Map<string, any>(baseList.map((x: any) => [x.id, x]));
+        for (const c of changed) if (c && c.id) map.set(c.id, c);
+        return Array.from(map.values());
+      };
+      const hasServices = Array.isArray(services);
+      const hasVehicles = Array.isArray(vehicles);
+      const conflicts: { services: string[]; vehicles: string[] } = { services: [], vehicles: [] };
+      let acceptedServices: any[] | undefined = hasServices ? services : undefined;
+      let acceptedVehicles: any[] | undefined = hasVehicles ? vehicles : undefined;
+      let diskServices: any[] | undefined = acceptedServices;
+      let diskVehicles: any[] | undefined = acceptedVehicles;
+
+      if (partial === true) {
+        // Partial save = only the CHANGED items. Reject any item that was modified by someone else
+        // after the sender last saw it (stale tab / device), then merge the rest by id.
+        const disk = loadDiskPersistentState();
+        const storedTs = async (table: 'catalog_services' | 'catalog_vehicles', diskList: any[] | undefined, id: string): Promise<number> => {
+          let ts = 0;
+          const d = Array.isArray(diskList) ? diskList.find((x: any) => x && x.id === id) : null;
+          if (d && Number(d.updatedAt) > ts) ts = Number(d.updatedAt);
+          if (isDbConnected()) {
+            try {
+              const rows = await query(`SELECT raw_json FROM ${table} WHERE id = ?`, [id]);
+              if (rows && rows[0]) {
+                const j = JSON.parse(rows[0].raw_json || '{}');
+                if (Number(j.updatedAt) > ts) ts = Number(j.updatedAt);
+              }
+            } catch { /* ignore, treat as no stored version */ }
+          }
+          return ts;
+        };
+        const filterFresh = async (items: any[], table: 'catalog_services' | 'catalog_vehicles', diskList: any[] | undefined, baseMap: any, bucket: string[]) => {
+          const ok: any[] = [];
+          for (const it of items) {
+            if (!it || !it.id) continue;
+            const seen = Number(baseMap?.[it.id]) || 0;
+            const stored = await storedTs(table, diskList, it.id);
+            if (stored > seen) bucket.push(it.id); else ok.push(it);
+          }
+          return ok;
+        };
+        if (hasServices) {
+          acceptedServices = await filterFresh(services, 'catalog_services', disk.services, base?.services, conflicts.services);
+          const diskBase = Array.isArray(disk.services) ? disk.services : (Array.isArray(full?.services) ? full.services : []);
+          diskServices = mergeById(diskBase, acceptedServices);
+        }
+        if (hasVehicles) {
+          acceptedVehicles = await filterFresh(vehicles, 'catalog_vehicles', disk.vehicles, base?.vehicles, conflicts.vehicles);
+          const diskBase = Array.isArray(disk.vehicles) ? disk.vehicles : (Array.isArray(full?.vehicles) ? full.vehicles : []);
+          diskVehicles = mergeById(diskBase, acceptedVehicles);
+        }
+      }
+
+      // Write ONLY what this request actually carried
+      const diskPatch: { services?: any[]; vehicles?: any[] } = {};
+      if (diskServices) diskPatch.services = diskServices;
+      if (diskVehicles) diskPatch.vehicles = diskVehicles;
+      if (diskPatch.services || diskPatch.vehicles) saveDiskPersistentState(diskPatch);
+
       if (isDbConnected()) {
-        if (Array.isArray(services)) {
-          for (const s of services) {
+        if (Array.isArray(acceptedServices)) {
+          for (const s of acceptedServices) {
             if (!s.id || !s.name) continue;
             await query(`
               INSERT INTO catalog_services (id, name, category, base_price, estimated_duration, description, is_published, assigned_provider_id, assigned_provider_name, raw_json)
@@ -483,8 +542,8 @@ async function startServer() {
             ]);
           }
         }
-        if (Array.isArray(vehicles)) {
-          for (const v of vehicles) {
+        if (Array.isArray(acceptedVehicles)) {
+          for (const v of acceptedVehicles) {
             if (!v.id || !v.name) continue;
             await query(`
               INSERT INTO catalog_vehicles (id, name, capacity_kg, dimensions, base_fare, per_km_rate, helper_rate, is_published, assigned_provider_id, assigned_provider_name, raw_json)
@@ -516,8 +575,17 @@ async function startServer() {
           }
         }
       }
-      createFullSnapshot('Catalog Updated Snapshot', { services, vehicles }).catch(() => {});
-      res.json({ success: true, message: 'Catalog rates saved permanently to MySQL & Snapshot Storage!' });
+      const snap: any = {};
+      if (diskServices) snap.services = diskServices;
+      if (diskVehicles) snap.vehicles = diskVehicles;
+      createFullSnapshot('Catalog Updated Snapshot', snap).catch(() => {});
+      res.json({
+        success: true,
+        conflicts,
+        message: (conflicts.services.length || conflicts.vehicles.length)
+          ? 'Kuch items kisi aur ne pehle badal diye the - unhein skip kar diya gaya.'
+          : 'Catalog rates saved permanently to MySQL & Snapshot Storage!'
+      });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }

@@ -87,28 +87,6 @@ export const CloudSyncService = {
     }
   },
 
-  // Save catalog to MySQL backend
-  async saveCatalog(data: { services?: HomeServiceItem[]; vehicles?: TransportVehicleItem[] }): Promise<void> {
-    try {
-      if (Array.isArray(data.services)) {
-        await fetch('/api/catalog/services', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ services: data.services })
-        });
-      }
-      if (Array.isArray(data.vehicles)) {
-        await fetch('/api/catalog/vehicles', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ vehicles: data.vehicles })
-        });
-      }
-    } catch (err) {
-      console.warn('[MySQL Sync] Note saving catalog:', err);
-    }
-  },
-
   // Auto-snapshot trigger on MySQL workflow end
   async uploadFullBackup(state: {
     users: User[];

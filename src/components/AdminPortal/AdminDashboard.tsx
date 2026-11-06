@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Order, 
   User, 
@@ -74,13 +74,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [catalogSavedMessage, setCatalogSavedMessage] = useState('');
   const [catalogFilter, setCatalogFilter] = useState<'all' | 'published' | 'unpublished'>('all');
 
+  // Items the admin has typed into but not saved yet. Store refreshes (poll, notifications, etc.)
+  // must never overwrite these drafts.
+  const dirtyServiceIds = useRef<Set<string>>(new Set());
+  const dirtyVehicleIds = useRef<Set<string>>(new Set());
+  const [isSavingCatalog, setIsSavingCatalog] = useState(false);
+
   useEffect(() => {
-    setEditingServices(services);
+    setEditingServices(prev => {
+      const mine = new Map(prev.map(s => [s.id, s]));
+      return services.map(s =>
+        dirtyServiceIds.current.has(s.id) && mine.has(s.id) ? mine.get(s.id)! : s
+      );
+    });
   }, [services]);
 
   useEffect(() => {
-    setEditingVehicles(vehicles);
+    setEditingVehicles(prev => {
+      const mine = new Map(prev.map(v => [v.id, v]));
+      return vehicles.map(v =>
+        dirtyVehicleIds.current.has(v.id) && mine.has(v.id) ? mine.get(v.id)! : v
+      );
+    });
   }, [vehicles]);
+
+  // Replace ONE item with its fresh store copy, keeping any unsaved rate the admin typed.
+  const refreshServiceDraft = (id: string) => {
+    const fresh = Store.getServicesCatalog().find(s => s.id === id);
+    setEditingServices(prev => prev.map(s => {
+      if (s.id !== id || !fresh) return s;
+      return dirtyServiceIds.current.has(id) ? { ...fresh, basePrice: s.basePrice } : fresh;
+    }));
+  };
+  const refreshVehicleDraft = (id: string) => {
+    const fresh = Store.getVehiclesCatalog().find(v => v.id === id);
+    setEditingVehicles(prev => prev.map(v => {
+      if (v.id !== id || !fresh) return v;
+      return dirtyVehicleIds.current.has(id)
+        ? { ...fresh, baseFare: v.baseFare, perKmRate: v.perKmRate, helperRate: v.helperRate }
+        : fresh;
+    }));
+  };
 
   // Dynamic Settings State
   const [settings, setSettings] = useState<SystemSettings>(() => Store.getSettings());
@@ -262,10 +296,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         res = await Store.deleteUserPermanently(deleteTarget.id, deleteResetKeyInput);
       } else if (deleteTarget.type === 'service') {
         res = await Store.deleteServiceWithKey(deleteTarget.id, deleteResetKeyInput);
-        setEditingServices([...Store.getServicesCatalog()]);
+        if (res.success) {
+          dirtyServiceIds.current.delete(deleteTarget.id);
+          setEditingServices(prev => prev.filter(s => s.id !== deleteTarget.id));
+        }
       } else {
         res = await Store.deleteVehicleWithKey(deleteTarget.id, deleteResetKeyInput);
-        setEditingVehicles([...Store.getVehiclesCatalog()]);
+        if (res.success) {
+          dirtyVehicleIds.current.delete(deleteTarget.id);
+          setEditingVehicles(prev => prev.filter(v => v.id !== deleteTarget.id));
+        }
       }
 
       if (res.success) {
@@ -538,27 +578,61 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleServicePriceChange = (serviceId: string, newPrice: number) => {
+    dirtyServiceIds.current.add(serviceId);
     setEditingServices(prev => 
       prev.map(s => s.id === serviceId ? { ...s, basePrice: newPrice } : s)
     );
   };
 
   const handleVehicleRateChange = (vehicleId: string, field: 'baseFare' | 'perKmRate' | 'helperRate', value: number) => {
+    dirtyVehicleIds.current.add(vehicleId);
     setEditingVehicles(prev =>
       prev.map(v => v.id === vehicleId ? { ...v, [field]: value } : v)
     );
   };
 
-  const handleSaveCatalog = () => {
-    Store.updateServicesCatalog(editingServices);
-    Store.updateVehiclesCatalog(editingVehicles);
-    setCatalogSavedMessage('Service & Transport Catalog saved and deployed successfully!');
-    setTimeout(() => setCatalogSavedMessage(''), 4000);
+  const handleSaveCatalog = async () => {
+    if (isSavingCatalog) return;
+    const changedServices = editingServices.filter(s => dirtyServiceIds.current.has(s.id));
+    const changedVehicles = editingVehicles.filter(v => dirtyVehicleIds.current.has(v.id));
+    if (changedServices.length === 0 && changedVehicles.length === 0) {
+      setCatalogSavedMessage('Koi naya change nahi hai - save karne ke liye pehle koi rate badlein.');
+      setTimeout(() => setCatalogSavedMessage(''), 4000);
+      return;
+    }
+    setIsSavingCatalog(true);
+    const result = await Store.saveCatalogChanges({
+      services: changedServices.length ? changedServices : undefined,
+      vehicles: changedVehicles.length ? changedVehicles : undefined
+    });
+    setIsSavingCatalog(false);
+    if (result.ok) {
+      // Only clear what we actually handled (admin may have typed more meanwhile)
+      changedServices.forEach(s => dirtyServiceIds.current.delete(s.id));
+      changedVehicles.forEach(v => dirtyVehicleIds.current.delete(v.id));
+      const conflictCount = result.conflicts.services.length + result.conflicts.vehicles.length;
+      if (conflictCount > 0) {
+        // Those drafts were stale: store now holds the server's newer copy, so show that
+        setEditingServices(Store.getServicesCatalog().map(sv => dirtyServiceIds.current.has(sv.id)
+          ? (editingServices.find(e => e.id === sv.id) || sv) : sv));
+        setEditingVehicles(Store.getVehiclesCatalog().map(vh => dirtyVehicleIds.current.has(vh.id)
+          ? (editingVehicles.find(e => e.id === vh.id) || vh) : vh));
+        setCatalogSavedMessage(
+          `${conflictCount} item(s) kisi doosre tab/device se pehle badle ja chuke the, is liye aap ka purana rate save nahi hua - naye rates dikha diye gaye hain. Baqi sab save ho gaya.`
+        );
+      } else {
+        setCatalogSavedMessage('Rates server par kamyabi se save ho gaye!');
+      }
+    } else {
+      // Draft stays untouched & dirty so nothing is lost; admin can retry
+      setCatalogSavedMessage('Save fail ho gaya (server jawab nahi de raha). Aap ke rates mehfooz hain - dobara koshish karein.');
+    }
+    setTimeout(() => setCatalogSavedMessage(''), 6000);
   };
 
   const handleAssignServiceSource = (serviceId: string, providerId: string) => {
     Store.assignSourceToService(serviceId, providerId);
-    setEditingServices([...Store.getServicesCatalog()]);
+    refreshServiceDraft(serviceId);
     setCatalogSavedMessage(
       providerId ? 'Provider source assigned! Service is now Published on the Customer Store.' : 'Provider source unassigned. Service is now Hidden from Customer Store.'
     );
@@ -568,7 +642,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleDeleteService = (serviceId: string) => {
     if (window.confirm('Are you sure you want to delete this service permanently from the catalog?')) {
       Store.deleteServiceFromCatalog(serviceId);
-      setEditingServices([...Store.getServicesCatalog()]);
+      dirtyServiceIds.current.delete(serviceId);
+      setEditingServices(prev => prev.filter(s => s.id !== serviceId));
       setCatalogSavedMessage('Service deleted permanently from catalog.');
       setTimeout(() => setCatalogSavedMessage(''), 4000);
     }
@@ -576,7 +651,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleAssignVehicleSource = (vehicleId: string, driverId: string) => {
     Store.assignSourceToVehicle(vehicleId, driverId);
-    setEditingVehicles([...Store.getVehiclesCatalog()]);
+    refreshVehicleDraft(vehicleId);
     setCatalogSavedMessage(
       driverId ? 'Driver source assigned! Vehicle is now Published on the Customer Store.' : 'Driver source unassigned. Vehicle is now Hidden from Customer Store.'
     );
@@ -586,7 +661,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleDeleteVehicle = (vehicleId: string) => {
     if (window.confirm('Are you sure you want to delete this vehicle permanently from the fleet catalog?')) {
       Store.deleteVehicleFromCatalog(vehicleId);
-      setEditingVehicles([...Store.getVehiclesCatalog()]);
+      dirtyVehicleIds.current.delete(vehicleId);
+      setEditingVehicles(prev => prev.filter(v => v.id !== vehicleId));
       setCatalogSavedMessage('Vehicle deleted permanently from fleet catalog.');
       setTimeout(() => setCatalogSavedMessage(''), 4000);
     }
@@ -594,7 +670,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleTogglePublishService = (serviceId: string) => {
     const isNowPublished = Store.togglePublishService(serviceId);
-    setEditingServices([...Store.getServicesCatalog()]);
+    refreshServiceDraft(serviceId);
     setCatalogSavedMessage(
       isNowPublished ? 'Service published live to customer store!' : 'Service hidden from customer store.'
     );
@@ -603,7 +679,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleTogglePublishVehicle = (vehicleId: string) => {
     const isNowPublished = Store.togglePublishVehicle(vehicleId);
-    setEditingVehicles([...Store.getVehiclesCatalog()]);
+    refreshVehicleDraft(vehicleId);
     setCatalogSavedMessage(
       isNowPublished ? 'Vehicle / Driver published live to customer store!' : 'Vehicle / Driver hidden from customer store.'
     );
@@ -623,9 +699,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       icon: 'Zap',
       isPublished: true
     };
-    const updated = [...editingServices, newService];
-    setEditingServices(updated);
-    Store.updateServicesCatalog(updated);
+    Store.updateServicesCatalog([...Store.getServicesCatalog(), newService]);
+    setEditingServices(prev => [...prev, newService]);
     setCatalogSavedMessage('New technician service added to catalog!');
     setTimeout(() => setCatalogSavedMessage(''), 4000);
   };
@@ -644,9 +719,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       icon: 'Truck',
       isPublished: true
     };
-    const updated = [...editingVehicles, newVehicle];
-    setEditingVehicles(updated);
-    Store.updateVehiclesCatalog(updated);
+    Store.updateVehiclesCatalog([...Store.getVehiclesCatalog(), newVehicle]);
+    setEditingVehicles(prev => [...prev, newVehicle]);
     setCatalogSavedMessage('New vehicle / rickshaw added to fleet catalog!');
     setTimeout(() => setCatalogSavedMessage(''), 4000);
   };
@@ -1988,10 +2062,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <button
                 type="button"
                 onClick={handleSaveCatalog}
+                disabled={isSavingCatalog}
                 className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
               >
                 <Save className="w-4 h-4" />
-                <span>Tamam Rates Mehfooz Karein</span>
+                <span>{isSavingCatalog ? 'Save ho raha hai...' : 'Tamam Rates Mehfooz Karein'}</span>
               </button>
             </div>
           </div>
