@@ -171,7 +171,20 @@ export async function initAllTables() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
 
-    console.log('[MySQL] All database tables (users, orders, app_settings, catalog_services, catalog_vehicles) verified.');
+    // 6. System Snapshots Table (Zero-Loss Persistent Backup & Cache)
+    await query(`
+      CREATE TABLE IF NOT EXISTS \`system_snapshots\` (
+        \`id\` VARCHAR(64) NOT NULL PRIMARY KEY,
+        \`snapshot_label\` VARCHAR(150) NOT NULL,
+        \`orders_count\` INT NOT NULL DEFAULT 0,
+        \`users_count\` INT NOT NULL DEFAULT 0,
+        \`snapshot_json\` LONGTEXT NOT NULL,
+        \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX \`idx_snap_created\` (\`created_at\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    console.log('[MySQL] All database tables (users, orders, app_settings, catalog_services, catalog_vehicles, system_snapshots) verified.');
   } catch (err: any) {
     console.warn('[MySQL] Note verifying schema tables:', err.message);
   }

@@ -1,15 +1,3 @@
-import { 
-  collection, 
-  addDoc, 
-  updateDoc, 
-  doc, 
-  onSnapshot, 
-  query, 
-  orderBy, 
-  limit, 
-  serverTimestamp 
-} from 'firebase/firestore';
-import { db } from './firebase';
 import { PushNotificationService } from './pushNotification';
 
 export interface AppNotification {
@@ -53,7 +41,6 @@ export function isNotificationForUser(
 
   // Customer: STRICT ISOLATION
   // Customers only see notifications where recipientId matches their unique user id!
-  // No other customer's order info or admin alerts are ever exposed.
   return notif.recipientId === userId;
 }
 
@@ -96,8 +83,9 @@ export function playNotificationChime() {
   }
 }
 
-// Local storage fallback key for offline notification cache
+// Local storage key for notification cache
 const LOCAL_NOTIF_KEY = 'khanewal_notifications_v1';
+const NOTIF_EVENT = 'khanewal_notif_event';
 
 function getLocalNotifications(): AppNotification[] {
   try {
@@ -111,6 +99,7 @@ function getLocalNotifications(): AppNotification[] {
 function saveLocalNotifications(list: AppNotification[]) {
   try {
     localStorage.setItem(LOCAL_NOTIF_KEY, JSON.stringify(list.slice(0, 100)));
+    window.dispatchEvent(new CustomEvent(NOTIF_EVENT));
   } catch {
     // ignore
   }
@@ -145,9 +134,19 @@ export const NotificationService = {
     const current = getLocalNotifications();
     saveLocalNotifications([newRecord, ...current]);
 
+    // Play chime locally if appropriate
+    playNotificationChime();
+
+    // Trigger OS Push Notification
+    PushNotificationService.showDirectNotification(
+      newRecord.title, 
+      { body: newRecord.body, tag: newRecord.orderId || newRecord.id }, 
+      newRecord.orderId
+    );
+
     // Dispatch transactional email via Brevo and backend notification router
     try {
-      fetch('/api/notifications/dispatch', {
+      fetch('/api/notifications/dispatch-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -158,7 +157,7 @@ export const NotificationService = {
           title: notif.title,
           body: notif.body,
           orderId: notif.orderId,
-          order: notif.order,
+          orderData: notif.order,
           note: notif.note
         })
       }).catch(err => console.warn('Email notification dispatch error:', err));
@@ -166,17 +165,7 @@ export const NotificationService = {
       // ignore
     }
 
-    // Push to Firestore if connected
-    try {
-      const docRef = await addDoc(collection(db, 'notifications'), {
-        ...newRecord,
-        serverTime: serverTimestamp()
-      });
-      return docRef.id;
-    } catch (err) {
-      console.warn('Firestore notification write fallback to local storage:', err);
-      return newRecord.id;
-    }
+    return newRecord.id;
   },
 
   // Mark notification as read
@@ -184,13 +173,6 @@ export const NotificationService = {
     const current = getLocalNotifications();
     const updated = current.map(n => n.id === notificationId ? { ...n, isRead: true } : n);
     saveLocalNotifications(updated);
-
-    try {
-      const ref = doc(db, 'notifications', notificationId);
-      await updateDoc(ref, { isRead: true });
-    } catch {
-      // offline fallback
-    }
   },
 
   // Mark all as read for active user
@@ -205,7 +187,7 @@ export const NotificationService = {
     saveLocalNotifications(updated);
   },
 
-  // Subscribe to strictly targeted real-time notifications for the active user
+  // Subscribe to strictly targeted notifications for the active user
   subscribe(
     userId: string | null,
     userRole: string | undefined,
@@ -216,87 +198,20 @@ export const NotificationService = {
       return () => {};
     }
 
-    let previousUnreadIds = new Set<string>();
-    let isInitialLoad = true;
+    const deliver = () => {
+      const list = getLocalNotifications().filter(n => isNotificationForUser(n, userId, userRole));
+      callback(list);
+    };
 
-    // Load initial filtered notifications from local storage
-    const initialLocal = getLocalNotifications().filter(n => 
-      isNotificationForUser(n, userId, userRole)
-    );
-    initialLocal.forEach(n => {
-      if (!n.isRead) previousUnreadIds.add(n.id);
-    });
-    callback(initialLocal);
+    deliver();
 
-    try {
-      const notifsRef = collection(db, 'notifications');
-      // Query recent 50 notifications ordered by createdAt
-      const q = query(notifsRef, orderBy('createdAt', 'desc'), limit(50));
+    const handler = () => deliver();
+    window.addEventListener(NOTIF_EVENT, handler);
+    window.addEventListener('storage', handler);
 
-      const unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          const list: AppNotification[] = [];
-          snapshot.forEach(docSnap => {
-            const data = docSnap.data();
-            list.push({
-              id: docSnap.id,
-              recipientId: data.recipientId || '',
-              recipientRole: data.recipientRole,
-              title: data.title || '',
-              body: data.body || '',
-              orderId: data.orderId,
-              type: data.type || 'system_alert',
-              isRead: !!data.isRead,
-              createdAt: data.createdAt || new Date().toISOString()
-            });
-          });
-
-          // Strictly filter only notifications intended for THIS user
-          const userNotifications = (list.length > 0 ? list : getLocalNotifications())
-            .filter(n => isNotificationForUser(n, userId, userRole));
-
-          // Detect new incoming unread notifications
-          const currentUnread = userNotifications.filter(n => !n.isRead);
-          const newlyArrived = currentUnread.filter(n => !previousUnreadIds.has(n.id));
-
-          if (!isInitialLoad && newlyArrived.length > 0) {
-            // 1. Play audio chime
-            playNotificationChime();
-
-            // 2. Trigger native Web Push Popup for the top new notification
-            const top = newlyArrived[0];
-            PushNotificationService.show({
-              title: top.title,
-              body: top.body,
-              orderId: top.orderId,
-              tag: `notif-${top.id}`
-            });
-          }
-
-          // Update tracked unread ids
-          previousUnreadIds = new Set(currentUnread.map(n => n.id));
-          isInitialLoad = false;
-
-          callback(userNotifications);
-        },
-        (error) => {
-          console.warn('Firestore notification listener fallback to local:', error);
-          const localFiltered = getLocalNotifications().filter(n => 
-            isNotificationForUser(n, userId, userRole)
-          );
-          callback(localFiltered);
-        }
-      );
-
-      return unsubscribe;
-    } catch (err) {
-      console.warn('Notification listener setup error:', err);
-      const localFiltered = getLocalNotifications().filter(n => 
-        isNotificationForUser(n, userId, userRole)
-      );
-      callback(localFiltered);
-      return () => {};
-    }
+    return () => {
+      window.removeEventListener(NOTIF_EVENT, handler);
+      window.removeEventListener('storage', handler);
+    };
   }
 };

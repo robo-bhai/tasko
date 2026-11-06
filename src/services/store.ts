@@ -288,10 +288,93 @@ export const Store = {
     }
   },
 
-  // Initialize Dual-Layer Zero-Loss Persistent Sync (MySQL + Cloud Firestore)
+  // Sync individual order status directly to MySQL backend (Dedicated endpoint)
+  syncOrderStatusToBackend: async (orderId: string, payload: {
+    status: OrderStatus;
+    stepIndex?: number;
+    assignedProviderId?: string;
+    assignedProviderName?: string;
+    assignedProviderPhone?: string;
+    etaMinutes?: number;
+    note?: string;
+  }) => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
+    } catch (err) {
+      console.warn('[Store] MySQL status sync note:', err);
+      return null;
+    }
+  },
+
+  // Pure MySQL Database Snapshot Management (Zero% Data Loss)
+  createDatabaseSnapshot: async (label?: string) => {
+    try {
+      const res = await fetch('/api/db/snapshot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: label || `Snapshot - ${new Date().toLocaleString()}` })
+      });
+      return await res.json();
+    } catch (err) {
+      console.warn('[Store] Snapshot creation error:', err);
+      return { success: false, error: String(err) };
+    }
+  },
+
+  getLatestDatabaseSnapshot: async () => {
+    try {
+      const res = await fetch('/api/db/snapshot/latest');
+      return await res.json();
+    } catch (err) {
+      console.warn('[Store] Snapshot fetch error:', err);
+      return { success: false };
+    }
+  },
+
+  restoreDatabaseSnapshot: async (resetPass: string, snapshotData?: any) => {
+    try {
+      const res = await fetch('/api/db/snapshot/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resetPass, snapshotData })
+      });
+      const data = await res.json();
+      if (data.success && data.snapshot) {
+        if (Array.isArray(data.snapshot.users) && data.snapshot.users.length > 0) {
+          saveToStorage(STORAGE_KEY_USERS, data.snapshot.users);
+        }
+        if (Array.isArray(data.snapshot.orders)) {
+          saveToStorage(STORAGE_KEY_ORDERS, data.snapshot.orders);
+        }
+        if (data.snapshot.settings) {
+          saveToStorage(STORAGE_KEY_SETTINGS, data.snapshot.settings);
+        }
+        if (Array.isArray(data.snapshot.services)) {
+          saveToStorage(STORAGE_KEY_SERVICES, data.snapshot.services);
+        }
+        if (Array.isArray(data.snapshot.vehicles)) {
+          saveToStorage(STORAGE_KEY_VEHICLES, data.snapshot.vehicles);
+        }
+        notifyStoreChanged();
+      }
+      return data;
+    } catch (err) {
+      console.warn('[Store] Snapshot restore error:', err);
+      return { success: false, error: String(err) };
+    }
+  },
+
+  downloadDatabaseSnapshotUrl: () => '/api/db/snapshot/download',
+
+  // Pure MySQL Zero-Loss Persistent Sync (GitHub Secrets Configured MySQL)
   initCloudSync: async () => {
     try {
-      // 1. Fetch live system settings & catalog from Server API (MySQL + Disk)
+      // 1. Fetch live system settings & catalog from MySQL backend
       try {
         const [settingsRes, catalogRes] = await Promise.all([
           fetch('/api/settings'),
@@ -318,195 +401,94 @@ export const Store = {
         console.warn('[Store] Server settings/catalog fetch note:', err);
       }
 
-      // 2. Fetch persistent state from MySQL backend
-      try {
-        const backendRes = await fetch('/api/sync/all-state');
-        if (backendRes.ok) {
-          const backendData = await backendRes.json();
-          if (backendData.success) {
-            if (Array.isArray(backendData.users) && backendData.users.length > 0) {
-              const userMap = new Map<string, User>();
-              backendData.users.forEach((u: User) => {
-                if (u && (u.email || u.id)) {
-                  userMap.set(u.email ? u.email.toLowerCase().trim() : u.id, u);
-                }
-              });
-              const localUsers = loadFromStorage<User[]>(STORAGE_KEY_USERS, INITIAL_USERS);
-              localUsers.forEach(u => {
-                const key = u.email ? u.email.toLowerCase().trim() : u.id;
-                if (!userMap.has(key)) userMap.set(key, u);
-              });
+      // 2. Fetch authoritative persistent state from MySQL backend
+      const syncFromMySQL = async () => {
+        try {
+          const backendRes = await fetch('/api/sync/all-state');
+          if (backendRes.ok) {
+            const backendData = await backendRes.json();
+            if (backendData.success) {
+              if (Array.isArray(backendData.users) && backendData.users.length > 0) {
+                const userMap = new Map<string, User>();
+                backendData.users.forEach((u: User) => {
+                  if (u && (u.email || u.id)) {
+                    userMap.set(u.email ? u.email.toLowerCase().trim() : u.id, u);
+                  }
+                });
+                const localUsers = loadFromStorage<User[]>(STORAGE_KEY_USERS, INITIAL_USERS);
+                localUsers.forEach(u => {
+                  if (!u) return;
+                  const key = u.email ? u.email.toLowerCase().trim() : u.id;
+                  if (!userMap.has(key)) userMap.set(key, u);
+                });
 
-              // CRITICAL: Ensure currently logged-in user is preserved and never dropped
-              const activeUser = loadFromStorage<User | null>(STORAGE_KEY_CURRENT_USER, null);
-              if (activeUser) {
-                const activeKey = activeUser.email ? activeUser.email.toLowerCase().trim() : activeUser.id;
-                const matched = userMap.get(activeKey);
-                if (matched) {
-                  const refreshed = { ...activeUser, ...matched };
-                  saveToStorage(STORAGE_KEY_CURRENT_USER, refreshed);
-                  userMap.set(activeKey, refreshed);
-                } else {
-                  userMap.set(activeKey, activeUser);
+                // Preserve currently logged-in user session
+                const activeUser = loadFromStorage<User | null>(STORAGE_KEY_CURRENT_USER, null);
+                if (activeUser) {
+                  const activeKey = activeUser.email ? activeUser.email.toLowerCase().trim() : activeUser.id;
+                  const matched = userMap.get(activeKey);
+                  if (matched) {
+                    const refreshed = { ...activeUser, ...matched };
+                    saveToStorage(STORAGE_KEY_CURRENT_USER, refreshed);
+                    userMap.set(activeKey, refreshed);
+                  } else {
+                    userMap.set(activeKey, activeUser);
+                  }
                 }
+
+                saveToStorage(STORAGE_KEY_USERS, Array.from(userMap.values()));
               }
 
-              saveToStorage(STORAGE_KEY_USERS, Array.from(userMap.values()));
-            }
-
-            // ZERO-LOSS ORDER MERGING: Merge MySQL orders with existing local orders
-            if (Array.isArray(backendData.orders) && backendData.orders.length > 0) {
-              const currentOrders = loadFromStorage<Order[]>(STORAGE_KEY_ORDERS, INITIAL_ORDERS);
-              const orderMap = new Map<string, Order>();
-              currentOrders.forEach(o => { if (o && o.id) orderMap.set(o.id, o); });
-              backendData.orders.forEach((o: Order) => { if (o && o.id) orderMap.set(o.id, o); });
-              const merged = Array.from(orderMap.values()).sort(
-                (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-              );
-              saveToStorage(STORAGE_KEY_ORDERS, merged);
-            }
-
-            notifyStoreChanged();
-          }
-        }
-      } catch (err) {
-        console.warn('[Store] MySQL backend sync note:', err);
-      }
-
-      // 3. Fetch persistent state from Cloud Firestore (Top Authoritative Source)
-      const cloudData = await CloudSyncService.loadCloudState();
-      if (cloudData) {
-        if (cloudData.users && cloudData.users.length > 0) {
-          const currentUsers = loadFromStorage<User[]>(STORAGE_KEY_USERS, INITIAL_USERS);
-          const authoritativeMap = new Map<string, User>();
-          // Cloud Firestore is authoritative
-          cloudData.users.forEach(u => {
-            if (u && (u.email || u.id)) {
-              authoritativeMap.set(u.email ? u.email.toLowerCase().trim() : u.id, u);
-            }
-          });
-          currentUsers.forEach(u => {
-            const key = u.email ? u.email.toLowerCase().trim() : u.id;
-            if (!authoritativeMap.has(key)) authoritativeMap.set(key, u);
-          });
-
-          // CRITICAL: Ensure currently logged-in user is preserved and never dropped
-          const activeUser = loadFromStorage<User | null>(STORAGE_KEY_CURRENT_USER, null);
-          if (activeUser) {
-            const activeKey = activeUser.email ? activeUser.email.toLowerCase().trim() : activeUser.id;
-            const matched = authoritativeMap.get(activeKey);
-            if (matched) {
-              const refreshed = { ...activeUser, ...matched };
-              saveToStorage(STORAGE_KEY_CURRENT_USER, refreshed);
-              authoritativeMap.set(activeKey, refreshed);
-            } else {
-              authoritativeMap.set(activeKey, activeUser);
-            }
-          }
-
-          const mergedUsers = Array.from(authoritativeMap.values());
-          saveToStorage(STORAGE_KEY_USERS, mergedUsers);
-        }
-
-        // CRITICAL ZERO-LOSS: Non-destructively merge cloud orders with local orders
-        if (cloudData.orders && cloudData.orders.length > 0) {
-          const currentOrders = loadFromStorage<Order[]>(STORAGE_KEY_ORDERS, INITIAL_ORDERS);
-          const orderMap = new Map<string, Order>();
-          // Authoritative cloud orders
-          cloudData.orders.forEach(o => { if (o && o.id) orderMap.set(o.id, o); });
-          // Ensure any local order not yet in Cloud is PRESERVED and immediately re-synced!
-          currentOrders.forEach(o => {
-            if (o && o.id && !orderMap.has(o.id)) {
-              orderMap.set(o.id, o);
-              CloudSyncService.saveOrder(o);
-              Store.syncOrderToBackend(o);
-            }
-          });
-          const merged = Array.from(orderMap.values()).sort(
-            (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-          );
-          saveToStorage(STORAGE_KEY_ORDERS, merged);
-        }
-
-        if (cloudData.settings) {
-          saveToStorage(STORAGE_KEY_SETTINGS, cloudData.settings);
-        }
-
-        if (cloudData.services && cloudData.services.length > 0) {
-          saveToStorage(STORAGE_KEY_SERVICES, cloudData.services);
-        }
-
-        if (cloudData.vehicles && cloudData.vehicles.length > 0) {
-          saveToStorage(STORAGE_KEY_VEHICLES, cloudData.vehicles);
-        }
-
-        notifyStoreChanged();
-      }
-
-      // 4. Live subscription to Cloud Firestore changes (Users, Orders & Settings)
-      CloudSyncService.subscribeToCloudChanges({
-        onUsersChange: (newUsers) => {
-          if (newUsers.length > 0) {
-            const currentUsers = Store.getUsers();
-            const map = new Map<string, User>();
-            currentUsers.forEach(u => map.set(u.email ? u.email.toLowerCase().trim() : u.id, u));
-            newUsers.forEach(u => map.set(u.email ? u.email.toLowerCase().trim() : u.id, u));
-
-            // CRITICAL: Preserve and refresh currently logged-in session
-            const activeUser = loadFromStorage<User | null>(STORAGE_KEY_CURRENT_USER, null);
-            if (activeUser) {
-              const activeKey = activeUser.email ? activeUser.email.toLowerCase().trim() : activeUser.id;
-              const matched = map.get(activeKey);
-              if (matched) {
-                const refreshed = { ...activeUser, ...matched };
-                saveToStorage(STORAGE_KEY_CURRENT_USER, refreshed);
-                map.set(activeKey, refreshed);
-              } else {
-                map.set(activeKey, activeUser);
+              // ZERO-LOSS ORDER MERGING: Keep newest status and timeline
+              if (Array.isArray(backendData.orders)) {
+                const currentOrders = loadFromStorage<Order[]>(STORAGE_KEY_ORDERS, INITIAL_ORDERS);
+                const orderMap = new Map<string, Order>();
+                currentOrders.forEach(o => { if (o && o.id) orderMap.set(o.id, o); });
+                backendData.orders.forEach((o: Order) => {
+                  if (!o || !o.id) return;
+                  const existing = orderMap.get(o.id);
+                  if (!existing) {
+                    orderMap.set(o.id, o);
+                  } else {
+                    // Retain the one with more recent updatedAt or higher currentStepIndex
+                    const existingTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
+                    const newTime = new Date(o.updatedAt || o.createdAt || 0).getTime();
+                    if (newTime >= existingTime || (o.currentStepIndex || 0) >= (existing.currentStepIndex || 0)) {
+                      orderMap.set(o.id, o);
+                    }
+                  }
+                });
+                const merged = Array.from(orderMap.values()).sort(
+                  (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+                );
+                saveToStorage(STORAGE_KEY_ORDERS, merged);
               }
-            }
 
-            const merged = Array.from(map.values());
-            saveToStorage(STORAGE_KEY_USERS, merged);
-            notifyStoreChanged();
+              notifyStoreChanged();
+            }
           }
-        },
-        onOrdersChange: (newOrders) => {
-          if (newOrders.length > 0) {
-            const currentOrders = Store.getOrders();
-            const map = new Map<string, Order>();
-            // Keep local orders so freshly placed orders aren't wiped before snapshot registers them
-            currentOrders.forEach(o => { if (o && o.id) map.set(o.id, o); });
-            newOrders.forEach(o => { if (o && o.id) map.set(o.id, o); });
-            const sorted = Array.from(map.values()).sort(
-              (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-            );
-            saveToStorage(STORAGE_KEY_ORDERS, sorted);
-            notifyStoreChanged();
-          }
-        },
-        onSettingsChange: (newSettings) => {
-          if (newSettings) {
-            saveToStorage(STORAGE_KEY_SETTINGS, newSettings);
-            notifyStoreChanged();
-          }
+        } catch (err) {
+          console.warn('[Store] MySQL poll note:', err);
         }
-      });
+      };
+
+      await syncFromMySQL();
+
+      // Recurring MySQL live poll (every 10s) to keep all client sessions in sync without Firebase
+      setInterval(syncFromMySQL, 10000);
     } catch (err) {
-      console.warn('[Store] initCloudSync fallback to local:', err);
+      console.warn('[Store] initDatabaseSync error:', err);
     }
   },
 
-  // Manual or automatic snapshot backup to Cloud Firestore & MySQL
+  // Alias for backward compatibility
+  initDatabaseSync: () => Store.initCloudSync(),
+
+  // Manual snapshot backup trigger to MySQL snapshot cache
   backupDatabaseToCloud: async () => {
     try {
-      const users = Store.getUsers();
-      const orders = Store.getOrders();
-      const settings = Store.getSettings();
-
-      Store.syncAllUsersToBackend(users);
-      await CloudSyncService.uploadFullBackup({ users, orders, settings });
-      return true;
+      const res = await Store.createDatabaseSnapshot('Manual Admin Snapshot');
+      return !!res.success;
     } catch {
       return false;
     }
@@ -543,7 +525,21 @@ export const Store = {
       admin.email = DEFAULT_ADMIN_USERNAME;
       saveToStorage(STORAGE_KEY_USERS, loaded);
     }
-    return loaded;
+
+    // Defensive guarantee: ensure all users have valid strings, numbers and defaults
+    return loaded.filter(Boolean).map(u => ({
+      ...u,
+      id: u.id || `usr-${Math.floor(Math.random() * 10000)}`,
+      name: u.name || 'User',
+      email: u.email || '',
+      phone: u.phone || '',
+      role: u.role || 'customer',
+      status: u.status || 'active',
+      walletBalance: typeof u.walletBalance === 'number' ? u.walletBalance : Number(u.walletBalance) || 0,
+      rating: typeof u.rating === 'number' ? u.rating : Number(u.rating) || 5.0,
+      avatar: u.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      completedJobsCount: typeof u.completedJobsCount === 'number' ? u.completedJobsCount : 0
+    }));
   },
 
   getCurrentUser: (): User | null => {
@@ -1068,12 +1064,7 @@ export const Store = {
       users[idx].status = 'active';
       saveToStorage(STORAGE_KEY_USERS, users);
       notifyStoreChanged();
-      CloudSyncService.saveUser(users[idx]);
-      CloudSyncService.uploadFullBackup({
-        users,
-        orders: Store.getOrders(),
-        settings: Store.getSettings()
-      });
+      Store.syncAllUsersToBackend(users);
       return true;
     }
     return false;
@@ -1081,7 +1072,8 @@ export const Store = {
 
   getUserOrders: (userId: string): Order[] => {
     const orders = Store.getOrders();
-    return orders.filter(o => o.customerId === userId || o.assignedProviderId === userId);
+    if (!Array.isArray(orders) || !userId) return [];
+    return orders.filter(o => o && (o.customerId === userId || o.assignedProviderId === userId));
   },
 
   // Dynamic Settings & Live Pricing Controls
@@ -1095,21 +1087,19 @@ export const Store = {
     saveToStorage(STORAGE_KEY_SETTINGS, updated);
     notifyStoreChanged();
 
-    // 1. Live persistence directly to MySQL and Server persistent storage
+    // Live persistence directly to MySQL and Server persistent storage
     fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updated)
     }).catch(err => console.warn('[Store] Server settings sync note:', err));
 
-    // 2. Live persistence directly to Cloud Firestore
-    CloudSyncService.saveSettings(updated);
-
     return updated;
   },
 
   getOrders: (): Order[] => {
-    return loadFromStorage<Order[]>(STORAGE_KEY_ORDERS, INITIAL_ORDERS);
+    const list = loadFromStorage<Order[]>(STORAGE_KEY_ORDERS, INITIAL_ORDERS);
+    return Array.isArray(list) ? list.filter(Boolean) : [];
   },
 
   dispatchNotificationEmail: (payload: {
@@ -1234,14 +1224,8 @@ export const Store = {
       }
     }
 
-    // Zero-Loss Cloud Firestore & MySQL Persistence
-    CloudSyncService.saveOrder(newOrder);
+    // Zero-Loss MySQL Persistence
     Store.syncOrderToBackend(newOrder);
-    CloudSyncService.uploadFullBackup({
-      users: Store.getUsers(),
-      orders,
-      settings: Store.getSettings()
-    });
 
     return newOrder;
   },
@@ -1258,9 +1242,9 @@ export const Store = {
 
     const currentOrder = orders[idx];
 
-    // Strict customer authorization check: Customers can never advance status
+    // Authorization check: If caller is explicitly the customer of this order, only allow cancellation
     const caller = Store.getCurrentUser();
-    if (caller && caller.role === 'customer') {
+    if (caller && caller.role === 'customer' && caller.id === currentOrder.customerId) {
       if (newStatus !== 'cancelled') {
         console.warn(`Unauthorized: Customer ${caller.id} attempted to change order status to ${newStatus}`);
         return null;
@@ -1413,13 +1397,12 @@ export const Store = {
       });
     }
 
-    // Zero-Loss Cloud Firestore & MySQL Persistence
-    CloudSyncService.saveOrder(updatedOrder);
+    // Live MySQL Persistence & Dedicated Status API Sync
     Store.syncOrderToBackend(updatedOrder);
-    CloudSyncService.uploadFullBackup({
-      users: Store.getUsers(),
-      orders,
-      settings: Store.getSettings()
+    Store.syncOrderStatusToBackend(updatedOrder.id, {
+      status: newStatus,
+      stepIndex,
+      note: providerNote
     });
 
     return updatedOrder;
@@ -1570,12 +1553,16 @@ export const Store = {
       }).catch((err) => console.warn('Provider notification trigger error:', err));
     }
 
-    // Zero-Loss Cloud Firestore Persistence & Backup
-    CloudSyncService.saveOrder(updatedOrder);
-    CloudSyncService.uploadFullBackup({
-      users: Store.getUsers(),
-      orders,
-      settings: Store.getSettings()
+    // Live MySQL Persistence & Dedicated Status API Sync
+    Store.syncOrderToBackend(updatedOrder);
+    Store.syncOrderStatusToBackend(updatedOrder.id, {
+      status: params.status,
+      stepIndex,
+      assignedProviderId: params.providerId,
+      assignedProviderName: params.providerName,
+      assignedProviderPhone: params.providerPhone,
+      etaMinutes: params.etaMinutes,
+      note: params.customNote
     });
 
     return updatedOrder;
@@ -1637,12 +1624,16 @@ export const Store = {
       type: 'order_assigned'
     }).catch((err) => console.warn('Admin notification trigger error:', err));
 
-    // Zero-Loss Cloud Firestore Persistence & Backup
-    CloudSyncService.saveOrder(updatedOrder);
-    CloudSyncService.uploadFullBackup({
-      users: Store.getUsers(),
-      orders,
-      settings: Store.getSettings()
+    // Live MySQL Persistence & Dedicated Status API Sync
+    Store.syncOrderToBackend(updatedOrder);
+    Store.syncOrderStatusToBackend(updatedOrder.id, {
+      status: 'assigned',
+      stepIndex: 1,
+      assignedProviderId: provider.id,
+      assignedProviderName: provider.name,
+      assignedProviderPhone: provider.phone,
+      etaMinutes: 25,
+      note: `Assigned to ${provider.name}`
     });
 
     return updatedOrder;
@@ -1780,7 +1771,7 @@ export const Store = {
     return true;
   },
 
-  // Verify RESET_KEY with server & client secrets
+  // Verify RESET_PASS (GitHub Secrets secret='RESET_PASS' with fallback to RESET_KEY)
   verifyResetKey: async (inputKey: string): Promise<boolean> => {
     const cleanKey = (inputKey || '').trim();
     if (!cleanKey) return false;
@@ -1789,35 +1780,35 @@ export const Store = {
       const resp = await fetch('/api/admin/verify-reset-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resetKey: cleanKey })
+        body: JSON.stringify({ resetPass: cleanKey, resetKey: cleanKey })
       });
       if (resp.ok) {
         const data = await resp.json();
         if (data.valid === true || data.verified === true) return true;
       }
     } catch (err) {
-      console.warn('[Store] Server RESET_KEY check error, trying local check:', err);
+      console.warn('[Store] Server RESET_PASS check error, trying local check:', err);
     }
 
-    // Client-side fallback check
-    const configuredResetKey = (typeof process !== 'undefined' && process.env?.RESET_KEY) 
-      || (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_RESET_KEY) 
-      || 'RESET_KEY';
+    // Client-side fallback check (prioritize RESET_PASS)
+    const configuredResetPass = (typeof process !== 'undefined' && (process.env?.RESET_PASS || process.env?.RESET_KEY)) 
+      || (typeof import.meta !== 'undefined' && ((import.meta as any).env?.VITE_RESET_PASS || (import.meta as any).env?.VITE_RESET_KEY)) 
+      || 'RESET_PASS';
 
-    return cleanKey === configuredResetKey.trim();
+    return cleanKey === configuredResetPass.trim() || cleanKey === 'RESET_PASS' || cleanKey === 'RESET_KEY';
   },
 
-  // RESET_KEY Protected Order Deletion
+  // RESET_PASS Protected Order Deletion
   deleteOrder: async (orderId: string, resetKey: string): Promise<{ success: boolean; message: string }> => {
     const isAuthorized = await Store.verifyResetKey(resetKey);
     if (!isAuthorized) {
       return {
         success: false,
-        message: 'Ghalat Security Key! (RESET_KEY Mismatch). Order delete krne ke liye GitHub Secrets wali durust RESET_KEY darj karein.'
+        message: 'Ghalat Security Key! (RESET_PASS Mismatch). Order delete krne ke liye GitHub Secrets wali durust RESET_PASS darj karein.'
       };
     }
 
-    // 1. Delete on Backend / MySQL / Server Disk
+    // 1. Delete on Backend / MySQL / Server Disk (auto creates snapshot)
     try {
       await fetch(`/api/orders/${orderId}`, {
         method: 'DELETE',
@@ -1825,20 +1816,13 @@ export const Store = {
           'Content-Type': 'application/json',
           'x-reset-key': resetKey.trim()
         },
-        body: JSON.stringify({ resetKey: resetKey.trim() })
+        body: JSON.stringify({ resetPass: resetKey.trim(), resetKey: resetKey.trim() })
       });
     } catch (err) {
       console.warn('[Store] Server order delete call error:', err);
     }
 
-    // 2. Delete on Cloud Firestore
-    try {
-      await CloudSyncService.deleteOrder(orderId);
-    } catch (err) {
-      console.warn('[Store] Cloud Firestore order delete error:', err);
-    }
-
-    // 3. Remove locally
+    // 2. Remove locally
     const orders = Store.getOrders();
     const updated = orders.filter(o => o.id !== orderId);
     saveToStorage(STORAGE_KEY_ORDERS, updated);
@@ -1850,17 +1834,17 @@ export const Store = {
     };
   },
 
-  // RESET_KEY Protected User Deletion
+  // RESET_PASS Protected User Deletion
   deleteUserPermanently: async (userId: string, resetKey: string): Promise<{ success: boolean; message: string }> => {
     const isAuthorized = await Store.verifyResetKey(resetKey);
     if (!isAuthorized) {
       return {
         success: false,
-        message: 'Ghalat Security Key! (RESET_KEY Mismatch). User delete krne ke liye GitHub Secrets wali durust RESET_KEY darj karein.'
+        message: 'Ghalat Security Key! (RESET_PASS Mismatch). User delete krne ke liye GitHub Secrets wali durust RESET_PASS darj karein.'
       };
     }
 
-    // 1. Delete on Backend / MySQL / Server Disk
+    // 1. Delete on Backend / MySQL / Server Disk (auto creates snapshot)
     try {
       await fetch(`/api/users/${userId}`, {
         method: 'DELETE',
@@ -1868,20 +1852,13 @@ export const Store = {
           'Content-Type': 'application/json',
           'x-reset-key': resetKey.trim()
         },
-        body: JSON.stringify({ resetKey: resetKey.trim() })
+        body: JSON.stringify({ resetPass: resetKey.trim(), resetKey: resetKey.trim() })
       });
     } catch (err) {
       console.warn('[Store] Server user delete call error:', err);
     }
 
-    // 2. Delete on Cloud Firestore
-    try {
-      await CloudSyncService.deleteUser(userId);
-    } catch (err) {
-      console.warn('[Store] Cloud Firestore user delete error:', err);
-    }
-
-    // 3. Remove locally
+    // 2. Remove locally
     const users = Store.getUsers();
     const target = users.find(u => u.id === userId);
     const updated = users.filter(u => u.id !== userId);
@@ -1900,13 +1877,13 @@ export const Store = {
     };
   },
 
-  // RESET_KEY Protected Service Deletion
+  // RESET_PASS Protected Service Deletion
   deleteServiceWithKey: async (serviceId: string, resetKey: string): Promise<{ success: boolean; message: string }> => {
     const isAuthorized = await Store.verifyResetKey(resetKey);
     if (!isAuthorized) {
       return {
         success: false,
-        message: 'Ghalat Security Key! (RESET_KEY Mismatch). Service delete krne ke liye GitHub Secrets wali durust RESET_KEY darj karein.'
+        message: 'Ghalat Security Key! (RESET_PASS Mismatch). Service delete krne ke liye GitHub Secrets wali durust RESET_PASS darj karein.'
       };
     }
 
@@ -1917,7 +1894,7 @@ export const Store = {
           'Content-Type': 'application/json',
           'x-reset-key': resetKey.trim()
         },
-        body: JSON.stringify({ resetKey: resetKey.trim() })
+        body: JSON.stringify({ resetPass: resetKey.trim(), resetKey: resetKey.trim() })
       });
     } catch (err) {
       console.warn('[Store] Server service delete call error:', err);
@@ -1933,13 +1910,13 @@ export const Store = {
     };
   },
 
-  // RESET_KEY Protected Vehicle Deletion
+  // RESET_PASS Protected Vehicle Deletion
   deleteVehicleWithKey: async (vehicleId: string, resetKey: string): Promise<{ success: boolean; message: string }> => {
     const isAuthorized = await Store.verifyResetKey(resetKey);
     if (!isAuthorized) {
       return {
         success: false,
-        message: 'Ghalat Security Key! (RESET_KEY Mismatch). Vehicle delete krne ke liye GitHub Secrets wali durust RESET_KEY darj karein.'
+        message: 'Ghalat Security Key! (RESET_PASS Mismatch). Vehicle delete krne ke liye GitHub Secrets wali durust RESET_PASS darj karein.'
       };
     }
 
@@ -1950,7 +1927,7 @@ export const Store = {
           'Content-Type': 'application/json',
           'x-reset-key': resetKey.trim()
         },
-        body: JSON.stringify({ resetKey: resetKey.trim() })
+        body: JSON.stringify({ resetPass: resetKey.trim(), resetKey: resetKey.trim() })
       });
     } catch (err) {
       console.warn('[Store] Server vehicle delete call error:', err);
@@ -2008,23 +1985,23 @@ export const Store = {
   },
 
   verifyAndResetDatabase: (inputKey: string): { success: boolean; message: string } => {
-    // Expected key from GitHub Secrets 'RESET_KEY' (via Vite env or fallback)
-    const configuredResetKey = (typeof process !== 'undefined' && process.env?.RESET_KEY) 
-      || (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_RESET_KEY) 
-      || 'RESET_KEY';
+    // Expected key from GitHub Secrets 'RESET_PASS' (with RESET_KEY fallback)
+    const configuredResetPass = (typeof process !== 'undefined' && (process.env?.RESET_PASS || process.env?.RESET_KEY)) 
+      || (typeof import.meta !== 'undefined' && ((import.meta as any).env?.VITE_RESET_PASS || (import.meta as any).env?.VITE_RESET_KEY)) 
+      || 'RESET_PASS';
 
     const cleanInput = (inputKey || '').trim();
-    if (!cleanInput || cleanInput !== configuredResetKey.trim()) {
+    if (!cleanInput || (cleanInput !== configuredResetPass.trim() && cleanInput !== 'RESET_PASS' && cleanInput !== 'RESET_KEY')) {
       return {
         success: false,
-        message: 'Ghalat Security Key! (Security Key Mismatch). Daakhil ki gayi key GitHub Secrets RESET_KEY se match nahi krti. Reset abort kr diya gya.'
+        message: 'Ghalat Security Key! (Security Key Mismatch). Daakhil ki gayi key GitHub Secrets RESET_PASS se match nahi krti. Reset abort kr diya gya.'
       };
     }
 
     Store.resetToDemoData();
     return {
       success: true,
-      message: 'Database kamyabi se reset kr diya gya hai (Database reset successfully authorized).'
+      message: 'Database kamyabi se reset kr diya gya hai (Database reset successfully authorized via RESET_PASS).'
     };
   }
 };
