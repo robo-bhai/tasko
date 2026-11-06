@@ -8,6 +8,7 @@ import {
   SystemSettings 
 } from '../../types';
 import { Store } from '../../services/store';
+import { AddServicesModal } from './AddServicesModal';
 import { 
   BarChart3, 
   Users, 
@@ -79,6 +80,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const dirtyServiceIds = useRef<Set<string>>(new Set());
   const dirtyVehicleIds = useRef<Set<string>>(new Set());
   const [isSavingCatalog, setIsSavingCatalog] = useState(false);
+  const [isAddServiceModalOpen, setIsAddServiceModalOpen] = useState(false);
 
   useEffect(() => {
     setEditingServices(prev => {
@@ -686,23 +688,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setTimeout(() => setCatalogSavedMessage(''), 4000);
   };
 
-  const handleAddNewService = () => {
-    const newId = 'srv-custom-' + Date.now();
-    const newService: HomeServiceItem = {
-      id: newId,
-      name: 'Smart Home Automation Setup',
-      category: 'Smart Devices',
-      basePrice: 2200,
-      estimatedDuration: '90 mins',
-      description: 'Smart switch installation, Wi-Fi smart camera setup, and Alexa/Google Home hub pairing.',
-      popularIssues: ['Smart camera mounting', 'Wi-Fi switch configuration', 'Zigbee sensor linking'],
-      icon: 'Zap',
-      isPublished: true
-    };
-    Store.updateServicesCatalog([...Store.getServicesCatalog(), newService]);
-    setEditingServices(prev => [...prev, newService]);
-    setCatalogSavedMessage('New technician service added to catalog!');
-    setTimeout(() => setCatalogSavedMessage(''), 4000);
+  // Modal se aayi hui ek ya zyada services (rate + worker ke sath) catalog mein add karo
+  const handleAddServicesFromModal = (items: HomeServiceItem[]) => {
+    if (items.length === 0) return;
+    const current = Store.getServicesCatalog();
+    const existingIds = new Set(current.map(s => s.id));
+    const fresh = items.filter(i => !existingIds.has(i.id));
+    if (fresh.length === 0) {
+      setCatalogSavedMessage('Ye services pehle se catalog mein maujood hain.');
+      setTimeout(() => setCatalogSavedMessage(''), 4000);
+      setIsAddServiceModalOpen(false);
+      return;
+    }
+    Store.updateServicesCatalog([...current, ...fresh]);
+    const saved = Store.getServicesCatalog().filter(s => fresh.some(f => f.id === s.id));
+    setEditingServices(prev => [...prev.filter(p => !fresh.some(f => f.id === p.id)), ...saved]);
+    const liveCount = saved.filter(s => Store.isServiceAvailable(s)).length;
+    setCatalogSavedMessage(
+      `${saved.length} service(s) add ho gayi. ${liveCount} live hain, ${saved.length - liveCount} worker assign hone tak hidden hain.`
+    );
+    setTimeout(() => setCatalogSavedMessage(''), 5000);
+    setIsAddServiceModalOpen(false);
   };
 
   const handleAddNewVehicle = () => {
@@ -2045,7 +2051,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={handleAddNewService}
+                onClick={() => setIsAddServiceModalOpen(true)}
                 className="px-3.5 py-2 bg-[#141825] hover:bg-[#1a2032] text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Plus className="w-4 h-4 text-amber-400" />
@@ -2403,6 +2409,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL 0: ADD HOME SERVICES (multi-select dropdown + rate + worker) */}
+      {isAddServiceModalOpen && (
+        <AddServicesModal
+          existingServices={Store.getServicesCatalog()}
+          technicians={techniciansList}
+          onClose={() => setIsAddServiceModalOpen(false)}
+          onSubmit={handleAddServicesFromModal}
+          onCreateWorker={() => {
+            setNewUserRole('provider');
+            setNewProviderCategory('home_technician');
+            setIsCreateUserModalOpen(true);
+          }}
+        />
       )}
 
       {/* MODAL 1: INSPECT ORDER AUDIT & PRINTABLE PDF RECEIPT MODAL */}

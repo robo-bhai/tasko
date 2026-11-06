@@ -96,6 +96,8 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
       case 'Wrench': return <Wrench className="w-5 h-5 text-amber-300" />;
       case 'Sparkles': return <Sparkles className="w-5 h-5 text-amber-400" />;
       case 'Cpu': return <Cpu className="w-5 h-5 text-yellow-300" />;
+      case 'Paintbrush': return <Paintbrush className="w-5 h-5 text-amber-400" />;
+      case 'Lock': return <Lock className="w-5 h-5 text-amber-300" />;
       default: return <Hammer className="w-5 h-5 text-amber-400" />;
     }
   };
