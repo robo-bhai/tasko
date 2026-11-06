@@ -220,6 +220,8 @@ jobs:
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME || 'admin@omniserve.com' }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'Admin@12345' }}
           VITE_ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME || 'admin@omniserve.com' }}
+          RESET_KEY: ${{ secrets.RESET_KEY }}
+          RESET_PASS: ${{ secrets.RESET_PASS }}
           VITE_ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD || 'Admin@12345' }}
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
