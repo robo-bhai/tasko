@@ -7,7 +7,7 @@ export interface AppNotification {
   title: string;
   body: string;
   orderId?: string;
-  type: 'order_created' | 'order_assigned' | 'order_status' | 'system_alert';
+  type: 'order_created' | 'order_assigned' | 'order_status' | 'system_alert' | 'extra_work';
   isRead: boolean;
   createdAt: string;
 }
@@ -116,7 +116,9 @@ export const NotificationService = {
     orderId?: string;
     order?: any;
     note?: string;
-    type: 'order_created' | 'order_assigned' | 'order_status' | 'system_alert';
+    type: 'order_created' | 'order_assigned' | 'order_status' | 'system_alert' | 'extra_work';
+    /** true = in-app only (the server already sends the email, e.g. extra-work events) */
+    skipEmail?: boolean;
   }): Promise<string> {
     const newRecord: AppNotification = {
       id: 'notif-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
@@ -145,6 +147,7 @@ export const NotificationService = {
     );
 
     // Dispatch transactional email via Brevo and backend notification router
+    if (notif.skipEmail) return newRecord.id;
     try {
       fetch('/api/notifications/dispatch-email', {
         method: 'POST',

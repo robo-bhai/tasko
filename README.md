@@ -35,3 +35,11 @@ The app creates its own tables on first start (`initAllTables()` in `src/server/
 
 If the cached backup is ever corrupt, the workflow now stops instead of wiping data.
 To deliberately start from an empty database, run the workflow manually with `force_fresh_database = true`.
+
+## Extra Work Quotes (provider -> customer approval)
+
+- The provider assigned to a job sends an extra-work quote (description + PKR) from the Provider Dashboard.
+- The customer sees it in Live Order Tracker and must **Approve** or **Reject**. Only approved amounts are added to the bill.
+- A job cannot be completed while a quote is waiting for the customer.
+- Admin, provider and customer each get an in-app notification and an email (Brevo) for every quote / approval / rejection.
+- Identity is checked on the server from a signed login token, so only the assigned provider can quote and only the order's customer can respond. **Set `SESSION_SECRET`** in your environment (see `.env.example`). Users who were already logged in before this update must log out and log in once.

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User, Order, OrderStatus } from '../../types';
 import { Store } from '../../services/store';
+import { ExtraWorkProviderPanel } from './ExtraWorkProviderPanel';
 import { 
   CheckCircle2, 
   Clock, 
@@ -66,9 +67,20 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
     setActiveTab('active');
   };
 
-  const handleUpdateStatus = (newStatus: OrderStatus, note: string) => {
-    if (!activeTask) return;
-    Store.updateOrderStatus(activeTask.id, newStatus, note);
+  const hasPendingExtraQuote = !!activeTask?.extraWork?.some(q => q.status === 'pending');
+
+  const handleUpdateStatus = (newStatus: OrderStatus, note: string): boolean => {
+    if (!activeTask) return false;
+    const result = Store.updateOrderStatus(activeTask.id, newStatus, note);
+    if (!result) {
+      alert(
+        hasPendingExtraQuote && newStatus === 'completed'
+          ? 'Customer ne extra kaam ke quote par abhi jawab nahi diya. Pehle uske jawab ka intezar karein.'
+          : 'Ye job aap ke account par assign nahi hai, is liye status change nahi ho saka.'
+      );
+      return false;
+    }
+    return true;
   };
 
   const handleWithdraw = () => {
@@ -172,6 +184,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
 
           {/* Persona quick switch for testing */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            {currentUser.role === 'admin' && (
             <div className="flex flex-col text-xs text-slate-400">
               <span className="text-[11px] font-semibold text-slate-300">View as Worker Persona:</span>
               <div className="flex gap-1.5 mt-1">
@@ -190,6 +203,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
                 ))}
               </div>
             </div>
+            )}
 
             {/* Online / Offline Toggle */}
             <button
@@ -588,6 +602,11 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
                 </div>
               </div>
 
+              {/* Extra work quote (only the assigned provider sees this) */}
+              {currentUser.role === 'provider' && activeTask.assignedProviderId === currentUser.id && (
+                <ExtraWorkProviderPanel order={activeTask} />
+              )}
+
               {/* Live Status Progression Control Bar */}
               <div className="p-5 rounded-xl bg-blue-50/70 border border-blue-200 space-y-3">
                 <div className="flex items-center justify-between">
@@ -625,11 +644,14 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
                   <button
                     onClick={() => {
                       if (window.confirm('Confirm job completion and credit your wallet?')) {
-                        handleUpdateStatus('completed', 'Order successfully fulfilled and payment settled');
-                        setActiveTab('history');
+                        if (handleUpdateStatus('completed', 'Order successfully fulfilled and payment settled')) {
+                          setActiveTab('history');
+                        }
                       }
                     }}
-                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-1.5 ml-auto"
+                    disabled={hasPendingExtraQuote}
+                    title={hasPendingExtraQuote ? 'Customer ke extra quote ke jawab ka intezar hai' : undefined}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-1.5 ml-auto"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>3. Complete Job & Collect Payment</span>

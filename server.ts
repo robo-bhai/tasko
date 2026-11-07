@@ -21,6 +21,8 @@ import {
   restoreFromSnapshot,
   getLatestSnapshot
 } from './src/server/snapshotManager.js';
+import { issueSessionToken, getRequestActor } from './src/server/session.js';
+import { registerExtraWorkRoutes } from './src/server/extraWork.js';
 
 dotenv.config();
 
@@ -941,6 +943,7 @@ async function startServer() {
     res.json({
       success: true,
       user: foundUser,
+      token: issueSessionToken({ id: foundUser.id, role: foundUser.role }),
       message: 'Login kamyabi se mukammal ho gaya.'
     });
   });
@@ -1029,6 +1032,18 @@ async function startServer() {
     const user = req.body;
     if (!user || !user.id || !user.email) {
       return res.status(400).json({ success: false, error: 'Invalid user payload' });
+    }
+
+    // Every worker must have a UNIQUE login: refuse a NEW provider whose email or phone is already used
+    if (user.role === 'provider' && !memoryUsers.some(u => u && u.id === user.id)) {
+      const normPhone = (v: any) => String(v || '').replace(/[\s\-]+/g, '');
+      const clash = memoryUsers.find(u => u && u.id !== user.id && (
+        (u.email && String(u.email).toLowerCase() === String(user.email).toLowerCase()) ||
+        (user.phone && u.phone && normPhone(u.phone) === normPhone(user.phone))
+      ));
+      if (clash) {
+        return res.status(409).json({ success: false, error: 'Is email ya phone se pehle hi ek account mojood hai. Har provider ka login alag hona chahiye.' });
+      }
     }
 
     // Always update in memory cache & disk cache
@@ -1202,6 +1217,13 @@ async function startServer() {
         assignedProviderRating: ex.assignedProviderRating,
         etaMinutes: ex.etaMinutes,
         paymentStatus: ex.paymentStatus,
+        // Extra-work quotes + the approved extra total can only change through the extra-work endpoints
+        extraWork: ex.extraWork,
+        extraWorkTotal: ex.extraWorkTotal,
+        pricingBaseTotal: ex.pricingBaseTotal,
+        pricing: Array.isArray(ex.extraWork) && ex.extraWork.length
+          ? { ...order.pricing, total: ex.pricing?.total ?? order.pricing?.total }
+          : order.pricing,
         walletCredited: !!(ex.walletCredited || order.walletCredited),
         updatedAt: ex.updatedAt || order.updatedAt
       };
@@ -1311,6 +1333,21 @@ async function startServer() {
       return res.status(400).json({ success: false, error: 'Status is required' });
     }
 
+    // A provider who logged in with their own account can only change jobs assigned to THEM
+    const actor = getRequestActor(req);
+    const targetOrder = memoryOrders.find(o => o.id === id);
+    if (
+      actor && actor.role === 'provider' && targetOrder &&
+      targetOrder.assignedProviderId && targetOrder.assignedProviderId !== actor.id
+    ) {
+      return res.status(403).json({ success: false, error: 'Ye job kisi aur provider ko assign hai.' });
+    }
+    // The job cannot be completed while an extra-work quote is waiting for the customer
+    if (status === 'completed' && targetOrder && Array.isArray(targetOrder.extraWork) &&
+        targetOrder.extraWork.some((q: any) => q.status === 'pending')) {
+      return res.status(409).json({ success: false, error: 'Customer ne extra kaam ke quote par abhi jawab nahi diya.' });
+    }
+
     const oIdx = memoryOrders.findIndex(o => o.id === id);
     let updatedOrder: any = null;
     if (oIdx >= 0) {
@@ -1382,6 +1419,12 @@ async function startServer() {
 
     createFullSnapshot(`Workflow End: Order #${id} Status ${status}`, { orders: memoryOrders, users: memoryUsers, settings: memorySettings });
     res.json({ success: true, order: updatedOrder || { id, status } });
+  });
+
+  // Extra work quotes (provider -> customer approve/reject, emails to admin + provider + customer)
+  registerExtraWorkRoutes(app, {
+    getOrders: () => memoryOrders,
+    getUsers: () => memoryUsers
   });
 
   // Verify GitHub Secrets RESET_PASS / RESET_KEY

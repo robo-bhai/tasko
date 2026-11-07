@@ -369,6 +369,12 @@ export const OrderHistoryModal: React.FC<OrderHistoryModalProps> = ({
                       <span>PKR {receiptOrder.pricing.helperFee}</span>
                     </div>
                   )}
+                  {(receiptOrder.extraWork || []).filter(q => q.status === 'approved').map(q => (
+                    <div key={q.id} className="flex justify-between gap-3 text-slate-300">
+                      <span>Extra Kaam (Approved): {q.description}</span>
+                      <span className="shrink-0">PKR {q.amount}</span>
+                    </div>
+                  ))}
                   {receiptOrder.category === 'home_services' ? (
                     <div className="flex justify-between text-slate-300">
                       <span>7 Din ki Warranty:</span>

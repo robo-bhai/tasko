@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Order, OrderStatus } from '../../types';
 import { Store } from '../../services/store';
+import { ExtraWorkCustomerCard } from './ExtraWorkCustomerCard';
 import { 
   X, 
   MapPin, 
@@ -301,6 +302,9 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
               </div>
             </div>
           )}
+
+          {/* Extra work quotes (customer approves / rejects) */}
+          <ExtraWorkCustomerCard order={activeOrder} />
 
           {/* Assigned Provider Profile Card */}
           {activeOrder.assignedProviderName ? (

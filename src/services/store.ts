@@ -262,6 +262,19 @@ export const subscribeToStore = (listener: StoreListener) => {
 // Orders whose status change is still travelling to the server.
 // The 10s poll must not overwrite these with an older server copy.
 const pendingOrderSync = new Map<string, number>();
+
+// Login session token (issued by the server at login). Proves WHICH account is calling
+// protected APIs, e.g. only the provider assigned to a job may send extra-work quotes.
+const STORAGE_KEY_AUTH_TOKEN = 'omniserve_auth_token_v1';
+const STORAGE_KEY_XW_SEEN = 'omniserve_extra_work_seen_v1';
+const getAuthToken = (): string | null => {
+  try { return localStorage.getItem(STORAGE_KEY_AUTH_TOKEN); } catch { return null; }
+};
+const authHeaders = (): Record<string, string> => {
+  const t = getAuthToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
+const SESSION_EXPIRED_MSG = 'Aap ka login session khatam ho gaya hai. Baraye meherbani logout kar ke dobara login karein.';
 const PENDING_ORDER_GUARD_MS = 30000;
 // Admin's own just-saved settings / catalog: do not let the 10s poll overwrite them for 30s
 const pendingConfigSync: { settings: number; services: number; vehicles: number } = { settings: 0, services: 0, vehicles: 0 };
@@ -342,7 +355,7 @@ export const Store = {
     try {
       const res = await fetch(`/api/orders/${orderId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify(payload)
       });
       const data = await res.json();
@@ -513,6 +526,7 @@ export const Store = {
                   (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
                 );
                 saveToStorage(STORAGE_KEY_ORDERS, merged);
+                Store.processExtraWorkNotifications(merged);
               }
 
               notifyStoreChanged();
@@ -650,6 +664,7 @@ export const Store = {
   setCurrentUser: (user: User | null) => {
     if (user === null) {
       localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
+      localStorage.removeItem(STORAGE_KEY_AUTH_TOKEN);
     } else {
       saveToStorage(STORAGE_KEY_CURRENT_USER, user);
       // Also sync in users list
@@ -671,6 +686,7 @@ export const Store = {
 
   logout: () => {
     localStorage.removeItem(STORAGE_KEY_CURRENT_USER);
+    localStorage.removeItem(STORAGE_KEY_AUTH_TOKEN);
     notifyStoreChanged();
   },
 
@@ -881,6 +897,9 @@ export const Store = {
 
         saveToStorage(STORAGE_KEY_USERS, users);
         Store.setCurrentUser(serverUser);
+        if (data.token) {
+          try { localStorage.setItem(STORAGE_KEY_AUTH_TOKEN, data.token); } catch { /* ignore */ }
+        }
         notifyStoreChanged();
         CloudSyncService.saveUser(serverUser);
         return { success: true, user: serverUser };
@@ -959,6 +978,12 @@ export const Store = {
   },
 
   switchUserById: (userId: string): User | null => {
+    // Every worker has a unique login. Only an administrator may preview another account.
+    const caller = Store.getCurrentUser();
+    if (!caller || caller.role !== 'admin') {
+      console.warn('Unauthorized: only admin can switch to another account');
+      return null;
+    }
     const users = Store.getUsers();
     const target = users.find(u => u.id === userId);
     if (target) {
@@ -1306,6 +1331,17 @@ export const Store = {
         console.warn(`Unauthorized: Customer cannot cancel an order that is already in progress or completed`);
         return null;
       }
+    }
+
+    // A provider can only change jobs that are assigned to THEM
+    if (caller && caller.role === 'provider' && currentOrder.assignedProviderId !== caller.id) {
+      console.warn(`Unauthorized: Provider ${caller.id} attempted to change order ${orderId} assigned to someone else`);
+      return null;
+    }
+    // Cannot complete while an extra-work quote is still waiting for the customer's answer
+    if (newStatus === 'completed' && currentOrder.extraWork?.some(q => q.status === 'pending')) {
+      console.warn('Blocked: extra-work quote is waiting for customer approval');
+      return null;
     }
 
     const timeFormatted = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -1820,6 +1856,112 @@ export const Store = {
       return result;
     } catch {
       return result;
+    }
+  },
+
+  // ---------------------------------------------------------------------
+  // EXTRA WORK QUOTES
+  // Provider (assigned to the job) -> quote. Customer (owner) -> approve / reject.
+  // The server checks identity from the login token and sends the emails.
+  // ---------------------------------------------------------------------
+  requestExtraWork: async (
+    orderId: string,
+    description: string,
+    amount: number
+  ): Promise<{ success: boolean; error?: string; order?: Order }> => {
+    return Store._extraWorkCall(`/api/orders/${encodeURIComponent(orderId)}/extra-work`, { description, amount });
+  },
+
+  respondExtraWork: async (
+    orderId: string,
+    quoteId: string,
+    decision: 'approve' | 'reject',
+    note?: string
+  ): Promise<{ success: boolean; error?: string; order?: Order }> => {
+    return Store._extraWorkCall(
+      `/api/orders/${encodeURIComponent(orderId)}/extra-work/${encodeURIComponent(quoteId)}/respond`,
+      { decision, note }
+    );
+  },
+
+  _extraWorkCall: async (url: string, body: any): Promise<{ success: boolean; error?: string; order?: Order }> => {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok || !data.success || !data.order) {
+        return {
+          success: false,
+          error: data.error || (res.status === 401 ? SESSION_EXPIRED_MSG : 'Kamyabi nahi hui. Dobara koshish karein.')
+        };
+      }
+      const orders = Store.getOrders();
+      const idx = orders.findIndex(o => o.id === data.order.id);
+      if (idx >= 0) orders[idx] = data.order; else orders.unshift(data.order);
+      saveToStorage(STORAGE_KEY_ORDERS, orders);
+      notifyStoreChanged();
+      return { success: true, order: data.order as Order };
+    } catch {
+      return { success: false, error: 'Server se rabta nahi ho saka. Internet check kar ke dobara koshish karein.' };
+    }
+  },
+
+  // In-app notifications for extra-work events on THIS device (emails are sent by the server).
+  processExtraWorkNotifications: (orders: Order[]) => {
+    const user = Store.getCurrentUser();
+    if (!user) return;
+    let seen: string[] = [];
+    try { seen = JSON.parse(localStorage.getItem(STORAGE_KEY_XW_SEEN) || '[]'); } catch { seen = []; }
+    const seenSet = new Set<string>(Array.isArray(seen) ? seen : []);
+    const FRESH_MS = 24 * 60 * 60 * 1000;
+    let changed = false;
+
+    const push = (key: string, ts: string | undefined, n: { recipientId: string; recipientRole: 'admin' | 'customer' | 'provider'; title: string; body: string; orderId: string }) => {
+      if (seenSet.has(key)) return;
+      seenSet.add(key);
+      changed = true;
+      if (ts && Date.now() - new Date(ts).getTime() > FRESH_MS) return; // old event: just mark as seen
+      NotificationService.createNotification({ ...n, type: 'extra_work', skipEmail: true })
+        .catch(err => console.warn('Extra work notification error:', err));
+    };
+
+    for (const o of orders) {
+      if (!o || !Array.isArray(o.extraWork) || o.extraWork.length === 0) continue;
+      const isAdmin = user.role === 'admin';
+      const isCustomer = user.role === 'customer' && o.customerId === user.id;
+      const isProvider = user.role === 'provider' && o.assignedProviderId === user.id;
+      if (!isAdmin && !isCustomer && !isProvider) continue;
+
+      for (const q of o.extraWork) {
+        const amt = `PKR ${Number(q.amount).toLocaleString()}`;
+        const recipientId = isAdmin ? 'all_admins' : user.id;
+        const recipientRole = isAdmin ? 'admin' : isCustomer ? 'customer' : 'provider';
+
+        if (isAdmin || isCustomer) {
+          push(`${user.id}:${q.id}:pending`, q.requestedAt, {
+            recipientId, recipientRole, orderId: o.id,
+            title: isCustomer ? `Extra Kaam Quote: #${o.id}` : `Extra Charges Quote: #${o.id}`,
+            body: isCustomer
+              ? `${q.requestedByName} ne extra kaam ka quote bheja: ${amt} (${q.description}). Approve ya Reject karein.`
+              : `${q.requestedByName} ne order #${o.id} par extra kaam ka quote bheja: ${amt}. Customer ke jawab ka intezar hai.`
+          });
+        }
+        if ((isAdmin || isProvider) && q.status !== 'pending') {
+          push(`${user.id}:${q.id}:${q.status}`, q.respondedAt, {
+            recipientId, recipientRole, orderId: o.id,
+            title: q.status === 'approved' ? `Extra Quote Approve: #${o.id}` : `Extra Quote Reject: #${o.id}`,
+            body: q.status === 'approved'
+              ? `${o.customerName} ne ${amt} ka extra kaam approve kar diya.`
+              : `${o.customerName} ne ${amt} ka extra kaam reject kar diya. Sirf original kaam mukammal karein.`
+          });
+        }
+      }
+    }
+    if (changed) {
+      try { localStorage.setItem(STORAGE_KEY_XW_SEEN, JSON.stringify(Array.from(seenSet).slice(-400))); } catch { /* ignore */ }
     }
   },
 

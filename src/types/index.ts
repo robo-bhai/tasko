@@ -123,6 +123,21 @@ export interface OrderPricing {
   total: number;
 }
 
+export type ExtraWorkStatus = 'pending' | 'approved' | 'rejected';
+
+/** Extra work found on-site. Only the ASSIGNED provider can send it, only the CUSTOMER can approve/reject. */
+export interface ExtraWorkQuote {
+  id: string;
+  description: string;
+  amount: number;
+  status: ExtraWorkStatus;
+  requestedAt: string;
+  requestedById: string;
+  requestedByName: string;
+  respondedAt?: string;
+  responseNote?: string;
+}
+
 export interface OrderReview {
   rating: number; // 1-5
   comment: string;
@@ -166,6 +181,12 @@ export interface Order {
   
   // Feedback
   review?: OrderReview;
+
+  // Extra work quotes (approved ones are included in pricing.total)
+  extraWork?: ExtraWorkQuote[];
+  extraWorkTotal?: number;
+  /** Original total before any approved extra work (set by the server) */
+  pricingBaseTotal?: number;
 
   // Set once the provider wallet has been credited (prevents double credit if admin re-completes)
   walletCredited?: boolean;

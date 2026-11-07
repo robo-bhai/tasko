@@ -2626,6 +2626,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <span>PKR {selectedOrderDetails.pricing.helperFee}</span>
                   </div>
                 )}
+                {(selectedOrderDetails.extraWork || []).length > 0 && (
+                  <div className="pt-1 border-t border-slate-800 space-y-1">
+                    <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Extra Work Quotes</p>
+                    {(selectedOrderDetails.extraWork || []).map(q => (
+                      <div key={q.id} className="flex justify-between gap-3 text-[11px]">
+                        <span className="text-slate-300">
+                          {q.requestedByName}: {q.description}{' '}
+                          <span className={q.status === 'approved' ? 'text-emerald-400' : q.status === 'rejected' ? 'text-rose-400' : 'text-amber-400'}>
+                            [{q.status}]
+                          </span>
+                        </span>
+                        <span className={`shrink-0 ${q.status === 'approved' ? 'text-emerald-400' : 'text-slate-500 line-through'}`}>
+                          PKR {q.amount}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="flex justify-between text-slate-400 text-[11px] pt-1 border-t border-slate-800">
                   <span>System Commission ({settings.platformCommissionRate}%):</span>
                   <span>PKR {Math.round(selectedOrderDetails.pricing.total * (settings.platformCommissionRate / 100))}</span>

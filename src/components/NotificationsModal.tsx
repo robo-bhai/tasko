@@ -92,6 +92,8 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
         return <Wrench className="w-4 h-4 text-emerald-400" />;
       case 'order_status':
         return <Truck className="w-4 h-4 text-blue-400" />;
+      case 'extra_work':
+        return <Wrench className="w-4 h-4 text-amber-300" />;
       default:
         return <ShieldCheck className="w-4 h-4 text-amber-300" />;
     }
