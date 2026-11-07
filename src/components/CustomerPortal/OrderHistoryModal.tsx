@@ -354,7 +354,7 @@ export const OrderHistoryModal: React.FC<OrderHistoryModalProps> = ({
                     <span>PKR {receiptOrder.pricing.baseFee}</span>
                   </div>
                   <div className="flex justify-between text-slate-300">
-                    <span>Service / Distance Charge:</span>
+                    <span>{receiptOrder.category === 'home_services' ? 'Tools & Equipment Charges:' : 'Service / Distance Charge:'}</span>
                     <span>PKR {receiptOrder.pricing.serviceOrDeliveryFee}</span>
                   </div>
                   {receiptOrder.pricing.itemOrDistanceBudget > 0 && (
@@ -365,14 +365,21 @@ export const OrderHistoryModal: React.FC<OrderHistoryModalProps> = ({
                   )}
                   {receiptOrder.pricing.helperFee > 0 && (
                     <div className="flex justify-between text-slate-300">
-                      <span>Helper / Labor Charge:</span>
+                      <span>{receiptOrder.category === 'home_services' ? 'Urgent Dispatch (Optional):' : 'Helper / Labor Charge:'}</span>
                       <span>PKR {receiptOrder.pricing.helperFee}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-slate-300">
-                    <span>SafePay Escrow Protection:</span>
-                    <span>PKR {receiptOrder.pricing.platformFee}</span>
-                  </div>
+                  {receiptOrder.category === 'home_services' ? (
+                    <div className="flex justify-between text-slate-300">
+                      <span>7 Din ki Warranty:</span>
+                      <span className="text-emerald-400">FREE</span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between text-slate-300">
+                      <span>SafePay Escrow Protection:</span>
+                      <span>PKR {receiptOrder.pricing.platformFee}</span>
+                    </div>
+                  )}
                   <div className="pt-2 border-t border-slate-700 flex justify-between font-bold text-amber-400 text-sm">
                     <span>Kul Qabil-e-Ada Raqam (Total):</span>
                     <span>PKR {receiptOrder.pricing.total.toLocaleString()}</span>

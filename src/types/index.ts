@@ -75,6 +75,9 @@ export interface HomeServiceDetails {
   scheduledTimeSlot: string;
   serviceAddress: string;
   notes?: string;
+  /** true only if customer ticked the optional urgent dispatch */
+  urgentDispatch?: boolean;
+  urgentFee?: number;
 }
 
 export interface TransportDetails {
@@ -179,6 +182,10 @@ export interface HomeServiceItem {
   icon: string;
   assignedProviderId?: string;
   assignedProviderName?: string;
+  /** Tools & equipment charge shown at booking (PKR). Admin editable per service. Default 350. */
+  equipmentFee?: number;
+  /** OPTIONAL fast/urgent dispatch charge (PKR). Customer must tick it; 0 or empty = option hidden. */
+  urgentDispatchFee?: number;
   isPublished?: boolean;
   /** ms timestamp of the last admin change; used by the server to reject stale writes */
   updatedAt?: number;

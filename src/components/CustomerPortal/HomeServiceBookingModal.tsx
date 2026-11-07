@@ -45,6 +45,7 @@ export const HomeServiceBookingModal: React.FC<HomeServiceBookingModalProps> = (
   const [customDescription, setCustomDescription] = useState('');
   const [scheduledDate, setScheduledDate] = useState('Today (Immediate)');
   const [scheduledTimeSlot, setScheduledTimeSlot] = useState('10:00 AM - 01:00 PM');
+  const [wantsUrgent, setWantsUrgent] = useState(false);
   const [serviceAddress, setServiceAddress] = useState(currentUser?.address || 'House 14, Street 3, Peoples Colony, Khanewal');
 
   useEffect(() => {
@@ -71,10 +72,15 @@ export const HomeServiceBookingModal: React.FC<HomeServiceBookingModalProps> = (
     }
   };
 
+  // Visit charges + equipment charges both come from the service set by admin.
   const basePrice = activeService ? activeService.basePrice : 1500;
-  const toolAndEquipmentFee = 350;
-  const platformFee = 150;
-  const total = basePrice + toolAndEquipmentFee + platformFee;
+  const toolAndEquipmentFee = Number(activeService?.equipmentFee ?? 350) || 0;
+  // 7-day warranty is FREE (no charge). Kept at 0 so old order/receipt fields stay valid.
+  const platformFee = 0;
+  // Urgent dispatch is OPTIONAL: charged only if customer ticks it. Fee is admin-editable per service.
+  const urgentFeeAvailable = Number(activeService?.urgentDispatchFee ?? 0) || 0;
+  const urgentFee = wantsUrgent && urgentFeeAvailable > 0 ? urgentFeeAvailable : 0;
+  const total = basePrice + toolAndEquipmentFee + platformFee + urgentFee;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +93,8 @@ export const HomeServiceBookingModal: React.FC<HomeServiceBookingModalProps> = (
       baseFee: basePrice,
       serviceOrDeliveryFee: toolAndEquipmentFee,
       itemOrDistanceBudget: 0,
-      helperFee: 0,
+      // helperFee column carries the optional urgent dispatch charge for home services
+      helperFee: urgentFee,
       platformFee,
       total
     };
@@ -98,9 +105,11 @@ export const HomeServiceBookingModal: React.FC<HomeServiceBookingModalProps> = (
       category: activeService.category,
       issueDescription: customDescription.trim() || selectedIssues.join(', ') || 'Inspection and maintenance',
       selectedIssues,
-      scheduledDate,
-      scheduledTimeSlot,
-      serviceAddress: serviceAddress.trim()
+      scheduledDate: urgentFee > 0 ? 'Today (Immediate)' : scheduledDate,
+      scheduledTimeSlot: urgentFee > 0 ? 'Immediate Urgent Dispatch' : scheduledTimeSlot,
+      serviceAddress: serviceAddress.trim(),
+      urgentDispatch: urgentFee > 0,
+      urgentFee
     };
 
     onProceedToCheckout({
@@ -250,9 +259,10 @@ export const HomeServiceBookingModal: React.FC<HomeServiceBookingModalProps> = (
                   <select
                     value={scheduledDate}
                     onChange={(e) => setScheduledDate(e.target.value)}
-                    className="w-full text-xs sm:text-sm rounded-xl border border-slate-700 pl-8 pr-3 py-2 sm:py-2.5 bg-slate-900 text-white font-medium focus:outline-hidden focus:border-amber-400 cursor-pointer"
+                    disabled={urgentFee > 0}
+                    className="w-full text-xs sm:text-sm rounded-xl border border-slate-700 pl-8 pr-3 py-2 sm:py-2.5 bg-slate-900 text-white font-medium focus:outline-hidden focus:border-amber-400 cursor-pointer disabled:opacity-50"
                   >
-                    <option value="Today (Immediate)" className="bg-slate-900 text-white">Aaj hi (Fori 30-45 minute mein)</option>
+                    <option value="Today (Immediate)" className="bg-slate-900 text-white">Aaj hi (Today)</option>
                     <option value="Tomorrow Morning" className="bg-slate-900 text-white">Kal Subah (Morning)</option>
                     <option value="Tomorrow Afternoon" className="bg-slate-900 text-white">Kal Dopehar (Afternoon)</option>
                     <option value="This Weekend (Saturday)" className="bg-slate-900 text-white">Hafta / Itwar (Weekend)</option>
@@ -269,9 +279,9 @@ export const HomeServiceBookingModal: React.FC<HomeServiceBookingModalProps> = (
                   <select
                     value={scheduledTimeSlot}
                     onChange={(e) => setScheduledTimeSlot(e.target.value)}
-                    className="w-full text-xs sm:text-sm rounded-xl border border-slate-700 pl-8 pr-3 py-2 sm:py-2.5 bg-slate-900 text-white font-medium focus:outline-hidden focus:border-amber-400 cursor-pointer"
+                    disabled={urgentFee > 0}
+                    className="w-full text-xs sm:text-sm rounded-xl border border-slate-700 pl-8 pr-3 py-2 sm:py-2.5 bg-slate-900 text-white font-medium focus:outline-hidden focus:border-amber-400 cursor-pointer disabled:opacity-50"
                   >
-                    <option value="Immediate Urgent Dispatch" className="bg-slate-900 text-white">Fori Urgent Dispatch (Immediate)</option>
                     <option value="10:00 AM - 01:00 PM" className="bg-slate-900 text-white">10:00 AM - 01:00 PM (Subah)</option>
                     <option value="01:00 PM - 04:00 PM" className="bg-slate-900 text-white">01:00 PM - 04:00 PM (Dopehar)</option>
                     <option value="04:00 PM - 07:00 PM" className="bg-slate-900 text-white">04:00 PM - 07:00 PM (Shaam)</option>
@@ -279,6 +289,26 @@ export const HomeServiceBookingModal: React.FC<HomeServiceBookingModalProps> = (
                 </div>
               </div>
             </div>
+
+            {/* Optional Urgent Dispatch (only charged if customer selects it) */}
+            {urgentFeeAvailable > 0 && (
+              <label className="flex items-start gap-2.5 p-3 rounded-xl bg-[#12141e] border border-slate-800 cursor-pointer hover:border-amber-500/40 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={wantsUrgent}
+                  onChange={(e) => setWantsUrgent(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-amber-500 cursor-pointer"
+                />
+                <span className="flex-1">
+                  <span className="block text-[11px] sm:text-xs font-bold text-white">
+                    Fori Urgent Dispatch (Optional)
+                  </span>
+                  <span className="block text-[10px] text-slate-400">
+                    Karigar sab se pehle aap ke paas aaye ga. Sirf select karne par + PKR {urgentFeeAvailable.toLocaleString()}
+                  </span>
+                </span>
+              </label>
+            )}
 
             {/* Service Address in Khanewal */}
             <div>
@@ -309,9 +339,15 @@ export const HomeServiceBookingModal: React.FC<HomeServiceBookingModalProps> = (
                 <span className="font-mono font-semibold text-white">PKR {toolAndEquipmentFee}</span>
               </div>
               <div className="flex items-center justify-between text-slate-400">
-                <span>7 Din ki Khanewal Connect Warranty</span>
-                <span className="font-mono font-semibold text-white">PKR {platformFee}</span>
+                <span>7 Din ki Warranty</span>
+                <span className="font-mono font-semibold text-emerald-400">FREE</span>
               </div>
+              {urgentFee > 0 && (
+                <div className="flex items-center justify-between text-slate-400">
+                  <span>Fori Urgent Dispatch</span>
+                  <span className="font-mono font-semibold text-white">PKR {urgentFee.toLocaleString()}</span>
+                </div>
+              )}
               <div className="pt-2 border-t border-slate-800 flex items-center justify-between font-bold text-white text-xs sm:text-sm">
                 <span>Kul Takhmeenah Raqam (Total)</span>
                 <span className="font-mono text-amber-400 text-sm sm:text-base">PKR {total.toLocaleString()}</span>

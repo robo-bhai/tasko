@@ -148,6 +148,8 @@ export const AddServicesModal: React.FC<Props> = ({
             name: r.name.trim(),
             category: r.category.trim() || 'Other',
             basePrice: rate,
+            equipmentFee: 350,
+            urgentDispatchFee: 150,
             estimatedDuration: r.duration.trim() || '60 mins',
             description: `${r.name.trim()} - professional home service at your doorstep.`,
             popularIssues: ['General repair', 'Installation', 'Inspection / checkup'],

@@ -105,7 +105,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const fresh = Store.getServicesCatalog().find(s => s.id === id);
     setEditingServices(prev => prev.map(s => {
       if (s.id !== id || !fresh) return s;
-      return dirtyServiceIds.current.has(id) ? { ...fresh, basePrice: s.basePrice } : fresh;
+      return dirtyServiceIds.current.has(id)
+        ? { ...fresh, basePrice: s.basePrice, equipmentFee: s.equipmentFee, urgentDispatchFee: s.urgentDispatchFee }
+        : fresh;
     }));
   };
   const refreshVehicleDraft = (id: string) => {
@@ -579,10 +581,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setEditingUser(null);
   };
 
-  const handleServicePriceChange = (serviceId: string, newPrice: number) => {
+  const handleServicePriceChange = (
+    serviceId: string,
+    newPrice: number,
+    field: 'basePrice' | 'equipmentFee' | 'urgentDispatchFee' = 'basePrice'
+  ) => {
     dirtyServiceIds.current.add(serviceId);
+    const safe = Number.isFinite(newPrice) && newPrice >= 0 ? newPrice : 0;
     setEditingServices(prev => 
-      prev.map(s => s.id === serviceId ? { ...s, basePrice: newPrice } : s)
+      prev.map(s => s.id === serviceId ? { ...s, [field]: safe } : s)
     );
   };
 
@@ -2219,20 +2226,56 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         )}
                       </div>
 
-                      {/* Base Price & Delete Action */}
-                      <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-3">
-                        <div className="flex-1">
-                          <label className="block text-[10px] font-semibold text-slate-400">
-                            Starting Rate (PKR)
-                          </label>
-                          <input
-                            type="number"
-                            step={100}
-                            value={srv.basePrice}
-                            onChange={(e) => handleServicePriceChange(srv.id, Number(e.target.value))}
-                            className="w-full text-xs font-mono font-bold rounded-lg border border-slate-700 px-2.5 py-1.5 bg-[#141825] text-white focus:border-amber-400 focus:outline-hidden"
-                          />
+                      {/* Visit / Equipment / Optional Urgent charges */}
+                      <div className="pt-2 border-t border-slate-800 space-y-2">
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-400">
+                              Visit Charges (PKR)
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={50}
+                              value={srv.basePrice}
+                              onChange={(e) => handleServicePriceChange(srv.id, Number(e.target.value), 'basePrice')}
+                              className="w-full text-xs font-mono font-bold rounded-lg border border-slate-700 px-2 py-1.5 bg-[#141825] text-white focus:border-amber-400 focus:outline-hidden"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-400">
+                              Equipment (PKR)
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={50}
+                              value={srv.equipmentFee ?? 350}
+                              onChange={(e) => handleServicePriceChange(srv.id, Number(e.target.value), 'equipmentFee')}
+                              className="w-full text-xs font-mono font-bold rounded-lg border border-slate-700 px-2 py-1.5 bg-[#141825] text-white focus:border-amber-400 focus:outline-hidden"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-400">
+                              Urgent Optional (PKR)
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={50}
+                              value={srv.urgentDispatchFee ?? 0}
+                              onChange={(e) => handleServicePriceChange(srv.id, Number(e.target.value), 'urgentDispatchFee')}
+                              className="w-full text-xs font-mono font-bold rounded-lg border border-slate-700 px-2 py-1.5 bg-[#141825] text-white focus:border-amber-400 focus:outline-hidden"
+                            />
+                          </div>
                         </div>
+                        <p className="text-[10px] text-slate-500">
+                          7 din ki warranty free hai. Urgent charge sirf tab lagta hai jab customer khud select kare (0 = option hide).
+                        </p>
+                      </div>
+
+                      {/* Delete Action */}
+                      <div className="flex items-center justify-end gap-3">
 
                         <button
                           type="button"
@@ -2246,7 +2289,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               subtitle: `Category: ${srv.category} • Base Price: PKR ${srv.basePrice}`
                             });
                           }}
-                          className="text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 p-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors mt-3.5 cursor-pointer"
+                          className="text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 p-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
                           title="Delete service permanently from catalog (Requires RESET_PASS)"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -2568,7 +2611,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <span>PKR {selectedOrderDetails.pricing.baseFee}</span>
                 </div>
                 <div className="flex justify-between text-slate-300">
-                  <span>Service / Faasla Charge (Service/Distance Charge):</span>
+                  <span>{selectedOrderDetails.category === 'home_services' ? 'Tools & Equipment Charges:' : 'Service / Faasla Charge (Service/Distance Charge):'}</span>
                   <span>PKR {selectedOrderDetails.pricing.serviceOrDeliveryFee}</span>
                 </div>
                 {selectedOrderDetails.pricing.itemOrDistanceBudget > 0 && (
@@ -2579,7 +2622,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 )}
                 {selectedOrderDetails.pricing.helperFee > 0 && (
                   <div className="flex justify-between text-slate-300">
-                    <span>Mazdoor / Helper Charge (Helper Fee):</span>
+                    <span>{selectedOrderDetails.category === 'home_services' ? 'Urgent Dispatch (Optional):' : 'Mazdoor / Helper Charge (Helper Fee):'}</span>
                     <span>PKR {selectedOrderDetails.pricing.helperFee}</span>
                   </div>
                 )}
