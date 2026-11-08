@@ -47,6 +47,11 @@ export default defineConfig(() => {
           enabled: true,
         },
         workbox: {
+          // Cache version: bump cacheId to force every device to drop old caches.
+          cacheId: 'khanewal-connect-v2',
+          cleanupOutdatedCaches: true,
+          skipWaiting: true,
+          clientsClaim: true,
           maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}']
         }

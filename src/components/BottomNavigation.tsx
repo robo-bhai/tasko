@@ -13,9 +13,8 @@ import {
 } from 'lucide-react';
 import { User, Order } from '../types';
 import { Store } from '../services/store';
-import { StoreViewer } from './StoreViewer';
 
-const STORE_URL = 'https://uqn88.store/shop';
+const STORE_URL = 'https://khanewalconnect.store';
 
 interface BottomNavigationProps {
   currentUser: User | null;
@@ -40,7 +39,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'home' | 'orders' | 'profile'>('home');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [isStoreOpen, setIsStoreOpen] = useState(false);
 
   const pendingActiveCount = activeOrders.filter(
     o => o.status !== 'completed' && o.status !== 'cancelled'
@@ -66,8 +64,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     }
   };
 
+  // Open the store on its original domain in the same window (no iframe, no popup).
   const handleOpenStore = () => {
-    setIsStoreOpen(true);
+    window.location.href = STORE_URL;
   };
 
   return (
@@ -150,15 +149,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
         </div>
       </nav>
-
-      {/* In-app store with branded loading animation */}
-      {isStoreOpen && (
-        <StoreViewer
-          url={STORE_URL}
-          isUrdu={isUrdu}
-          onClose={() => setIsStoreOpen(false)}
-        />
-      )}
 
       {/* Profile Modal */}
       {isProfileModalOpen && currentUser && (

@@ -14,7 +14,7 @@ import {
 
 interface PWAInstallButtonProps {
   isUrdu?: boolean;
-  variant?: 'navbar' | 'hero' | 'floating' | 'banner';
+  variant?: 'navbar' | 'hero' | 'floating' | 'banner' | 'icon';
 }
 
 export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ 
@@ -27,6 +27,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
 
   // If already running inside installed standalone PWA, hide install triggers
   if (isInstalled) {
+    if (variant === 'icon') return null;
     return (
       <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 font-bold">
         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
@@ -50,6 +51,18 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
 
   return (
     <>
+      {variant === 'icon' && (
+        <button
+          onClick={handleInstallClick}
+          aria-label={isUrdu ? 'App Install Karein' : 'Install App'}
+          title={isUrdu ? 'App Install Karein' : 'Install App'}
+          className="relative p-2 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-md shadow-emerald-500/30 hover:scale-105 active:scale-95 transition-all cursor-pointer touch-manipulation shrink-0"
+        >
+          <span className="absolute inset-0 rounded-full bg-emerald-400/40 animate-ping pointer-events-none" />
+          <Download className="relative w-4 h-4 text-white" strokeWidth={2.6} />
+        </button>
+      )}
+
       {variant === 'navbar' && (
         <button
           onClick={handleInstallClick}

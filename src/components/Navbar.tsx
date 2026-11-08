@@ -159,6 +159,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="hidden sm:block">
             <PWAInstallButton isUrdu={isUrdu} variant="navbar" />
           </div>
+          <div className="sm:hidden">
+            <PWAInstallButton isUrdu={isUrdu} variant="icon" />
+          </div>
 
           {/* Order Tracker Button (Customer Live Tracker) */}
           {currentUser && (
